@@ -29,9 +29,4 @@ class WfhAttendance extends Model
     {
         return $this->belongsTo(User::class);
     }
-
-    public function report(): BelongsTo
-    {
-        return $this->belongsTo(WfhReport::class);
-    }
 }

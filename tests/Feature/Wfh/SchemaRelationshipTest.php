@@ -35,23 +35,4 @@ class SchemaRelationshipTest extends TestCase
         $this->assertCount(3, $report->attendances);
         $this->assertEquals(['pagi', 'siang', 'sore'], $report->attendances->pluck('session')->toArray());
     }
-
-    public function test_attendance_belongs_to_report(): void
-    {
-        $user = User::factory()->create();
-        $report = WfhReport::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $attendance = WfhAttendance::create([
-            'user_id' => $user->id,
-            'date' => $report->report_date->format('Y-m-d'),
-            'session' => 'pagi',
-            'photo_path' => 'attendances/test/pagi.jpg',
-            'report_id' => $report->id,
-        ]);
-
-        $this->assertNotNull($attendance->report);
-        $this->assertEquals($report->id, $attendance->report->id);
-    }
 }
