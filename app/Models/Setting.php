@@ -42,9 +42,4 @@ class Setting extends Model
 
         self::$cache[$key] = $value;
     }
-
-    public static function flushCache(): void
-    {
-        self::$cache = [];
-    }
 }

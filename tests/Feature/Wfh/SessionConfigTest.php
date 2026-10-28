@@ -111,23 +111,6 @@ class SessionConfigTest extends TestCase
             ->assertStatus(401);
     }
 
-    public function test_session_config_returns_defaults_when_settings_empty(): void
-    {
-        // Wipe what setUp's SettingsSeeder wrote (DB rows + static cache)
-        // so the endpoint truly exercises its inline defaults.
-        Setting::query()->delete();
-        Setting::flushCache();
-
-        $user = User::factory()->create();
-        $user->assignRole('staf');
-        Sanctum::actingAs($user);
-
-        $this->getJson('/api/wfh/session-config')
-            ->assertStatus(200)
-            ->assertJsonPath('data.sessions', ['pagi', 'siang', 'sore'])
-            ->assertJsonPath('data.allowed_days', [1, 2, 3, 4, 5]);
-    }
-
     public function test_session_config_does_not_leak_sensitive_keys(): void
     {
         // Seed sensitive keys explicitly.

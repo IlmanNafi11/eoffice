@@ -22,15 +22,4 @@ class PdfRendererService
 
         return $pdf->output();
     }
-
-    /**
-     * Render and get as Symfony StreamedResponse for download.
-     */
-    public function download(string $view, string $filename, array $data = [], string $paper = 'A4', string $orientation = 'portrait')
-    {
-        $pdf = Pdf::loadView($view, $data);
-        $pdf->setPaper($paper, $orientation);
-
-        return $pdf->download($filename);
-    }
 }
