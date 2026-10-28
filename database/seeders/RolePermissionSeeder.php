@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\Constants\Roles;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -72,10 +73,10 @@ class RolePermissionSeeder extends Seeder
         }
 
         // === ROLES ===
-        $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-        $kepalaBidang = Role::firstOrCreate(['name' => 'kepala_bidang', 'guard_name' => 'web']);
-        $kepalaTim = Role::firstOrCreate(['name' => 'kepala_tim', 'guard_name' => 'web']);
-        $staf = Role::firstOrCreate(['name' => 'staf', 'guard_name' => 'web']);
+        $admin = Role::firstOrCreate(['name' => Roles::ADMIN, 'guard_name' => 'web']);
+        $kepalaBidang = Role::firstOrCreate(['name' => Roles::KEPALA_BIDANG, 'guard_name' => 'web']);
+        $kepalaTim = Role::firstOrCreate(['name' => Roles::KEPALA_TIM, 'guard_name' => 'web']);
+        $staf = Role::firstOrCreate(['name' => Roles::STAF, 'guard_name' => 'web']);
 
         // === ROLE → PERMISSION ASSIGNMENTS ===
 

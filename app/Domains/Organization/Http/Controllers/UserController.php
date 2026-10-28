@@ -8,6 +8,7 @@ use App\Domains\Organization\Http\Resources\UserResource;
 use App\Domains\Organization\Repositories\UserRepositoryInterface;
 use App\Models\Setting;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use App\Support\Import\UserImport;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -57,7 +58,7 @@ class UserController extends Controller
             $data['password'] = $password;
         } else {
             $roles = $request->input('roles', []);
-            $hasAdmin = in_array('admin', $roles);
+            $hasAdmin = in_array(Roles::ADMIN, $roles);
 
             $data['password'] = $hasAdmin
                 ? Setting::get('password_default_admin', 'admin123')

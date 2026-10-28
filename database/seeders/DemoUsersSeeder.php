@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use Illuminate\Database\Seeder;
 
 class DemoUsersSeeder extends Seeder
@@ -36,7 +37,7 @@ class DemoUsersSeeder extends Seeder
                 'is_active' => true,
             ],
         );
-        $staf->assignRole('staf');
+        $staf->assignRole(Roles::STAF);
 
         $kepalaTim = User::firstOrCreate(
             ['email' => 'kepala.tim@kominfo.go.id'],
@@ -48,7 +49,7 @@ class DemoUsersSeeder extends Seeder
                 'is_active' => true,
             ],
         );
-        $kepalaTim->assignRole('kepala_tim');
+        $kepalaTim->assignRole(Roles::KEPALA_TIM);
 
         $kepalaBidang = User::firstOrCreate(
             ['email' => 'kepala.bidang@kominfo.go.id'],
@@ -60,7 +61,7 @@ class DemoUsersSeeder extends Seeder
                 'is_active' => true,
             ],
         );
-        $kepalaBidang->assignRole('kepala_bidang');
+        $kepalaBidang->assignRole(Roles::KEPALA_BIDANG);
 
         // Circular references — KT is team leader, KB is field head.
         $team->update(['leader_id' => $kepalaTim->id]);

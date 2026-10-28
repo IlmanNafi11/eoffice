@@ -6,6 +6,7 @@ use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Services\TeamReportStateMachine;
 use App\Models\Field;
 use App\Models\Team;
+use App\Support\Constants\Roles;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,7 +46,7 @@ class TeamReportController extends Controller
         $perPage = min($request->integer('per_page', 15), 100);
 
         // Admin sees all team reports
-        if ($user->hasRole('admin')) {
+        if ($user->hasRole(Roles::ADMIN)) {
             $reports = WfhTeamReport::with(['team', 'creator', 'supervisor'])
                 ->orderByDesc('report_date')
                 ->paginate($perPage);

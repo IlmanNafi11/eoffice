@@ -5,6 +5,7 @@ namespace App\Domains\Wfh\Http\Controllers;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Field;
 use App\Models\Team;
+use App\Support\Constants\Roles;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class WfhMonitoringController extends Controller
         $fieldId = null;
 
         // Admin sees all (no filters)
-        if ($user->hasRole('admin')) {
+        if ($user->hasRole(Roles::ADMIN)) {
             $teamId = null;
             $fieldId = null;
         } else {

@@ -6,6 +6,7 @@ use App\Domains\Wfh\Http\Requests\StoreReportRequest;
 use App\Domains\Wfh\Http\Resources\WfhReportResource;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
+use App\Support\Constants\Roles;
 use App\Support\Dates\DateRangeHelper;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
@@ -240,7 +241,7 @@ class ReportController extends Controller
             ], 404);
         }
 
-        if ($report->user_id !== request()->user()->id && ! request()->user()->hasRole('admin')) {
+        if ($report->user_id !== request()->user()->id && ! request()->user()->hasRole(Roles::ADMIN)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tidak dapat menghapus laporan orang lain.',

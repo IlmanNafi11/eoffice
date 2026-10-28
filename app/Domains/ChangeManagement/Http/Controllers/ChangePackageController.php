@@ -12,6 +12,7 @@ use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -377,11 +378,11 @@ class ChangePackageController extends Controller
      */
     private function actorCanAccessPackage(User $actor, ChangeInitiation $package): bool
     {
-        if ($actor->hasRole('admin')) {
+        if ($actor->hasRole(Roles::ADMIN)) {
             return true;
         }
 
-        if ($actor->hasAnyRole(['kepala_tim', 'kepala_bidang'])) {
+        if ($actor->hasAnyRole([Roles::KEPALA_TIM, Roles::KEPALA_BIDANG])) {
             return $actor->team_id !== null
                 && $actor->team_id === $package->initiator?->team_id;
         }

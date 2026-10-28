@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -30,7 +31,7 @@ class AdminUserSeeder extends Seeder
                 'is_active' => true,
             ],
         );
-        $admin->assignRole('admin');
+        $admin->assignRole(Roles::ADMIN);
 
         // Set circular refs
         $field->update(['head_id' => $admin->id]);

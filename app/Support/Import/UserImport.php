@@ -5,6 +5,7 @@ namespace App\Support\Import;
 use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -69,7 +70,7 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         $this->results['imported']++;
 
         // Determine default password from Setting based on role
-        $hasAdmin = $roleName === 'admin';
+        $hasAdmin = $roleName === Roles::ADMIN;
         $defaultPassword = $hasAdmin
             ? Setting::get('password_default_admin', 'admin123')
             : Setting::get('password_default_user', 'user1234');

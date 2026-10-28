@@ -7,6 +7,7 @@ use App\Domains\ChangeManagement\Models\ChangeImplementationAttachment;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Models\User;
 use App\Repositories\EloquentRepository;
+use App\Support\Constants\Roles;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -123,8 +124,8 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
             $query->where('field_id', $filters['field_id']);
         }
 
-        if ($actor && ! $actor->hasRole('admin')) {
-            if ($actor->hasAnyRole(['kepala_tim', 'kepala_bidang'])) {
+        if ($actor && ! $actor->hasRole(Roles::ADMIN)) {
+            if ($actor->hasAnyRole([Roles::KEPALA_TIM, Roles::KEPALA_BIDANG])) {
                 // Team scope; null team sees nothing (deny-by-default).
                 $actor->team_id === null
                     ? $query->whereRaw('false')
