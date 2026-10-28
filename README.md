@@ -99,7 +99,7 @@ php artisan test
 
 ## Config
 - `config/wfh.php` — Allowed WFH days (default: Friday)
-- `config/change-mgmt.php` — Document number prefix format
+- Document number prefix: `CHANGE_DOC_PREFIX` env var (default `9/1.1/114`)
 
 ## CI/CD Pipeline
 
