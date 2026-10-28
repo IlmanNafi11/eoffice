@@ -58,7 +58,7 @@ class SettingTest extends TestCase
         $this->assertEquals([1, 2, 3, 4, 5, 6], Setting::get('wfh_allowed_days'));
     }
 
-    public function test_update_nonexistent_setting_returns_422(): void
+    public function test_update_nonexistent_setting_returns_404(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
@@ -66,7 +66,8 @@ class SettingTest extends TestCase
 
         $this->putJson('/api/admin/settings/non_existent_key', [
             'value' => 'some_value',
-        ])->assertStatus(422);
+        ])->assertStatus(404)
+            ->assertJsonPath('success', false);
     }
 
     public function test_get_returns_default_for_nonexistent_key(): void

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Http\ApiResponse;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,10 +14,7 @@ class EnsurePasswordChanged
         $user = $request->user();
 
         if ($user && $user->must_change_password) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Password harus diubah sebelum mengakses fitur ini.',
-            ], 403);
+            return ApiResponse::fail('Password harus diubah sebelum mengakses fitur ini.', 403);
         }
 
         return $next($request);

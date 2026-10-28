@@ -10,6 +10,7 @@ use App\Domains\Auth\Http\Requests\ResetPasswordRequest;
 use App\Domains\Auth\Http\Requests\VerifyOtpRequest;
 use App\Domains\Auth\Services\PasswordResetService;
 use App\Models\User;
+use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -28,50 +29,34 @@ class AuthController extends Controller
         $passwordValid = Hash::check($request->password, $hashToCheck);
 
         if (! $user || ! $passwordValid) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email atau password salah.',
-            ], 401);
+            return ApiResponse::fail('Email atau password salah.', 401);
         }
 
         if (! $user->is_active) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akun tidak aktif. Hubungi administrator.',
-            ], 403);
+            return ApiResponse::fail('Akun tidak aktif. Hubungi administrator.', 403);
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
         $user->load(['team.field', 'team.leader', 'roles.permissions']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Login berhasil.',
-            'data' => [
-                'token' => $token,
-                'user' => $this->formatUserPayload($user),
-            ],
-        ]);
+        return ApiResponse::ok([
+            'token' => $token,
+            'user' => $this->formatUserPayload($user),
+        ], 'Login berhasil.');
     }
 
     public function me(Request $request): JsonResponse
     {
         $user = $request->user()->load(['team.field', 'team.leader', 'roles.permissions']);
 
-        return response()->json([
-            'success' => true,
-            'data' => $this->formatUserPayload($user),
-        ]);
+        return ApiResponse::ok($this->formatUserPayload($user));
     }
 
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logout berhasil.',
-        ]);
+        return ApiResponse::ok(null, 'Logout berhasil.');
     }
 
     public function changePassword(ChangePasswordRequest $request): JsonResponse
@@ -83,20 +68,14 @@ class AuthController extends Controller
             'must_change_password' => false,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password berhasil diubah.',
-        ]);
+        return ApiResponse::ok(null, 'Password berhasil diubah.');
     }
 
     public function forgotPassword(ForgotPasswordRequest $request, PasswordResetService $service): JsonResponse
     {
         $service->sendOtp($request->email);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Jika email terdaftar, kode OTP telah dikirim ke email Anda.',
-        ]);
+        return ApiResponse::ok(null, 'Jika email terdaftar, kode OTP telah dikirim ke email Anda.');
     }
 
     public function verifyOtp(VerifyOtpRequest $request, PasswordResetService $service): JsonResponse
@@ -104,17 +83,12 @@ class AuthController extends Controller
         $resetToken = $service->verifyOtp($request->email, $request->code);
 
         if (! $resetToken) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Kode OTP tidak valid atau telah kedaluwarsa.',
-            ], 422);
+            return ApiResponse::fail('Kode OTP tidak valid atau telah kedaluwarsa.');
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'OTP terverifikasi. Gunakan reset_token untuk mengatur password baru.',
-            'data' => ['reset_token' => $resetToken],
-        ]);
+        return ApiResponse::ok([
+            'reset_token' => $resetToken,
+        ], 'OTP terverifikasi. Gunakan reset_token untuk mengatur password baru.');
     }
 
     public function resetPassword(ResetPasswordRequest $request, PasswordResetService $service): JsonResponse
@@ -122,15 +96,9 @@ class AuthController extends Controller
         $success = $service->resetPassword($request->reset_token, $request->new_password);
 
         if (! $success) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token reset tidak valid atau telah kedaluwarsa.',
-            ], 422);
+            return ApiResponse::fail('Token reset tidak valid atau telah kedaluwarsa.');
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password berhasil diatur. Silakan login.',
-        ]);
+        return ApiResponse::ok(null, 'Password berhasil diatur. Silakan login.');
     }
 }
