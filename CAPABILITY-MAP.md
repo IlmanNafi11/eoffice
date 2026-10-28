@@ -1,0 +1,33 @@
+# Capability Map: API Hardening & Audit Closeout (eoffice)
+
+> Source intent: `docs/intent/api-hardening-closeout.md` (confirmed 2026-10-28).
+> Consumer: SPA repo ini (belum diimplementasi) → breaking change pada kontrak
+> API diperbolehkan penuh. Tidak ada shim kompatibilitas mundur.
+
+| Module id | Responsibility | Depends on |
+|---|---|---|
+| dead-code | Hapus semua simbol mati terkonfirmasi (A1–A11): interface CRUD tak terpakai, `Roles::` mati, `Setting::flushCache`, `BroadcastServiceProvider`+`channels.php`, relasi inverse, `SpikeController`+views spike, middleware alias mati, `welcome.blade.php` | — |
+| error-contract | `Handler::render()` + mapping exception (404 generik tanpa FQCN, 422 seragam, 422/409 transisi invalid, 500 aman); `Authenticate` → 401; SecurityHeaders pada respons error; log trace utuh; `APP_DEBUG=false` di `.env.example`/compose | envelope |
+| envelope | Helper respon terpusat (`ok`/`created`/`deleted`/`fail`); satu standar `{success, data, message, meta}` di SEMUA endpoint; 204 DELETE; satu bentuk `meta` + clamp `per_page`; binding `int $id` → route-model binding sungguhan | — |
+| authorization-consistency | Self-approval → 403 (+ update `SegregationOfDutiesTest`); urutan guard seragam (existence → access → state); permission bermakna verb: tambah `*.delete` untuk sub-resource, permission untuk `submit`/`revise`/`attachments`, hapus 11 permission seed mati, least-privilege untuk `GET /teams` + `session-config` | envelope |
+| dedup-state | DRY + SOLID domain: trait `EnsuresSameField`, `decide()` paket, base state machine, scope `visibleTo($actor)` di repo, pindah transisi invalid ke exception domain (H1) | envelope, error-contract, authorization-consistency |
+| dedup-http | DRY + SOLID HTTP: satu resource user (hapus drift `FormatsUserPayload` vs `UserResource`), resolusi signature/PDF ke service, pecah `ChangePackageController`/`ReportController` gemuk, `verification_token` keluar dari resource | envelope, authorization-consistency |
+| query-hygiene | N+1 & query: import user preload+batch, `Setting::prime()`, `withCount` untuk list, upsert/batch insert, `user.team.field` eager-load | envelope, dedup-http |
+
+**Build order:**
+
+```
+dead-code  ─────────────┐
+envelope ──→ error-contract ──→ dedup-state ──┐
+envelope ──→ authorization-consistency ───────┼──→ dedup-http ──→ query-hygiene
+```
+
+Alasan urutan: `dead-code` dan `envelope` tak bergantung siapa pun dan mengubah
+permukaan paling banyak → dikerjakan lebih dulu agar modul berikutnya tidak
+merapikan kode yang akan hilang. `error-contract` mendahului `dedup-state`
+karena mapping `DomainException` menentukan bentuk catch yang tersisa. `dedup-http`
+setelah authorization karena pemecahan controller menyentuh guard. `query-hygiene`
+terakhir karena menyentuh repo/resource hasil refactor, bukan sebaliknya.
+
+**Catatan skema:** Tidak ada migrasi skema apa pun. Permission baru
+(`*.delete`, `wfh.report.submit`, dsb.) adalah data seeder, bukan DDL.
