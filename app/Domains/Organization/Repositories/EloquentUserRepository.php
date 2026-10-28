@@ -17,14 +17,4 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     {
         return $this->model->with($relations)->paginate($perPage);
     }
-
-    public function findByNip(string $nip): ?User
-    {
-        return $this->model->where('nip', $nip)->first();
-    }
-
-    public function findByEmail(string $email): ?User
-    {
-        return $this->model->where('email', $email)->first();
-    }
 }
