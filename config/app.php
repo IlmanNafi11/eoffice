@@ -171,7 +171,6 @@ return [
          */
         AppServiceProvider::class,
         AuthServiceProvider::class,
-        // App\Providers\BroadcastServiceProvider::class,
         EventServiceProvider::class,
         RouteServiceProvider::class,
         RepositoryServiceProvider::class,
