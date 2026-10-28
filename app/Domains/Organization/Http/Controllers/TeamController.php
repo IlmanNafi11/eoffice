@@ -4,6 +4,7 @@ namespace App\Domains\Organization\Http\Controllers;
 
 use App\Domains\Organization\Http\Resources\TeamResource;
 use App\Domains\Organization\Repositories\TeamRepositoryInterface;
+use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -20,9 +21,6 @@ class TeamController extends Controller
 
         $teams = $this->teamRepository->listForField($fieldId);
 
-        return response()->json([
-            'success' => true,
-            'data' => TeamResource::collection($teams),
-        ]);
+        return ApiResponse::ok(TeamResource::collection($teams));
     }
 }

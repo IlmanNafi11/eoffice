@@ -3,6 +3,7 @@
 namespace App\Domains\Organization\Http\Controllers;
 
 use App\Domains\Organization\Http\Resources\PermissionResource;
+use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
@@ -18,9 +19,6 @@ class PermissionController extends Controller
 
         $permissions = Permission::orderBy('name')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => PermissionResource::collection($permissions),
-        ]);
+        return ApiResponse::ok(PermissionResource::collection($permissions));
     }
 }

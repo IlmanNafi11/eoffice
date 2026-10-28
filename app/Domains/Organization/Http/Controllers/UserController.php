@@ -9,6 +9,7 @@ use App\Domains\Organization\Repositories\UserRepositoryInterface;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\Constants\Roles;
+use App\Support\Http\ApiResponse;
 use App\Support\Import\UserImport;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
 {
@@ -30,19 +32,11 @@ class UserController extends Controller
         $this->authorize('user.manage');
 
         $users = $this->userRepository->paginateWithRelations(
-            perPage: min($request->integer('per_page', 15), 100),
+            perPage: min(max($request->integer('per_page', 15), 1), 100),
             relations: ['team.field', 'roles'],
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => UserResource::collection($users->items()),
-            'meta' => [
-                'current_page' => $users->currentPage(),
-                'last_page' => $users->lastPage(),
-                'total' => $users->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($users, UserResource::class);
     }
 
     public function store(StoreUserRequest $request): JsonResponse
@@ -73,11 +67,10 @@ class UserController extends Controller
             $user->syncPermissions($request->input('permissions', []));
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil dibuat.',
-            'data' => new UserResource($user->load(['team.field', 'roles', 'permissions'])),
-        ], 201);
+        return ApiResponse::created(
+            new UserResource($user->load(['team.field', 'roles', 'permissions'])),
+            'User berhasil dibuat.',
+        );
     }
 
     public function show(int $id): JsonResponse
@@ -87,16 +80,10 @@ class UserController extends Controller
         $user = $this->userRepository->find($id, relations: ['team.field', 'roles', 'permissions']);
 
         if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('User tidak ditemukan.', 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => new UserResource($user),
-        ]);
+        return ApiResponse::ok(new UserResource($user));
     }
 
     public function update(UpdateUserRequest $request, int $id): JsonResponse
@@ -105,10 +92,7 @@ class UserController extends Controller
 
         $user = $this->userRepository->find($id);
         if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('User tidak ditemukan.', 404);
         }
 
         $data = $request->only(['name', 'nip', 'email', 'team_id', 'rank', 'position', 'phone', 'is_active']);
@@ -122,30 +106,21 @@ class UserController extends Controller
             $user->syncPermissions($request->input('permissions', []));
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil diperbarui.',
-            'data' => new UserResource($user->fresh(['team.field', 'roles', 'permissions'])),
-        ]);
+        return ApiResponse::ok(
+            new UserResource($user->fresh(['team.field', 'roles', 'permissions'])),
+            'User berhasil diperbarui.',
+        );
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id): Response
     {
         $this->authorize('user.manage');
 
-        $deleted = $this->userRepository->delete($id);
-
-        if (! $deleted) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User tidak ditemukan.',
-            ], 404);
+        if (! $this->userRepository->delete($id)) {
+            return ApiResponse::fail('User tidak ditemukan.', 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User berhasil dihapus.',
-        ]);
+        return ApiResponse::deleted();
     }
 
     public function import(Request $request): JsonResponse
@@ -169,18 +144,11 @@ class UserController extends Controller
                 }
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Import selesai.',
-                'data' => $import->results,
-            ]);
+            return ApiResponse::ok($import->results, 'Import selesai.');
         } catch (\Throwable $e) {
             Log::error('User import failed', ['error' => $e->getMessage()]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Import gagal. Silakan periksa format file.',
-            ], 422);
+            return ApiResponse::fail('Import gagal. Silakan periksa format file.');
         }
     }
 }
