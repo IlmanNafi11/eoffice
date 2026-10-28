@@ -20,7 +20,7 @@ class DateRangeHelper
         }
 
         if ($month) {
-            $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+            $start = Carbon::createFromFormat('!Y-m', $month)->startOfMonth();
 
             return [
                 'date_from' => $start->format('Y-m-d'),
