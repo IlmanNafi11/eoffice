@@ -271,12 +271,12 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
-        if ($package->status !== 'draft') {
-            return ApiResponse::fail('Hanya paket draft yang dapat dilampirkan.');
+        if ($package->initiator_id !== $request->user()->id) {
+            return ApiResponse::fail('Hanya inisiator yang dapat mengunggah lampiran.', 403);
         }
 
-        if (! $package->implementation) {
-            return ApiResponse::fail('Implementasi tidak ditemukan.', 404);
+        if ($package->status !== 'draft') {
+            return ApiResponse::fail('Hanya paket draft yang dapat dilampirkan.');
         }
 
         $paths = [];
