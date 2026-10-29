@@ -48,9 +48,18 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     // Admin User Management
     Route::middleware('permission:user.manage')->group(function () {
         Route::get('/admin/users', [UserController::class, 'index']);
-        Route::post('/admin/users', [UserController::class, 'store']);
         Route::get('/admin/users/{user}', [UserController::class, 'show']);
+    });
+
+    Route::middleware('permission:user.create')->group(function () {
+        Route::post('/admin/users', [UserController::class, 'store']);
+    });
+
+    Route::middleware('permission:user.update')->group(function () {
         Route::put('/admin/users/{user}', [UserController::class, 'update']);
+    });
+
+    Route::middleware('permission:user.delete')->group(function () {
         Route::delete('/admin/users/{user}', [UserController::class, 'destroy']);
     });
 
@@ -90,22 +99,24 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::put('/wfh/reports/{report}/activities/{activity}', [ReportActivityController::class, 'update'])
         ->middleware('permission:wfh.report.update');
     Route::delete('/wfh/reports/{report}/activities/{activity}', [ReportActivityController::class, 'destroy'])
-        ->middleware('permission:wfh.report.update');
+        ->middleware('permission:wfh.report.activity.delete');
     Route::patch('/wfh/reports/{report}/activities/reorder', [ReportActivityController::class, 'reorder'])
         ->middleware('permission:wfh.report.update');
 
     // Attendance sub-resource
     Route::post('/wfh/reports/{report}/attendances', [ReportAttendanceController::class, 'store'])
-        ->middleware('permission:wfh.report.create');
+        ->middleware('permission:wfh.attendance.create');
     Route::delete('/wfh/reports/{report}/attendances/{attendance}', [ReportAttendanceController::class, 'destroy'])
-        ->middleware('permission:wfh.report.update');
+        ->middleware('permission:wfh.report.attendance.delete');
 
-    Route::post('/wfh/reports/{report}/submit', [ReportApprovalController::class, 'submit']);
+    Route::post('/wfh/reports/{report}/submit', [ReportApprovalController::class, 'submit'])
+        ->middleware('permission:wfh.report.submit');
     Route::post('/wfh/reports/{report}/approve', [ReportApprovalController::class, 'approve'])
         ->middleware('permission:wfh.report.approve');
     Route::post('/wfh/reports/{report}/reject', [ReportApprovalController::class, 'reject'])
         ->middleware('permission:wfh.report.reject');
-    Route::post('/wfh/reports/{report}/revise', [ReportApprovalController::class, 'revise']);
+    Route::post('/wfh/reports/{report}/revise', [ReportApprovalController::class, 'revise'])
+        ->middleware('permission:wfh.report.update');
 
     Route::get('/admin/wfh/monitoring', [WfhMonitoringController::class, 'index'])
         ->middleware('permission:wfh.monitoring.view');
@@ -138,7 +149,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::put('/changes/{id}', [ChangePackageController::class, 'update'])
         ->middleware('permission:change.initiation.update');
     Route::delete('/changes/{id}', [ChangePackageController::class, 'destroy'])
-        ->middleware('permission:change.initiation.update');
+        ->middleware('permission:change.initiation.delete');
     Route::post('/changes/{id}/submit', [ChangePackageController::class, 'submit'])
         ->middleware('permission:change.initiation.submit');
     Route::post('/changes/{id}/approve', [ChangePackageController::class, 'approve'])
