@@ -11,7 +11,18 @@ class SecurityHeaders
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
+        self::apply($response);
 
+        return $response;
+    }
+
+    /**
+     * Apply the security headers to any response, including error responses
+     * rendered outside the middleware pipeline (handled via the RequestHandled
+     * listener in AppServiceProvider).
+     */
+    public static function apply(Response $response): void
+    {
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -20,7 +31,5 @@ class SecurityHeaders
         if (app()->environment('production')) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
-
-        return $response;
     }
 }

@@ -5,12 +5,12 @@ namespace App\Domains\ChangeManagement\Repositories;
 use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Models\ChangeImplementationAttachment;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
+use App\Exceptions\ApiException;
 use App\Models\User;
 use App\Repositories\EloquentRepository;
 use App\Support\Constants\Roles;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 class EloquentChangeManagementRepository extends EloquentRepository implements ChangeManagementRepositoryInterface
 {
@@ -142,7 +142,7 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
     public function transitionPackage(int $id, string $parentStatus, array $parentExtra = [], array $childExtra = []): void
     {
         if (! isset(self::CHILD_STATUS_MIRROR[$parentStatus])) {
-            throw new InvalidArgumentException("Unknown package status: {$parentStatus}");
+            throw new ApiException("Unknown package status: {$parentStatus}", 422);
         }
 
         DB::transaction(function () use ($id, $parentStatus, $parentExtra, $childExtra) {
@@ -151,8 +151,9 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
             $current = $parent->status;
             $allowed = self::ALLOWED_TRANSITIONS[$current] ?? [];
             if (! in_array($parentStatus, $allowed, true)) {
-                throw new InvalidArgumentException(
-                    "Cannot transition package from '{$current}' to '{$parentStatus}'"
+                throw new ApiException(
+                    "Cannot transition package from '{$current}' to '{$parentStatus}'",
+                    422,
                 );
             }
 

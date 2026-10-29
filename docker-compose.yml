@@ -9,7 +9,7 @@ services:
       - .:/app
     environment:
       APP_ENV: local
-      APP_DEBUG: "true"
+      APP_DEBUG: "${APP_DEBUG:-false}"
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: "5432"

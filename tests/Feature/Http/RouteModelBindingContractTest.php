@@ -311,14 +311,17 @@ class RouteModelBindingContractTest extends TestCase
             ->assertJsonPath('message', 'Paket perubahan tidak ditemukan.');
     }
 
-    public function test_change_show_non_numeric_segment_returns_500_before_error_contract(): void
+    public function test_change_show_non_numeric_segment_returns_404(): void
     {
         $this->staf();
 
-        // Documents the CURRENT limitation of the kept int $id contract:
-        // TypeError → 500. The next module (error-contract) owns fixing this;
-        // this test is the marker, not an endorsement.
-        $this->getJson('/api/changes/not-a-number')->assertStatus(500);
+        // int $id is kept (custom relation loading), so the segment is
+        // constrained by Route::pattern('id', '[0-9]+'): a non-numeric value
+        // misses the route entirely and the framework answers 404.
+        $this->getJson('/api/changes/not-a-number')
+            ->assertNotFound()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Data tidak ditemukan.');
     }
 
     // ─── guards keep running after binding ───────────────────────

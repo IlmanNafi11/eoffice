@@ -6,6 +6,7 @@ use App\Domains\Organization\Http\Requests\StoreUserRequest;
 use App\Domains\Organization\Http\Requests\UpdateUserRequest;
 use App\Domains\Organization\Http\Resources\UserResource;
 use App\Domains\Organization\Repositories\UserRepositoryInterface;
+use App\Exceptions\ApiException;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\Constants\Roles;
@@ -17,6 +18,8 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Validators\ValidationException;
+use PhpOffice\PhpSpreadsheet\Reader\Exception as PhpSpreadsheetException;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
@@ -124,20 +127,28 @@ class UserController extends Controller
 
         try {
             Excel::import($import, $request->file('file'));
+        } catch (ValidationException $e) {
+            // Row-level validation (bad role names, malformed emails) is
+            // client-fixable: 422 with the import guidance message.
+            Log::error('User import failed', ['exception' => $e]);
 
-            // Assign roles from imported role column
-            foreach ($import->roleAssignments as $email => $roleName) {
-                $user = User::where('email', $email)->first();
-                if ($user) {
-                    $user->assignRole($roleName);
-                }
-            }
+            throw new ApiException('Import gagal. Silakan periksa format file.', 422);
+        } catch (PhpSpreadsheetException $e) {
+            // The file could not be parsed as a spreadsheet: client-fixable.
+            Log::error('User import failed', ['exception' => $e]);
 
-            return ApiResponse::ok($import->results, 'Import selesai.');
-        } catch (\Throwable $e) {
-            Log::error('User import failed', ['error' => $e->getMessage()]);
-
-            return ApiResponse::fail('Import gagal. Silakan periksa format file.');
+            throw new ApiException('Import gagal. Silakan periksa format file.', 422);
         }
+        // Anything else (DB, IO, ...) escapes to the Handler → 500 generic.
+
+        // Assign roles from imported role column
+        foreach ($import->roleAssignments as $email => $roleName) {
+            $user = User::where('email', $email)->first();
+            if ($user) {
+                $user->assignRole($roleName);
+            }
+        }
+
+        return ApiResponse::ok($import->results, 'Import selesai.');
     }
 }

@@ -82,11 +82,7 @@ class ReportActivityController extends Controller
             'ids.*' => ['integer'],
         ]);
 
-        try {
-            $this->wfhRepository->reorderActivities($report, $validated['ids']);
-        } catch (\InvalidArgumentException $e) {
-            return ApiResponse::fail($e->getMessage());
-        }
+        $this->wfhRepository->reorderActivities($report, $validated['ids']);
 
         return ApiResponse::ok(null, 'Urutan kegiatan berhasil diubah.');
     }

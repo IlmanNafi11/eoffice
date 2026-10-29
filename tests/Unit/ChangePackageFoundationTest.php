@@ -10,13 +10,13 @@ use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Domains\ChangeManagement\Models\ChangeType;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
+use App\Exceptions\ApiException;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
-use InvalidArgumentException;
 use Tests\TestCase;
 
 class ChangePackageFoundationTest extends TestCase
@@ -249,7 +249,16 @@ class ChangePackageFoundationTest extends TestCase
     {
         $package = $this->createDraftPackage();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Unknown package status: bogus');
+
+        try {
+            $this->repo->transitionPackage($package->id, 'bogus');
+        } catch (ApiException $e) {
+            $this->assertSame(422, $e->status());
+
+            throw $e;
+        }
 
         $this->repo->transitionPackage($package->id, 'bogus');
     }

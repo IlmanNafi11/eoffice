@@ -3,11 +3,11 @@
 namespace Tests\Unit;
 
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
+use App\Exceptions\ApiException;
 use App\Models\Field;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 use Tests\TestCase;
 
 class ChangeInitiationStateMachineTest extends TestCase
@@ -97,7 +97,7 @@ class ChangeInitiationStateMachineTest extends TestCase
         $this->repo->transitionPackage($package->id, 'pending');
         $this->repo->transitionPackage($package->id, 'rejected');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ApiException::class);
         $this->repo->transitionPackage($package->id, 'pending');
     }
 
@@ -111,7 +111,7 @@ class ChangeInitiationStateMachineTest extends TestCase
         $this->repo->transitionPackage($package->id, 'pending');
         $this->repo->transitionPackage($package->id, 'approved');
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ApiException::class);
         $this->repo->transitionPackage($package->id, 'pending');
     }
 }

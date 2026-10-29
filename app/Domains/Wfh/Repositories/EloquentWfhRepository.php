@@ -5,6 +5,7 @@ namespace App\Domains\Wfh\Repositories;
 use App\Domains\Wfh\Models\WfhAttendance;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhReportActivity;
+use App\Exceptions\ApiException;
 use App\Models\User;
 use App\Repositories\EloquentRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -250,7 +251,7 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
         // Validate all ids belong to this report
         $invalid = array_diff($ids, $reportActivityIds);
         if (! empty($invalid)) {
-            throw new \InvalidArgumentException('Some activity ids do not belong to this report.');
+            throw new ApiException('Some activity ids do not belong to this report.', 422);
         }
 
         foreach ($ids as $index => $id) {

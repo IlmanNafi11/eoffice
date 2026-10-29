@@ -101,6 +101,20 @@ php artisan test
 - `config/wfh.php` — Allowed WFH days (default: Friday)
 - Document number prefix: `CHANGE_DOC_PREFIX` env var (default `9/1.1/114`)
 
+## APP_DEBUG
+
+`APP_DEBUG=false` adalah default template (`.env.example` dan `docker-compose.yml`). Debug mode
+menambahkan blok `debug` (class, message, file:line) pada response error — kedengarannya berguna saat
+development, tetapi kebocoran stack trace di produksi adalah kerentanan keamanan. Untuk troubleshooting
+lokal melalui Docker:
+
+```bash
+APP_DEBUG=true docker compose up -d
+```
+
+atau set `APP_DEBUG=true` di `.env` (host) — `docker-compose.yml` membaca variabel tersebut dengan
+fallback `false`. Jangan pernah commit `.env` dengan `APP_DEBUG=true` untuk environment produksi.
+
 ## CI/CD Pipeline
 
 GitHub Actions otomatis menjalankan pemeriksaan berikut per branch:

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ApiException;
 use App\Http\Requests\UpdateSettingRequest;
 use App\Models\Setting;
 use App\Support\Http\ApiResponse;
@@ -22,7 +23,7 @@ class SettingController extends Controller
     public function update(string $key, UpdateSettingRequest $request): JsonResponse
     {
         if (! Setting::where('key', $key)->exists()) {
-            return ApiResponse::fail("Setting '{$key}' tidak ditemukan.", 404);
+            throw new ApiException("Setting '{$key}' tidak ditemukan.", 404);
         }
 
         $value = $request->input('value');

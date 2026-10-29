@@ -308,7 +308,9 @@ class ReportActivitySubResourceTest extends TestCase
             'ids' => [$a1->id, 99999],
         ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Some activity ids do not belong to this report.');
     }
 
     public function test_reorder_on_approved_report_returns_422(): void
