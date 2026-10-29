@@ -7,16 +7,19 @@ use App\Domains\ChangeManagement\Http\Requests\StoreChangePackageRequest;
 use App\Domains\ChangeManagement\Http\Requests\SubmitChangePackageRequest;
 use App\Domains\ChangeManagement\Http\Requests\UpdateChangePackageRequest;
 use App\Domains\ChangeManagement\Http\Requests\UploadChangePackageAttachmentsRequest;
+use App\Domains\ChangeManagement\Http\Resources\AttachmentResource;
 use App\Domains\ChangeManagement\Http\Resources\ChangePackageResource;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Models\User;
 use App\Support\Constants\Roles;
+use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Symfony\Component\HttpFoundation\Response;
 
 class ChangePackageController extends Controller
 {
@@ -32,21 +35,12 @@ class ChangePackageController extends Controller
         $this->authorize('change.initiation.view');
 
         $page = $this->repo->paginatePackages(
-            perPage: (int) $request->input('per_page', 15),
+            perPage: self::perPage($request),
             filters: $request->only(['status', 'field_id']),
             actor: $request->user(),
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => ChangePackageResource::collection($page->items()),
-            'meta' => [
-                'current_page' => $page->currentPage(),
-                'last_page' => $page->lastPage(),
-                'per_page' => $page->perPage(),
-                'total' => $page->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($page, ChangePackageResource::class);
     }
 
     public function store(StoreChangePackageRequest $request): JsonResponse
@@ -65,11 +59,10 @@ class ChangePackageController extends Controller
             typeIds: $request->input('implementation.change_type_ids', []),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Draft paket perubahan berhasil dibuat.',
-            'data' => new ChangePackageResource($package),
-        ], 201);
+        return ApiResponse::created(
+            new ChangePackageResource($package),
+            'Draft paket perubahan berhasil dibuat.',
+        );
     }
 
     public function show(Request $request, int $id): JsonResponse
@@ -79,23 +72,14 @@ class ChangePackageController extends Controller
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if (! $this->actorCanAccessPackage($request->user(), $package)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses ke paket ini.',
-            ], 403);
+            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => new ChangePackageResource($package),
-        ]);
+        return ApiResponse::ok(new ChangePackageResource($package));
     }
 
     public function update(UpdateChangePackageRequest $request, int $id): JsonResponse
@@ -105,24 +89,15 @@ class ChangePackageController extends Controller
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->initiator_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya inisiator yang dapat mengubah paket.',
-            ], 403);
+            return ApiResponse::fail('Hanya inisiator yang dapat mengubah paket.', 403);
         }
 
         if ($package->status !== 'draft') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya paket draft yang dapat diubah.',
-            ], 422);
+            return ApiResponse::fail('Hanya paket draft yang dapat diubah.');
         }
 
         $updated = $this->repo->updatePackage(
@@ -132,46 +107,33 @@ class ChangePackageController extends Controller
             typeIds: $request->input('implementation.change_type_ids', []),
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket perubahan berhasil diubah.',
-            'data' => new ChangePackageResource($updated),
-        ]);
+        return ApiResponse::ok(
+            new ChangePackageResource($updated),
+            'Paket perubahan berhasil diubah.',
+        );
     }
 
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, int $id): Response
     {
         $this->authorize('change.initiation.update');
 
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->initiator_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya inisiator yang dapat menghapus paket.',
-            ], 403);
+            return ApiResponse::fail('Hanya inisiator yang dapat menghapus paket.', 403);
         }
 
         if ($package->status !== 'draft') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya paket draft yang dapat dihapus.',
-            ], 422);
+            return ApiResponse::fail('Hanya paket draft yang dapat dihapus.');
         }
 
         $this->repo->deletePackage($id);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket perubahan berhasil dihapus.',
-        ]);
+        return ApiResponse::deleted();
     }
 
     public function submit(SubmitChangePackageRequest $request, int $id): JsonResponse
@@ -181,24 +143,15 @@ class ChangePackageController extends Controller
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->initiator_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya inisiator yang dapat mensubmit paket.',
-            ], 403);
+            return ApiResponse::fail('Hanya inisiator yang dapat mensubmit paket.', 403);
         }
 
         if ($package->status !== 'draft') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya paket draft yang dapat disubmit.',
-            ], 422);
+            return ApiResponse::fail('Hanya paket draft yang dapat disubmit.');
         }
 
         // Persist the submit payload (staf fills all business fields) before transition.
@@ -214,11 +167,10 @@ class ChangePackageController extends Controller
             'verification_token' => $package->verification_token ?? bin2hex(random_bytes(32)),
         ], []);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket berhasil disubmit untuk persetujuan.',
-            'data' => new ChangePackageResource($this->repo->findPackage($id)),
-        ]);
+        return ApiResponse::ok(
+            new ChangePackageResource($this->repo->findPackage($id)),
+            'Paket berhasil disubmit untuk persetujuan.',
+        );
     }
 
     public function approve(DecideChangePackageRequest $request, int $id): JsonResponse
@@ -228,31 +180,19 @@ class ChangePackageController extends Controller
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->initiator_id === $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inisiator tidak dapat menyetujui paketnya sendiri.',
-            ], 422);
+            return ApiResponse::fail('Inisiator tidak dapat menyetujui paketnya sendiri.');
         }
 
         if ($package->status !== 'pending') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya paket pending yang dapat disetujui.',
-            ], 422);
+            return ApiResponse::fail('Hanya paket pending yang dapat disetujui.');
         }
 
         if (! $this->actorCanAccessPackage($request->user(), $package)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses ke paket ini.',
-            ], 403);
+            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
         $now = now();
@@ -270,11 +210,10 @@ class ChangePackageController extends Controller
             'review_status' => 'diterima',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket perubahan berhasil disetujui.',
-            'data' => new ChangePackageResource($this->repo->findPackage($id)),
-        ]);
+        return ApiResponse::ok(
+            new ChangePackageResource($this->repo->findPackage($id)),
+            'Paket perubahan berhasil disetujui.',
+        );
     }
 
     public function reject(DecideChangePackageRequest $request, int $id): JsonResponse
@@ -284,31 +223,19 @@ class ChangePackageController extends Controller
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->initiator_id === $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inisiator tidak dapat menolak paketnya sendiri.',
-            ], 422);
+            return ApiResponse::fail('Inisiator tidak dapat menolak paketnya sendiri.');
         }
 
         if ($package->status !== 'pending') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya paket pending yang dapat ditolak.',
-            ], 422);
+            return ApiResponse::fail('Hanya paket pending yang dapat ditolak.');
         }
 
         if (! $this->actorCanAccessPackage($request->user(), $package)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda tidak memiliki akses ke paket ini.',
-            ], 403);
+            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
         $userId = $request->user()->id;
@@ -324,11 +251,10 @@ class ChangePackageController extends Controller
             'review_status' => 'ditolak',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket perubahan ditolak.',
-            'data' => new ChangePackageResource($this->repo->findPackage($id)),
-        ]);
+        return ApiResponse::ok(
+            new ChangePackageResource($this->repo->findPackage($id)),
+            'Paket perubahan ditolak.',
+        );
     }
 
     public function uploadAttachments(UploadChangePackageAttachmentsRequest $request, int $id): JsonResponse
@@ -338,24 +264,15 @@ class ChangePackageController extends Controller
         $package = $this->repo->findPackage($id);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->status !== 'draft') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya paket draft yang dapat dilampirkan.',
-            ], 422);
+            return ApiResponse::fail('Hanya paket draft yang dapat dilampirkan.');
         }
 
         if (! $package->implementation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Implementasi tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Implementasi tidak ditemukan.', 404);
         }
 
         $paths = [];
@@ -365,11 +282,20 @@ class ChangePackageController extends Controller
 
         $this->repo->addAttachments($package->implementation->id, $paths);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Lampiran berhasil diunggah.',
-            'data' => $package->implementation->fresh('attachments')->attachments,
-        ]);
+        $attachments = $package->implementation->fresh('attachments')->attachments;
+
+        return ApiResponse::ok(
+            AttachmentResource::collection($attachments),
+            'Lampiran berhasil diunggah.',
+        );
+    }
+
+    /**
+     * Uniform list clamp: per_page is bounded to 1..100 (SPEC-envelope item 3).
+     */
+    private static function perPage(Request $request): int
+    {
+        return min(max($request->integer('per_page', 15), 1), 100);
     }
 
     /**

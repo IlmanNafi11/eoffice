@@ -4,6 +4,7 @@ namespace App\Domains\ChangeManagement\Http\Controllers;
 
 use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
+use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignatureGuard;
@@ -29,17 +30,11 @@ class ChangeManagementPdfController extends Controller
         $package = $this->repo->findPackage($packageId);
 
         if (! $package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket perubahan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
         if ($package->status !== 'approved') {
-            return response()->json([
-                'success' => false,
-                'message' => 'PDF hanya dapat di-generate untuk paket yang sudah disetujui.',
-            ], 422);
+            return ApiResponse::fail('PDF hanya dapat di-generate untuk paket yang sudah disetujui.');
         }
 
         $initiator = $package->initiator;
@@ -51,7 +46,7 @@ class ChangeManagementPdfController extends Controller
             $initiator,
             $reviewer,
         ])) {
-            return response()->json(SignatureGuard::missingMessage($missing->name), 422);
+            return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message']);
         }
 
         $field = $package->field;
@@ -97,19 +92,13 @@ class ChangeManagementPdfController extends Controller
         $package = $this->repo->findPackage($packageId);
 
         if (! $package || ! $package->implementation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Implementasi tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Implementasi tidak ditemukan.', 404);
         }
 
         $impl = $package->implementation;
 
         if ($impl->status !== 'completed') {
-            return response()->json([
-                'success' => false,
-                'message' => 'PDF hanya dapat di-generate untuk implementasi yang sudah selesai (diterima).',
-            ], 422);
+            return ApiResponse::fail('PDF hanya dapat di-generate untuk implementasi yang sudah selesai (diterima).');
         }
 
         $evaluator = $impl->evaluator;
@@ -124,7 +113,7 @@ class ChangeManagementPdfController extends Controller
             $reviewer,
             $responsible,
         ])) {
-            return response()->json(SignatureGuard::missingMessage($missing->name), 422);
+            return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message']);
         }
         $evaluatorSig = $this->resolveSignature($evaluator?->signature_path);
         $reviewerSig = $this->resolveSignature($reviewer?->signature_path);

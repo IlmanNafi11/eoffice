@@ -132,7 +132,7 @@ class ChangePackageFlowTest extends TestCase
     {
         Sanctum::actingAs($this->staf);
         $pkg = $this->postJson('/api/changes', $this->validDraftPayload())->json('data.initiation');
-        $this->deleteJson("/api/changes/{$pkg['id']}")->assertStatus(200);
+        $this->deleteJson("/api/changes/{$pkg['id']}")->assertNoContent();
         $this->assertSoftDeleted('change_initiations', ['id' => $pkg['id']]);
     }
 
