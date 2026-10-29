@@ -59,7 +59,7 @@ sebelum access (sekarang `:236-254` vs `:82-91`).
 
 | Endpoint | Sekarang | Menjadi |
 |---|---|---|
-| `GET /teams` (`:47`) | semua user terautentikasi, semua tim | hanya tim dalam **bidang** user; `admin`, `wfh.monitoring.view`, `user.manage` melihat semua. **Q2 RESOLVED:** `kepala_tim`/`kepala_bidang` melihat **seluruh bidang** (bukan hanya tim yang dipimpin). Parameter `field_id` hanya dihormati untuk admin. |
+| `GET /teams` (`:47`) | semua user terautentikasi, semua tim | hanya tim dalam **bidang** user; role `admin` atau permission `user.manage` melihat semua. **DECISION 2026-10-29:** `wfh.monitoring.view` **bukan** gate "lihat semua" — ia field-scoped di tempat lain (`WfhMonitoringController::index`) dan dipegang `kepala_tim`+`kepala_bidang`, sehingga gate global akan membuka semua bidang dan bertentangan dengan Q2. **Q2 RESOLVED:** `kepala_tim`/`kepala_bidang` melihat **seluruh bidang** (bukan hanya tim yang dipimpin). Parameter `field_id` hanya dihormati untuk `admin`/`user.manage`. |
 | `GET /wfh/session-config` (`:76`) | semua user terautentikasi | **tetap** tanpa permission — dibutuhkan form absensi setiap user. Terverifikasi: SPA (`resources/js/Root.jsx`, 11 baris) belum memanggil API apa pun. Perbaikan yang relevan hanya envelope (modul `envelope`). Kedua field (`sessions`, `allowed_days`) dipertahankan. |
 | `GET /wfh/reports/{report}` (`:81`) | tanpa permission, guard di controller | **pertahankan** guard pemilik-atau-`wfh.monitoring.view` (middleware akan memblokir pemilik tanpa permission khusus). Test eksplisit: pengguna lain → 403, pemilik → 200, monitoring → 200. |
 
