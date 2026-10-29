@@ -183,7 +183,7 @@ class ChangePackageFlowTest extends TestCase
         Sanctum::actingAs($this->admin);
         $pkg = $this->postJson('/api/changes', $this->validDraftWithAll())->json('data.initiation');
         $this->postJson("/api/changes/{$pkg['id']}/submit", $this->validSubmitPayload());
-        $this->postJson("/api/changes/{$pkg['id']}/approve")->assertStatus(422);
+        $this->postJson("/api/changes/{$pkg['id']}/approve")->assertStatus(403);
     }
 
     public function test_submit_persists_implementation_and_initiation_body(): void

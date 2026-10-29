@@ -235,7 +235,7 @@ class SegregationOfDutiesTest extends TestCase
         Sanctum::actingAs($initiator);
 
         $this->postJson("/api/changes/{$initiation->id}/approve")
-            ->assertStatus(422)
+            ->assertStatus(403)
             ->assertJsonPath('success', false);
     }
 
@@ -252,8 +252,43 @@ class SegregationOfDutiesTest extends TestCase
         $this->postJson("/api/changes/{$initiation->id}/reject", [
             'reason' => 'Not feasible',
         ])
-            ->assertStatus(422)
+            ->assertStatus(403)
             ->assertJsonPath('success', false);
+    }
+
+    /**
+     * Guard order: missing package (404) is reported even when the actor is
+     * the initiator — resource resolution precedes the self-approval rule.
+     */
+    public function test_missing_package_returns_404_before_self_check(): void
+    {
+        $initiator = $this->createUserWithRole('kepala_tim');
+
+        Sanctum::actingAs($initiator);
+
+        $this->postJson('/api/changes/999999/approve')->assertStatus(404);
+        $this->postJson('/api/changes/999999/reject', ['reason' => 'x'])
+            ->assertStatus(404);
+    }
+
+    /**
+     * Guard order: non-pending state (422) precedes the self-approval rule —
+     * an initiator touching their own non-pending package sees the state error.
+     */
+    public function test_non_pending_state_returns_422_before_self_check(): void
+    {
+        $initiator = $this->createUserWithRole('kepala_tim');
+        $initiation = $this->createPendingPackage($initiator);
+        $initiation->update(['status' => 'approved']);
+
+        Sanctum::actingAs($initiator);
+
+        $this->postJson("/api/changes/{$initiation->id}/approve")
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Hanya paket pending yang dapat disetujui.');
+        $this->postJson("/api/changes/{$initiation->id}/reject", ['reason' => 'x'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Hanya paket pending yang dapat ditolak.');
     }
 
     /**

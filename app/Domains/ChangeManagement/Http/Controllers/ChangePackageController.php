@@ -183,12 +183,16 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
-        if ($package->initiator_id === $request->user()->id) {
-            return ApiResponse::fail('Inisiator tidak dapat menyetujui paketnya sendiri.');
-        }
-
         if ($package->status !== 'pending') {
             return ApiResponse::fail('Hanya paket pending yang dapat disetujui.');
+        }
+
+        if (! $this->actorCanAccessPackage($request->user(), $package)) {
+            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
+        }
+
+        if ($package->initiator_id === $request->user()->id) {
+            return ApiResponse::fail('Inisiator tidak dapat menyetujui paketnya sendiri.', 403);
         }
 
         if (! $this->actorCanAccessPackage($request->user(), $package)) {
@@ -226,16 +230,16 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
-        if ($package->initiator_id === $request->user()->id) {
-            return ApiResponse::fail('Inisiator tidak dapat menolak paketnya sendiri.');
-        }
-
         if ($package->status !== 'pending') {
             return ApiResponse::fail('Hanya paket pending yang dapat ditolak.');
         }
 
         if (! $this->actorCanAccessPackage($request->user(), $package)) {
             return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
+        }
+
+        if ($package->initiator_id === $request->user()->id) {
+            return ApiResponse::fail('Inisiator tidak dapat menolak paketnya sendiri.', 403);
         }
 
         $userId = $request->user()->id;
