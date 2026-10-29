@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -78,6 +79,32 @@ class RbacManagementTest extends TestCase
         $this->assertTrue($role->hasPermissionTo('wfh.report.create'));
         $this->assertTrue($role->hasPermissionTo('wfh.report.submit'));
         $this->assertFalse($role->hasPermissionTo('wfh.report.approve'));
+    }
+
+    // === New delete permissions are assigned to all four roles ===
+
+    public function test_new_delete_permissions_are_assigned_to_all_four_roles(): void
+    {
+        $permissions = [
+            'wfh.report.activity.delete',
+            'wfh.report.attendance.delete',
+            'change.initiation.delete',
+        ];
+
+        foreach ($permissions as $permission) {
+            $this->assertDatabaseHas('permissions', ['name' => $permission]);
+        }
+
+        foreach (Roles::ALL as $roleName) {
+            $role = Role::where('name', $roleName)->first();
+            $this->assertNotNull($role, "Role {$roleName} should exist");
+            foreach ($permissions as $permission) {
+                $this->assertTrue(
+                    $role->hasPermissionTo($permission),
+                    "Role {$roleName} should have {$permission}"
+                );
+            }
+        }
     }
 
     // === Protected Role Lockout Prevention ===
