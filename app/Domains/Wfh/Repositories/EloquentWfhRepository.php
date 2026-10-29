@@ -82,9 +82,15 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
         }
     }
 
-    public function findReportWithRelations(int $id): ?WfhReport
+    /**
+     * Relations a report read needs; the same list `findReportWithRelations()`
+     * used before route-model binding took over resolution.
+     */
+    private const REPORT_RELATIONS = ['activities.links', 'attendances', 'user.team', 'supervisor'];
+
+    public function loadReportWithRelations(WfhReport $report): WfhReport
     {
-        return WfhReport::with(['activities.links', 'attendances', 'user.team', 'supervisor'])->find($id);
+        return $report->load(self::REPORT_RELATIONS);
     }
 
     public function getTeamReportData(int $teamId, string $date): array
@@ -149,13 +155,8 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
         });
     }
 
-    public function updateReportMetadata(int $id, array $reportData): bool
+    public function updateReportMetadata(WfhReport $report, array $reportData): bool
     {
-        $report = WfhReport::find($id);
-        if (! $report) {
-            return false;
-        }
-
         $safe = array_intersect_key($reportData, array_flip(self::METADATA_FIELDS));
 
         return $report->update($safe);

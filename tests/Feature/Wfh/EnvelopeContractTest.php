@@ -266,14 +266,14 @@ class EnvelopeContractTest extends TestCase
 
     // ─── error shapes ────────────────────────────────────────────
 
-    public function test_missing_report_returns_404_with_success_false(): void
+    // Route-model binding resolves this, so the framework raises the 404 and
+    // its body shape is the `error-contract` module's concern. Status only.
+    public function test_missing_report_returns_404(): void
     {
         $this->staf();
 
         $this->getJson('/api/wfh/reports/999999')
-            ->assertNotFound()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Laporan tidak ditemukan.');
+            ->assertNotFound();
     }
 
     public function test_signature_guard_rejection_keeps_success_false(): void

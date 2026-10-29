@@ -60,7 +60,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     // RBAC Management
     Route::middleware('permission:role.manage')->group(function () {
         Route::get('/admin/roles', [RoleController::class, 'index']);
-        Route::put('/admin/roles/{id}/permissions', [RoleController::class, 'updatePermissions']);
+        Route::put('/admin/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
     });
 
     Route::middleware('permission:permission.manage')->group(function () {
@@ -125,8 +125,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
         ->middleware('permission:wfh.team_report.create');
 
     Route::middleware('permission:wfh.team_report.approve')->group(function () {
-        Route::post('/admin/wfh/team-reports/{id}/approve', [TeamReportController::class, 'approve']);
-        Route::post('/admin/wfh/team-reports/{id}/reject', [TeamReportController::class, 'reject']);
+        Route::post('/admin/wfh/team-reports/{report}/approve', [TeamReportController::class, 'approve']);
+        Route::post('/admin/wfh/team-reports/{report}/reject', [TeamReportController::class, 'reject']);
     });
     // Change Management — Package flow
     Route::get('/changes', [ChangePackageController::class, 'index'])

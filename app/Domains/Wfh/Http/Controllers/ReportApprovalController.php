@@ -34,14 +34,8 @@ class ReportApprovalController extends Controller
         return null;
     }
 
-    public function submit(Request $request, int $id): JsonResponse
+    public function submit(Request $request, WfhReport $report): JsonResponse
     {
-        $report = WfhReport::find($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
-
         if ($report->user_id !== $request->user()->id) {
             return ApiResponse::fail('Hanya pembuat laporan yang dapat mensubmit.', 403);
         }
@@ -58,15 +52,9 @@ class ReportApprovalController extends Controller
         );
     }
 
-    public function approve(Request $request, int $id): JsonResponse
+    public function approve(Request $request, WfhReport $report): JsonResponse
     {
         $this->authorize('wfh.report.approve');
-
-        $report = WfhReport::find($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
 
         $guard = $this->ensureSameField($request, $report);
         if ($guard) {
@@ -85,19 +73,13 @@ class ReportApprovalController extends Controller
         );
     }
 
-    public function reject(Request $request, int $id): JsonResponse
+    public function reject(Request $request, WfhReport $report): JsonResponse
     {
         $this->authorize('wfh.report.reject');
 
         $request->validate([
             'reason' => ['required', 'string'],
         ]);
-
-        $report = WfhReport::find($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
 
         $guard = $this->ensureSameField($request, $report);
         if ($guard) {
@@ -116,13 +98,8 @@ class ReportApprovalController extends Controller
         );
     }
 
-    public function revise(Request $request, int $id): JsonResponse
+    public function revise(Request $request, WfhReport $report): JsonResponse
     {
-        $report = WfhReport::find($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
 
         if ($report->user_id !== $request->user()->id) {
             return ApiResponse::fail('Hanya pembuat laporan yang dapat merevisi.', 403);

@@ -73,30 +73,21 @@ class UserController extends Controller
         );
     }
 
-    public function show(int $id): JsonResponse
+    public function show(User $user): JsonResponse
     {
         $this->authorize('user.manage');
 
-        $user = $this->userRepository->find($id, relations: ['team.field', 'roles', 'permissions']);
-
-        if (! $user) {
-            return ApiResponse::fail('User tidak ditemukan.', 404);
-        }
+        $user->load(['team.field', 'roles', 'permissions']);
 
         return ApiResponse::ok(new UserResource($user));
     }
 
-    public function update(UpdateUserRequest $request, int $id): JsonResponse
+    public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
         $this->authorize('user.manage');
 
-        $user = $this->userRepository->find($id);
-        if (! $user) {
-            return ApiResponse::fail('User tidak ditemukan.', 404);
-        }
-
         $data = $request->only(['name', 'nip', 'email', 'team_id', 'rank', 'position', 'phone', 'is_active']);
-        $this->userRepository->update($id, $data);
+        $this->userRepository->update($user->id, $data);
 
         if ($request->has('roles')) {
             $user->syncRoles($request->input('roles', []));
@@ -112,13 +103,11 @@ class UserController extends Controller
         );
     }
 
-    public function destroy(int $id): Response
+    public function destroy(User $user): Response
     {
         $this->authorize('user.manage');
 
-        if (! $this->userRepository->delete($id)) {
-            return ApiResponse::fail('User tidak ditemukan.', 404);
-        }
+        $user->delete();
 
         return ApiResponse::deleted();
     }

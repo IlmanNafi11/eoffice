@@ -23,6 +23,13 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->input('email').'|'.$request->ip());
         });
 
+        // Bound route params are numeric keys. Constrain them at the router so a
+        // non-numeric segment misses the route (404) instead of reaching the
+        // database and raising a QueryException (500).
+        Route::pattern('user', '[0-9]+');
+        Route::pattern('report', '[0-9]+');
+        Route::pattern('role', '[0-9]+');
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

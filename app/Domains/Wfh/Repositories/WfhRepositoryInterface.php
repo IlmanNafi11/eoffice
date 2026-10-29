@@ -18,11 +18,11 @@ interface WfhRepositoryInterface extends RepositoryInterface
 
     public function paginateAllReports(int $perPage = 15, array $filters = []): LengthAwarePaginator;
 
-    public function findReportWithRelations(int $id): ?WfhReport;
+    public function loadReportWithRelations(WfhReport $report): WfhReport;
 
     public function createReportWithRelations(array $reportData, array $activities, array $attendances = []): WfhReport;
 
-    public function updateReportMetadata(int $id, array $reportData): bool;
+    public function updateReportMetadata(WfhReport $report, array $reportData): bool;
 
     public function getTeamReportData(int $teamId, string $date): array;
 

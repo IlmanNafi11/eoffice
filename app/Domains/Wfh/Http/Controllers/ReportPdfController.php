@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Controllers;
 
+use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Setting;
@@ -27,13 +28,9 @@ class ReportPdfController extends Controller
         private QrCodeService $qrCodeService,
     ) {}
 
-    public function export(int $id): Response|JsonResponse
+    public function export(WfhReport $report): Response|JsonResponse
     {
-        $report = $this->wfhRepository->findReportWithRelations($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
+        $report = $this->wfhRepository->loadReportWithRelations($report);
 
         if (! in_array($report->status, ['pending', 'approved'])) {
             return ApiResponse::fail('PDF hanya dapat di-generate untuk laporan yang sudah disubmit atau disetujui.');

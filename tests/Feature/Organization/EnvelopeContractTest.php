@@ -101,27 +101,23 @@ class EnvelopeContractTest extends TestCase
         $this->assertSoftDeleted('users', ['id' => $target->id]);
     }
 
-    public function test_show_missing_user_returns_404_with_success_false(): void
+    // Route-model binding resolves these, so the framework raises the 404 and
+    // its body shape is the `error-contract` module's concern. Status only.
+    public function test_show_missing_user_returns_404(): void
     {
         $this->getJson('/api/admin/users/999999')
-            ->assertNotFound()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'User tidak ditemukan.');
+            ->assertNotFound();
     }
 
-    public function test_update_missing_user_returns_404_with_success_false(): void
+    public function test_update_missing_user_returns_404(): void
     {
         $this->putJson('/api/admin/users/999999', ['name' => 'X'])
-            ->assertNotFound()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'User tidak ditemukan.');
+            ->assertNotFound();
     }
 
-    public function test_destroy_missing_user_returns_404_with_success_false(): void
+    public function test_destroy_missing_user_returns_404(): void
     {
         $this->deleteJson('/api/admin/users/999999')
-            ->assertNotFound()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'User tidak ditemukan.');
+            ->assertNotFound();
     }
 }

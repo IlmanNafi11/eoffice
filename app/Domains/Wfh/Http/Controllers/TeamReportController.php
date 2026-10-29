@@ -114,14 +114,9 @@ class TeamReportController extends Controller
         );
     }
 
-    public function approve(Request $request, int $id): JsonResponse
+    public function approve(Request $request, WfhTeamReport $report): JsonResponse
     {
         $this->authorize('wfh.team_report.approve');
-
-        $report = WfhTeamReport::find($id);
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
 
         $guard = $this->ensureSameField($request, $report);
         if ($guard) {
@@ -140,16 +135,11 @@ class TeamReportController extends Controller
         );
     }
 
-    public function reject(Request $request, int $id): JsonResponse
+    public function reject(Request $request, WfhTeamReport $report): JsonResponse
     {
         $this->authorize('wfh.team_report.reject');
 
         $request->validate(['reason' => ['required', 'string']]);
-
-        $report = WfhTeamReport::find($id);
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
 
         $guard = $this->ensureSameField($request, $report);
         if ($guard) {

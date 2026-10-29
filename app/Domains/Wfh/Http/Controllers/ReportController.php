@@ -4,6 +4,7 @@ namespace App\Domains\Wfh\Http\Controllers;
 
 use App\Domains\Wfh\Http\Requests\StoreReportRequest;
 use App\Domains\Wfh\Http\Resources\WfhReportResource;
+use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Support\Constants\Roles;
@@ -167,29 +168,19 @@ class ReportController extends Controller
         );
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, WfhReport $report): JsonResponse
     {
-        $report = $this->wfhRepository->findReportWithRelations($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
-
-        if ($report->user_id !== request()->user()->id) {
+        if ($report->user_id !== $request->user()->id) {
             $this->authorize('wfh.monitoring.view');
         }
 
-        return ApiResponse::ok(new WfhReportResource($report));
+        return ApiResponse::ok(new WfhReportResource(
+            $this->wfhRepository->loadReportWithRelations($report),
+        ));
     }
 
-    public function update(StoreReportRequest $request, int $id): JsonResponse
+    public function update(StoreReportRequest $request, WfhReport $report): JsonResponse
     {
-        $report = $this->wfhRepository->findReportWithRelations($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
-
         if ($report->user_id !== $request->user()->id) {
             return ApiResponse::fail('Tidak dapat mengubah laporan orang lain.', 403);
         }
@@ -200,25 +191,19 @@ class ReportController extends Controller
 
         // Metadata-only: only report_date is writable. Status transitions go
         // through submit/approve/reject/revise — never via PUT.
-        $this->wfhRepository->updateReportMetadata($id, [
+        $this->wfhRepository->updateReportMetadata($report, [
             'report_date' => $request->input('report_date', $report->report_date->format('Y-m-d')),
         ]);
 
         return ApiResponse::ok(
-            new WfhReportResource($this->wfhRepository->findReportWithRelations($id)),
+            new WfhReportResource($this->wfhRepository->loadReportWithRelations($report->fresh())),
             'Laporan WFH berhasil diperbarui.',
         );
     }
 
-    public function destroy(int $id): Response
+    public function destroy(Request $request, WfhReport $report): Response
     {
-        $report = $this->wfhRepository->findReportWithRelations($id);
-
-        if (! $report) {
-            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
-        }
-
-        if ($report->user_id !== request()->user()->id && ! request()->user()->hasRole(Roles::ADMIN)) {
+        if ($report->user_id !== $request->user()->id && ! $request->user()->hasRole(Roles::ADMIN)) {
             return ApiResponse::fail('Tidak dapat menghapus laporan orang lain.', 403);
         }
 
@@ -226,7 +211,7 @@ class ReportController extends Controller
             return ApiResponse::fail('Laporan yang sudah disetujui tidak dapat dihapus.');
         }
 
-        $this->wfhRepository->delete($id);
+        $report->delete();
 
         return ApiResponse::deleted();
     }

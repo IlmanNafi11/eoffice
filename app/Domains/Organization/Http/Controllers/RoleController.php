@@ -24,15 +24,9 @@ class RoleController extends Controller
         return ApiResponse::ok(RoleResource::collection($roles));
     }
 
-    public function updatePermissions(UpdateRolePermissionsRequest $request, int $id): JsonResponse
+    public function updatePermissions(UpdateRolePermissionsRequest $request, Role $role): JsonResponse
     {
         $this->authorize('role.manage');
-
-        $role = Role::find($id);
-
-        if (! $role) {
-            return ApiResponse::fail('Role tidak ditemukan.', 404);
-        }
 
         $permissions = $request->input('permissions', []);
 
