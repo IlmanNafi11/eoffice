@@ -10,6 +10,7 @@ use App\Domains\ChangeManagement\Http\Requests\UploadChangePackageAttachmentsReq
 use App\Domains\ChangeManagement\Http\Resources\AttachmentResource;
 use App\Domains\ChangeManagement\Http\Resources\ChangePackageResource;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
+use App\Domains\ChangeManagement\Services\ChangePackageDecision;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -24,6 +25,7 @@ class ChangePackageController extends Controller
 
     public function __construct(
         private ChangeManagementRepositoryInterface $repo,
+        private ChangePackageDecision $decisions,
         private DocNumberGenerator $docNumberGenerator,
     ) {}
 
@@ -181,35 +183,10 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
-        if ($package->status !== 'pending') {
-            return ApiResponse::fail('Hanya paket pending yang dapat disetujui.');
-        }
-
-        if (! $this->repo->packageVisibleTo($id, $request->user())) {
-            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
-        }
-
-        if ($package->initiator_id === $request->user()->id) {
-            return ApiResponse::fail('Inisiator tidak dapat menyetujui paketnya sendiri.', 403);
-        }
-
-        $now = now();
-        $userId = $request->user()->id;
-
-        $this->repo->transitionPackage($id, 'approved', [
-            'reviewer_id' => $userId,
-            'review_status' => 'approved',
-            'reviewed_at' => $now,
-        ], [
-            'reviewer_id' => $userId,
-            'reviewer_signed_at' => $now,
-            'responsible_id' => $userId,
-            'responsible_signed_at' => $now,
-            'review_status' => 'diterima',
-        ]);
-
         return ApiResponse::ok(
-            new ChangePackageResource($this->repo->findPackage($id)),
+            new ChangePackageResource(
+                $this->decisions->decide($package, $request->user(), approve: true),
+            ),
             'Paket perubahan berhasil disetujui.',
         );
     }
@@ -224,33 +201,10 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
-        if ($package->status !== 'pending') {
-            return ApiResponse::fail('Hanya paket pending yang dapat ditolak.');
-        }
-
-        if (! $this->repo->packageVisibleTo($id, $request->user())) {
-            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
-        }
-
-        if ($package->initiator_id === $request->user()->id) {
-            return ApiResponse::fail('Inisiator tidak dapat menolak paketnya sendiri.', 403);
-        }
-
-        $userId = $request->user()->id;
-        $now = now();
-
-        $this->repo->transitionPackage($id, 'rejected', [
-            'reviewer_id' => $userId,
-            'review_status' => 'rejected',
-            'reviewed_at' => $now,
-        ], [
-            'reviewer_id' => $userId,
-            'reviewer_signed_at' => $now,
-            'review_status' => 'ditolak',
-        ]);
-
         return ApiResponse::ok(
-            new ChangePackageResource($this->repo->findPackage($id)),
+            new ChangePackageResource(
+                $this->decisions->decide($package, $request->user(), approve: false),
+            ),
             'Paket perubahan ditolak.',
         );
     }
