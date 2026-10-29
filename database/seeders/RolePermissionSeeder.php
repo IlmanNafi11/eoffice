@@ -28,10 +28,6 @@ class RolePermissionSeeder extends Seeder
             'role.manage',
             'permission.manage',
 
-            // Organization
-            'field.manage',
-            'team.manage',
-
             // WFH
             'wfh.attendance.create',
             'wfh.report.create',
@@ -54,6 +50,10 @@ class RolePermissionSeeder extends Seeder
             'change.initiation.approve',
             'change.initiation.reject',
             'change.initiation.export_pdf',
+            // Retained without a route (authorization-consistency Q1, 2026-10-29):
+            // change.implementation.create/submit/review/view seed the RBAC
+            // surface for the future implementation module; update/export_pdf
+            // are already live. Remove the four together when that module lands.
             'change.implementation.view',
             'change.implementation.create',
             'change.implementation.update',

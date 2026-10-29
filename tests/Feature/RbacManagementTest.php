@@ -107,6 +107,21 @@ class RbacManagementTest extends TestCase
         }
     }
 
+    // === Dead permissions are not seeded ===
+
+    public function test_dead_permissions_are_not_seeded(): void
+    {
+        // Removed 2026-10-29 (authorization-consistency Task 7): referenced by
+        // no route, controller, or test.
+        foreach (['field.manage', 'team.manage'] as $dead) {
+            $this->assertDatabaseMissing('permissions', ['name' => $dead]);
+        }
+
+        // change.implementation.create/submit/review/view stay seeded (justified
+        // in the seeder) and must not be swept into future cleanups of this set.
+        $this->assertDatabaseHas('permissions', ['name' => 'change.implementation.create']);
+    }
+
     // === Protected Role Lockout Prevention ===
 
     public function test_cannot_strip_critical_permissions_from_admin_role(): void
