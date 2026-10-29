@@ -2,13 +2,13 @@
 
 namespace App\Domains\Auth\Http\Controllers;
 
-use App\Domains\Auth\Concerns\FormatsUserPayload;
 use App\Domains\Auth\Http\Requests\ChangePasswordRequest;
 use App\Domains\Auth\Http\Requests\ForgotPasswordRequest;
 use App\Domains\Auth\Http\Requests\LoginRequest;
 use App\Domains\Auth\Http\Requests\ResetPasswordRequest;
 use App\Domains\Auth\Http\Requests\VerifyOtpRequest;
 use App\Domains\Auth\Services\PasswordResetService;
+use App\Domains\Organization\Http\Resources\UserResource;
 use App\Models\User;
 use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    use FormatsUserPayload;
-
     public function login(LoginRequest $request): JsonResponse
     {
         $user = User::where('email', $request->email)->first();
@@ -41,7 +39,7 @@ class AuthController extends Controller
 
         return ApiResponse::ok([
             'token' => $token,
-            'user' => $this->formatUserPayload($user),
+            'user' => new UserResource($user),
         ], 'Login berhasil.');
     }
 
@@ -49,7 +47,7 @@ class AuthController extends Controller
     {
         $user = $request->user()->load(['team.field', 'team.leader', 'roles.permissions']);
 
-        return ApiResponse::ok($this->formatUserPayload($user));
+        return ApiResponse::ok(new UserResource($user));
     }
 
     public function logout(Request $request): JsonResponse

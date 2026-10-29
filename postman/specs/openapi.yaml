@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Intern Kominfo API
-  version: 6.5.0
+  version: 6.6.0
   description: |
     API for the Intern Kominfo application — a government intern management
     platform with Work-From-Home (WFH) reporting, change management workflows,
@@ -10,6 +10,17 @@ info:
     Authentication uses Laravel Sanctum bearer tokens.
     Authorization uses Spatie permission-based roles (admin, kepala_bidang, kepala_tim, staf).
 
+
+    **v6.6.0 — Unified user payload:**
+    - All user-bearing endpoints (`/auth/login`, `/auth/me`, `/profile`,
+      `/admin/users*`) now emit the single `UserResource` shape.
+    - Breaking: `direct_permissions` is gone from `/admin/users*`; replaced by
+      `permissions` (role + direct, same key as auth/profile endpoints).
+    - `/admin/users*` now also returns `signature_url`, `must_change_password`,
+      and `team.leader`.
+    - Removed the separate `TeamFlat` schema; `team` is always `TeamNested`.
+    - Deleted the `FormatsUserPayload` trait (code cleanup, no behavior beyond
+      the key changes above).
 
     **v6.5.0 — WFH report list default to all:**
     - `GET /api/wfh/reports` no longer defaults to today when no `date`/`month`
@@ -54,10 +65,9 @@ info:
 
     **v6.1.0 — Spec sync with codebase:**
     - Added `GET /wfh/session-config` (returns WFH session names + allowed days from Settings).
-    - `AuthUser` schema now includes `signature_url` (FormatsUserPayload always emits it).
-    - `UserResource` team payload no longer documents a fabricated `leader` object —
-      only auth/profile endpoints (FormatsUserPayload) emit `team.leader`. Introduced
-      `TeamFlat` schema for the admin/users `team` shape (id, name, field?).
+    - `AuthUser` schema now includes `signature_url`.
+    - `UserResource` now emits `leader`/`field` under `team` via `TeamNested`,
+      matching auth/profile endpoints. `UserResource` switched to `TeamNested`.
     - `WfhReportResource` now documents `activity_count` and conditional `attendances[]`.
     - `WfhReportActivity.links[].sort_order` noted as present only in full report
       responses (WfhReportResource); sub-resource responses (POST/PUT activity) omit it.
@@ -251,7 +261,7 @@ components:
           type: string
           nullable: true
           format: uri
-          description: Absolute URL to signature image (asset(storage/{path})); null when no signature set. Emitted by FormatsUserPayload.
+          description: Absolute URL to signature image (asset(storage/{path})); null when no signature set.
           example: http://localhost/storage/signatures/budi-signature.png
         must_change_password:
           type: boolean
@@ -277,7 +287,7 @@ components:
       type: object
       description: |
         User payload returned by GET /profile, PUT /profile, GET /auth/me, and POST /auth/login.
-        Since v5.0.0, all four endpoints use the same shared formatter (FormatsUserPayload trait),
+        Since v6.6.0, all four endpoints use the single shared `UserResource`,
         so the structure is identical across all of them — including team.field and permissions.
       required: [id, name, nip, email, must_change_password, is_active, roles, permissions]
       properties:
@@ -572,19 +582,19 @@ components:
           items:
             type: string
           example: [staf]
-        direct_permissions:
+        permissions:
           type: array
-          description: Direct permissions assigned specifically to this user (not via role).
           items:
             type: string
-          example: []
+          description: All permissions (role + direct) — used by clients to build menus. Present on user detail/create/update responses.
+          example: [wfh.attendance.create, wfh.report.create, wfh.report.update]
         created_at:
           type: string
           format: date-time
           nullable: true
           example: "2025-07-14T08:30:00.000000Z"
         team:
-          $ref: "#/components/schemas/TeamFlat"
+          $ref: "#/components/schemas/TeamNested"
       example:
         id: 12
         name: Dewi Lestari
@@ -593,9 +603,9 @@ components:
         rank: Pengatur Muda
         position: Staf Pelaksana
         phone: "081345678901"
-        is_active: true
-        signature_path: null
-        roles: [staf]
+        signature_url: null
+        must_change_password: false
+        permissions: [wfh.attendance.create, wfh.report.create, wfh.report.update]
         created_at: "2025-07-14T08:30:00.000000Z"
         team:
           id: 3
@@ -637,35 +647,6 @@ components:
         leader:
           id: 5
           name: Siti Nurhaliza
-        field:
-          id: 1
-          name: Bidang Teknologi Informasi
-    # Team shape emitted by UserResource (admin/users). UserResource does NOT
-    # nest leader (only FormatsUserPayload does, for auth/profile). field present
-    # only when loaded.
-    TeamFlat:
-      type: object
-      required: [id, name]
-      properties:
-        id:
-          type: integer
-          example: 3
-        name:
-          type: string
-          example: Tim Aplikasi
-        field:
-          type: object
-          nullable: true
-          properties:
-            id:
-              type: integer
-              example: 1
-            name:
-              type: string
-              example: Bidang Teknologi Informasi
-      example:
-        id: 3
-        name: Tim Aplikasi
         field:
           id: 1
           name: Bidang Teknologi Informasi
