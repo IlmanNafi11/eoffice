@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Controllers;
 
+use App\Domains\Wfh\Http\Controllers\Concerns\EnsuresSameField;
 use App\Domains\Wfh\Http\Resources\WfhReportResource;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
@@ -14,25 +15,11 @@ use Illuminate\Routing\Controller;
 class ReportApprovalController extends Controller
 {
     use AuthorizesRequests;
+    use EnsuresSameField;
 
     public function __construct(
         private WfhReportStateMachine $stateMachine,
     ) {}
-
-    /**
-     * Guard: actor must be in the same field as the report owner.
-     */
-    private function ensureSameField(Request $request, WfhReport $report): ?JsonResponse
-    {
-        $userFieldId = $request->user()->team?->field?->id;
-        $reportFieldId = $report->user->team?->field_id;
-
-        if (! $userFieldId || ! $reportFieldId || $userFieldId !== $reportFieldId) {
-            return ApiResponse::fail('Laporan tidak berada dalam bidang Anda.', 403);
-        }
-
-        return null;
-    }
 
     public function submit(Request $request, WfhReport $report): JsonResponse
     {
@@ -56,7 +43,7 @@ class ReportApprovalController extends Controller
     {
         $this->authorize('wfh.report.approve');
 
-        $guard = $this->ensureSameField($request, $report);
+        $guard = $this->ensureSameField($request, $report->user->team?->field_id);
         if ($guard) {
             return $guard;
         }
@@ -81,7 +68,7 @@ class ReportApprovalController extends Controller
             'reason' => ['required', 'string'],
         ]);
 
-        $guard = $this->ensureSameField($request, $report);
+        $guard = $this->ensureSameField($request, $report->user->team?->field_id);
         if ($guard) {
             return $guard;
         }
