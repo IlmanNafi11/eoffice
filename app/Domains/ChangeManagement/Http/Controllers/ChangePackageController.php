@@ -9,11 +9,8 @@ use App\Domains\ChangeManagement\Http\Requests\UpdateChangePackageRequest;
 use App\Domains\ChangeManagement\Http\Requests\UploadChangePackageAttachmentsRequest;
 use App\Domains\ChangeManagement\Http\Resources\AttachmentResource;
 use App\Domains\ChangeManagement\Http\Resources\ChangePackageResource;
-use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
-use App\Models\User;
-use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -69,17 +66,18 @@ class ChangePackageController extends Controller
     {
         $this->authorize('change.initiation.view');
 
-        $package = $this->repo->findPackage($id);
+        $package = $this->repo->packageVisibleTo($id, $request->user());
 
-        if (! $package) {
-            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
+        if ($package) {
+            return ApiResponse::ok(new ChangePackageResource($package));
         }
 
-        if (! $this->actorCanAccessPackage($request->user(), $package)) {
+        // Null conflates 404 and 403; resolve which by re-fetching without scope.
+        if ($this->repo->findPackage($id)) {
             return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
-        return ApiResponse::ok(new ChangePackageResource($package));
+        return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
     }
 
     public function update(UpdateChangePackageRequest $request, int $id): JsonResponse
@@ -187,16 +185,12 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Hanya paket pending yang dapat disetujui.');
         }
 
-        if (! $this->actorCanAccessPackage($request->user(), $package)) {
+        if (! $this->repo->packageVisibleTo($id, $request->user())) {
             return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
         if ($package->initiator_id === $request->user()->id) {
             return ApiResponse::fail('Inisiator tidak dapat menyetujui paketnya sendiri.', 403);
-        }
-
-        if (! $this->actorCanAccessPackage($request->user(), $package)) {
-            return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
         $now = now();
@@ -234,7 +228,7 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Hanya paket pending yang dapat ditolak.');
         }
 
-        if (! $this->actorCanAccessPackage($request->user(), $package)) {
+        if (! $this->repo->packageVisibleTo($id, $request->user())) {
             return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
@@ -300,23 +294,5 @@ class ChangePackageController extends Controller
     private static function perPage(Request $request): int
     {
         return min(max($request->integer('per_page', 15), 1), 100);
-    }
-
-    /**
-     * Single source of truth for package visibility. Mirrors paginatePackages scope:
-     * admin = all, kepala_tim/kepala_bidang = same team, staf = own.
-     */
-    private function actorCanAccessPackage(User $actor, ChangeInitiation $package): bool
-    {
-        if ($actor->hasRole(Roles::ADMIN)) {
-            return true;
-        }
-
-        if ($actor->hasAnyRole([Roles::KEPALA_TIM, Roles::KEPALA_BIDANG])) {
-            return $actor->team_id !== null
-                && $actor->team_id === $package->initiator?->team_id;
-        }
-
-        return $package->initiator_id === $actor->id;
     }
 }

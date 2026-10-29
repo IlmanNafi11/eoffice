@@ -15,6 +15,8 @@ interface ChangeManagementRepositoryInterface extends RepositoryInterface
 
     public function findPackage(int $id): ?ChangeInitiation;
 
+    public function packageVisibleTo(int $id, User $actor): ?ChangeInitiation;
+
     public function paginatePackages(int $perPage, array $filters, ?User $actor): LengthAwarePaginator;
 
     public function transitionPackage(int $id, string $parentStatus, array $parentExtra = [], array $childExtra = []): void;

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Repositories\EloquentRepository;
 use App\Support\Constants\Roles;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class EloquentChangeManagementRepository extends EloquentRepository implements ChangeManagementRepositoryInterface
@@ -124,19 +125,18 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
             $query->where('field_id', $filters['field_id']);
         }
 
-        if ($actor && ! $actor->hasRole(Roles::ADMIN)) {
-            if ($actor->hasAnyRole([Roles::KEPALA_TIM, Roles::KEPALA_BIDANG])) {
-                // Team scope; null team sees nothing (deny-by-default).
-                $actor->team_id === null
-                    ? $query->whereRaw('false')
-                    : $query->whereHas('initiator', fn ($q) => $q->where('team_id', $actor->team_id));
-            } else {
-                // staf / default: own packages only
-                $query->where('initiator_id', $actor->id);
-            }
-        }
+        $this->applyVisibilityScope($query, $actor);
 
         return $query->orderByDesc('created_at')->paginate($perPage);
+    }
+
+    public function packageVisibleTo(int $id, User $actor): ?ChangeInitiation
+    {
+        $query = ChangeInitiation::with(self::PACKAGE_RELATIONS)->whereKey($id);
+
+        $this->applyVisibilityScope($query, $actor);
+
+        return $query->first();
     }
 
     public function transitionPackage(int $id, string $parentStatus, array $parentExtra = [], array $childExtra = []): void
@@ -197,5 +197,29 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
                 ]);
             }
         });
+    }
+
+    /**
+     * Single definition of package visibility, shared by paginatePackages and
+     * packageVisibleTo: admin = all, kepala_tim/kepala_bidang = same team,
+     * staf/default = own; kepala_* with a null team is denied by default.
+     */
+    private function applyVisibilityScope(Builder $query, ?User $actor): void
+    {
+        if (! $actor || $actor->hasRole(Roles::ADMIN)) {
+            return;
+        }
+
+        if ($actor->hasAnyRole([Roles::KEPALA_TIM, Roles::KEPALA_BIDANG])) {
+            // Team scope; null team sees nothing (deny-by-default).
+            $actor->team_id === null
+                ? $query->whereRaw('false')
+                : $query->whereHas('initiator', fn ($q) => $q->where('team_id', $actor->team_id));
+
+            return;
+        }
+
+        // staf / default: own packages only
+        $query->where('initiator_id', $actor->id);
     }
 }
