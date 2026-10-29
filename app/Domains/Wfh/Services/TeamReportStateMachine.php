@@ -3,37 +3,28 @@
 namespace App\Domains\Wfh\Services;
 
 use App\Domains\Wfh\Models\WfhTeamReport;
+use App\Domains\Wfh\Services\Concerns\TransitionsReportState;
 use App\Models\User;
 
 class TeamReportStateMachine
 {
+    use TransitionsReportState;
+
     public function approve(WfhTeamReport $report, User $actor): WfhTeamReport
     {
-        if ($report->status !== 'pending') {
-            throw new \DomainException('Hanya laporan dengan status pending yang dapat disetujui.');
-        }
-
-        $report->update([
-            'status' => 'approved',
+        /** @var WfhTeamReport $result */
+        $result = $this->approveTransition($report, $actor, [
             'supervisor_id' => $actor->id,
-            'supervisor_signed_at' => now(),
-            'verification_token' => $report->verification_token ?? bin2hex(random_bytes(32)),
         ]);
 
-        return $report->fresh();
+        return $result;
     }
 
     public function reject(WfhTeamReport $report, User $actor, string $reason): WfhTeamReport
     {
-        if ($report->status !== 'pending') {
-            throw new \DomainException('Hanya laporan dengan status pending yang dapat ditolak.');
-        }
+        /** @var WfhTeamReport $result */
+        $result = $this->rejectTransition($report, $reason);
 
-        $report->update([
-            'status' => 'rejected',
-            'reject_reason' => $reason,
-        ]);
-
-        return $report->fresh();
+        return $result;
     }
 }
