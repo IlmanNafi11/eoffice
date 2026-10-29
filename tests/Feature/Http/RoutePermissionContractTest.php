@@ -3,6 +3,9 @@
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Domains\Wfh\Models\WfhAttendance;
 use App\Domains\Wfh\Models\WfhReport;
+use App\Domains\Wfh\Models\WfhTeamReport;
+use App\Models\Field;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -158,5 +161,29 @@ class RoutePermissionContractTest extends TestCase
         $target = User::factory()->create();
         $this->deleteJson("/api/admin/users/{$target->id}")
             ->assertStatus(403);
+    }
+
+    public function test_reject_team_report_requires_reject_permission_not_approve(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $user = User::factory()->create(['team_id' => $team->id]);
+        $user->givePermissionTo('wfh.team_report.reject');
+        $field->update(['head_id' => $user->id]);
+        Sanctum::actingAs($user);
+
+        $report = WfhTeamReport::create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'status' => 'pending',
+            'created_by' => $user->id,
+        ]);
+
+        // The reject gate must be wfh.team_report.reject, not .approve: this
+        // caller holds reject alone and must reach the controller (200), not
+        // be blocked at the route (403) for lacking approve.
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/reject", [
+            'reason' => 'Data tidak lengkap',
+        ])->assertStatus(200);
     }
 }

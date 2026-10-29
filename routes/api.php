@@ -135,10 +135,10 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/admin/wfh/team-reports', [TeamReportController::class, 'store'])
         ->middleware('permission:wfh.team_report.create');
 
-    Route::middleware('permission:wfh.team_report.approve')->group(function () {
-        Route::post('/admin/wfh/team-reports/{report}/approve', [TeamReportController::class, 'approve']);
-        Route::post('/admin/wfh/team-reports/{report}/reject', [TeamReportController::class, 'reject']);
-    });
+    Route::post('/admin/wfh/team-reports/{report}/approve', [TeamReportController::class, 'approve'])
+        ->middleware('permission:wfh.team_report.approve');
+    Route::post('/admin/wfh/team-reports/{report}/reject', [TeamReportController::class, 'reject'])
+        ->middleware('permission:wfh.team_report.reject');
     // Change Management — Package flow
     Route::get('/changes', [ChangePackageController::class, 'index'])
         ->middleware('permission:change.initiation.view');
