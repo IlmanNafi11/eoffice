@@ -7,10 +7,12 @@ use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhReportActivity;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
+use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Symfony\Component\HttpFoundation\Response;
 
 class ReportActivityController extends Controller
 {
@@ -30,11 +32,10 @@ class ReportActivityController extends Controller
 
         $activity = $this->wfhRepository->addActivityToReport($report, $request->validated());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Kegiatan berhasil ditambahkan.',
-            'data' => $this->formatActivity($activity),
-        ], 201);
+        return ApiResponse::created(
+            $this->formatActivity($activity),
+            'Kegiatan berhasil ditambahkan.',
+        );
     }
 
     public function update(WfhReport $report, WfhReportActivity $activity, StoreActivityRequest $request): JsonResponse
@@ -49,14 +50,13 @@ class ReportActivityController extends Controller
 
         $activity = $this->wfhRepository->updateActivity($activity, $request->validated());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Kegiatan berhasil diperbarui.',
-            'data' => $this->formatActivity($activity),
-        ]);
+        return ApiResponse::ok(
+            $this->formatActivity($activity),
+            'Kegiatan berhasil diperbarui.',
+        );
     }
 
-    public function destroy(WfhReport $report, WfhReportActivity $activity, Request $request): JsonResponse
+    public function destroy(WfhReport $report, WfhReportActivity $activity, Request $request): Response
     {
         if ($activity->wfh_report_id !== $report->id) {
             return $this->notFound('Kegiatan tidak ditemukan.');
@@ -68,10 +68,7 @@ class ReportActivityController extends Controller
 
         $this->wfhRepository->deleteActivity($activity->id);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Kegiatan berhasil dihapus.',
-        ]);
+        return ApiResponse::deleted();
     }
 
     public function reorder(WfhReport $report, Request $request): JsonResponse
@@ -88,16 +85,10 @@ class ReportActivityController extends Controller
         try {
             $this->wfhRepository->reorderActivities($report, $validated['ids']);
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Urutan kegiatan berhasil diubah.',
-        ]);
+        return ApiResponse::ok(null, 'Urutan kegiatan berhasil diubah.');
     }
 
     private function formatActivity(WfhReportActivity $activity): array

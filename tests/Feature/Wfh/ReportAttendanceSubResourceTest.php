@@ -194,11 +194,7 @@ class ReportAttendanceSubResourceTest extends TestCase
 
         $response = $this->deleteJson("/api/wfh/reports/{$report->id}/attendances/{$attendance->id}");
 
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'message' => 'Absensi berhasil dihapus.',
-        ]);
+        $response->assertNoContent();
         $this->assertSoftDeleted($attendance);
     }
 

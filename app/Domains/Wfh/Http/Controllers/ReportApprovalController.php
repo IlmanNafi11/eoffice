@@ -5,6 +5,7 @@ namespace App\Domains\Wfh\Http\Controllers;
 use App\Domains\Wfh\Http\Resources\WfhReportResource;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
+use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,10 +28,7 @@ class ReportApprovalController extends Controller
         $reportFieldId = $report->user->team?->field_id;
 
         if (! $userFieldId || ! $reportFieldId || $userFieldId !== $reportFieldId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak berada dalam bidang Anda.',
-            ], 403);
+            return ApiResponse::fail('Laporan tidak berada dalam bidang Anda.', 403);
         }
 
         return null;
@@ -41,33 +39,23 @@ class ReportApprovalController extends Controller
         $report = WfhReport::find($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         if ($report->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya pembuat laporan yang dapat mensubmit.',
-            ], 403);
+            return ApiResponse::fail('Hanya pembuat laporan yang dapat mensubmit.', 403);
         }
 
         try {
             $report = $this->stateMachine->submit($report, $request->user());
         } catch (\DomainException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan berhasil disubmit untuk persetujuan.',
-            'data' => new WfhReportResource($report->load(['activities.links', 'supervisor'])),
-        ]);
+        return ApiResponse::ok(
+            new WfhReportResource($report->load(['activities.links', 'supervisor'])),
+            'Laporan berhasil disubmit untuk persetujuan.',
+        );
     }
 
     public function approve(Request $request, int $id): JsonResponse
@@ -77,10 +65,7 @@ class ReportApprovalController extends Controller
         $report = WfhReport::find($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         $guard = $this->ensureSameField($request, $report);
@@ -91,17 +76,13 @@ class ReportApprovalController extends Controller
         try {
             $report = $this->stateMachine->approve($report, $request->user());
         } catch (\DomainException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan berhasil disetujui.',
-            'data' => new WfhReportResource($report->load(['activities.links', 'supervisor'])),
-        ]);
+        return ApiResponse::ok(
+            new WfhReportResource($report->load(['activities.links', 'supervisor'])),
+            'Laporan berhasil disetujui.',
+        );
     }
 
     public function reject(Request $request, int $id): JsonResponse
@@ -115,10 +96,7 @@ class ReportApprovalController extends Controller
         $report = WfhReport::find($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         $guard = $this->ensureSameField($request, $report);
@@ -129,17 +107,13 @@ class ReportApprovalController extends Controller
         try {
             $report = $this->stateMachine->reject($report, $request->user(), $request->input('reason'));
         } catch (\DomainException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan ditolak.',
-            'data' => new WfhReportResource($report->load(['activities.links', 'supervisor'])),
-        ]);
+        return ApiResponse::ok(
+            new WfhReportResource($report->load(['activities.links', 'supervisor'])),
+            'Laporan ditolak.',
+        );
     }
 
     public function revise(Request $request, int $id): JsonResponse
@@ -147,32 +121,22 @@ class ReportApprovalController extends Controller
         $report = WfhReport::find($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         if ($report->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hanya pembuat laporan yang dapat merevisi.',
-            ], 403);
+            return ApiResponse::fail('Hanya pembuat laporan yang dapat merevisi.', 403);
         }
 
         try {
             $report = $this->stateMachine->revise($report);
         } catch (\DomainException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan dikembalikan ke draft untuk revisi.',
-            'data' => new WfhReportResource($report),
-        ]);
+        return ApiResponse::ok(
+            new WfhReportResource($report),
+            'Laporan dikembalikan ke draft untuk revisi.',
+        );
     }
 }

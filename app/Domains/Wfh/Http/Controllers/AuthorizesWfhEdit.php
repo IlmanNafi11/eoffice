@@ -4,6 +4,7 @@ namespace App\Domains\Wfh\Http\Controllers;
 
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
+use App\Support\Http\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,17 +23,11 @@ trait AuthorizesWfhEdit
     private function authorizeEdit(WfhReport $report, Request $request): ?JsonResponse
     {
         if ($report->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak dapat mengubah laporan orang lain.',
-            ], 403);
+            return ApiResponse::fail('Tidak dapat mengubah laporan orang lain.', 403);
         }
 
         if (! $this->stateMachine->canEdit($report)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan yang sudah disetujui tidak dapat diubah.',
-            ], 422);
+            return ApiResponse::fail('Laporan yang sudah disetujui tidak dapat diubah.');
         }
 
         return null;
@@ -40,9 +35,6 @@ trait AuthorizesWfhEdit
 
     private function notFound(string $message): JsonResponse
     {
-        return response()->json([
-            'success' => false,
-            'message' => $message,
-        ], 404);
+        return ApiResponse::fail($message, 404);
     }
 }

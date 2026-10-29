@@ -243,11 +243,7 @@ class ReportActivitySubResourceTest extends TestCase
 
         $response = $this->deleteJson("/api/wfh/reports/{$report->id}/activities/{$activity->id}");
 
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'message' => 'Kegiatan berhasil dihapus.',
-        ]);
+        $response->assertNoContent();
         $this->assertDatabaseMissing('wfh_report_activities', ['id' => $activity->id]);
         // Links cascade-deleted via FK
         $this->assertDatabaseMissing('wfh_report_links', ['wfh_report_activity_id' => $activity->id]);

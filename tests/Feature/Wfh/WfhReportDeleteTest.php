@@ -32,7 +32,7 @@ class WfhReportDeleteTest extends TestCase
         ]);
 
         $this->deleteJson("/api/wfh/reports/{$report->id}")
-            ->assertStatus(200);
+            ->assertNoContent();
 
         $this->assertSoftDeleted('wfh_reports', ['id' => $report->id]);
     }
@@ -54,7 +54,7 @@ class WfhReportDeleteTest extends TestCase
         Sanctum::actingAs($admin);
 
         $this->deleteJson("/api/wfh/reports/{$report->id}")
-            ->assertStatus(200);
+            ->assertNoContent();
 
         $this->assertSoftDeleted('wfh_reports', ['id' => $report->id]);
     }

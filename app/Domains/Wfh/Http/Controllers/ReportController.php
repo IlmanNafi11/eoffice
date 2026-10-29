@@ -8,12 +8,14 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Support\Constants\Roles;
 use App\Support\Dates\DateRangeHelper;
+use App\Support\Http\ApiResponse;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Symfony\Component\HttpFoundation\Response;
 
 class ReportController extends Controller
 {
@@ -29,10 +31,9 @@ class ReportController extends Controller
         $validated = $request->validate([
             'date' => ['nullable', 'date'],
             'month' => ['nullable', 'date_format:Y-m'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $perPage = (int) ($validated['per_page'] ?? 15);
+        $perPage = self::perPage($request);
         $bounds = DateRangeHelper::resolve($validated['date'] ?? null, $validated['month'] ?? null);
 
         $reports = $this->wfhRepository->paginateReportsForUser($request->user()->id, $perPage, $bounds);
@@ -54,12 +55,10 @@ class ReportController extends Controller
         $fieldId = $request->user()->team?->field?->id;
 
         if (! $fieldId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User tidak terhubung dengan bidang manapun.',
-            ], 422);
+            return ApiResponse::fail('User tidak terhubung dengan bidang manapun.');
         }
-        $perPage = min($request->integer('per_page', 15), 100);
+
+        $perPage = self::perPage($request);
 
         // date_from/date_to take precedence; then date/month; no filter = all reports.
         $bounds = $this->resolveAdminBounds($request);
@@ -75,6 +74,14 @@ class ReportController extends Controller
         $reports = $this->wfhRepository->paginateAllReports($perPage, $filters);
 
         return $this->paginatedReportResponse($reports);
+    }
+
+    /**
+     * Uniform list clamp: per_page is bounded to 1..100 (SPEC-envelope item 3).
+     */
+    private static function perPage(Request $request): int
+    {
+        return min(max($request->integer('per_page', 15), 1), 100);
     }
 
     /**
@@ -102,15 +109,7 @@ class ReportController extends Controller
 
     private function paginatedReportResponse(LengthAwarePaginator $reports): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'data' => WfhReportResource::collection($reports->items()),
-            'meta' => [
-                'current_page' => $reports->currentPage(),
-                'last_page' => $reports->lastPage(),
-                'total' => $reports->total(),
-            ],
-        ]);
+        return ApiResponse::paginated($reports, WfhReportResource::class);
     }
 
     public function store(StoreReportRequest $request): JsonResponse
@@ -123,11 +122,10 @@ class ReportController extends Controller
         // Get-or-create: return existing draft/rejected if one exists
         $existing = $this->wfhRepository->findDraftForUserDate($user->id, $date);
         if ($existing) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Laporan WFH sudah ada.',
-                'data' => new WfhReportResource($existing->load(['activities.links', 'attendances'])),
-            ]);
+            return ApiResponse::ok(
+                new WfhReportResource($existing->load(['activities.links', 'attendances'])),
+                'Laporan WFH sudah ada.',
+            );
         }
 
         // Process attendance photos
@@ -154,21 +152,19 @@ class ReportController extends Controller
             if ($e->getCode() === '23505') {
                 $existing = $this->wfhRepository->findDraftForUserDate($user->id, $date);
                 if ($existing) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Laporan WFH sudah ada.',
-                        'data' => new WfhReportResource($existing->load(['activities.links', 'attendances'])),
-                    ]);
+                    return ApiResponse::ok(
+                        new WfhReportResource($existing->load(['activities.links', 'attendances'])),
+                        'Laporan WFH sudah ada.',
+                    );
                 }
             }
             throw $e;
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan WFH berhasil dibuat.',
-            'data' => new WfhReportResource($report),
-        ], 201);
+        return ApiResponse::created(
+            new WfhReportResource($report),
+            'Laporan WFH berhasil dibuat.',
+        );
     }
 
     public function show(int $id): JsonResponse
@@ -176,20 +172,14 @@ class ReportController extends Controller
         $report = $this->wfhRepository->findReportWithRelations($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         if ($report->user_id !== request()->user()->id) {
             $this->authorize('wfh.monitoring.view');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => new WfhReportResource($report),
-        ]);
+        return ApiResponse::ok(new WfhReportResource($report));
     }
 
     public function update(StoreReportRequest $request, int $id): JsonResponse
@@ -197,24 +187,15 @@ class ReportController extends Controller
         $report = $this->wfhRepository->findReportWithRelations($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         if ($report->user_id !== $request->user()->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak dapat mengubah laporan orang lain.',
-            ], 403);
+            return ApiResponse::fail('Tidak dapat mengubah laporan orang lain.', 403);
         }
 
         if (! $this->stateMachine->canEdit($report)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan yang sudah disetujui tidak dapat diubah.',
-            ], 422);
+            return ApiResponse::fail('Laporan yang sudah disetujui tidak dapat diubah.');
         }
 
         // Metadata-only: only report_date is writable. Status transitions go
@@ -223,43 +204,30 @@ class ReportController extends Controller
             'report_date' => $request->input('report_date', $report->report_date->format('Y-m-d')),
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan WFH berhasil diperbarui.',
-            'data' => new WfhReportResource($this->wfhRepository->findReportWithRelations($id)),
-        ]);
+        return ApiResponse::ok(
+            new WfhReportResource($this->wfhRepository->findReportWithRelations($id)),
+            'Laporan WFH berhasil diperbarui.',
+        );
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id): Response
     {
         $report = $this->wfhRepository->findReportWithRelations($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         if ($report->user_id !== request()->user()->id && ! request()->user()->hasRole(Roles::ADMIN)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak dapat menghapus laporan orang lain.',
-            ], 403);
+            return ApiResponse::fail('Tidak dapat menghapus laporan orang lain.', 403);
         }
 
         if (! $this->stateMachine->canEdit($report)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan yang sudah disetujui tidak dapat dihapus.',
-            ], 422);
+            return ApiResponse::fail('Laporan yang sudah disetujui tidak dapat dihapus.');
         }
 
         $this->wfhRepository->delete($id);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Laporan WFH berhasil dihapus.',
-        ]);
+        return ApiResponse::deleted();
     }
 }

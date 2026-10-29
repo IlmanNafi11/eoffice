@@ -6,6 +6,7 @@ use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Setting;
 use App\Models\Team;
+use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignatureGuard;
@@ -31,17 +32,11 @@ class ReportPdfController extends Controller
         $report = $this->wfhRepository->findReportWithRelations($id);
 
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         if (! in_array($report->status, ['pending', 'approved'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PDF hanya dapat di-generate untuk laporan yang sudah disubmit atau disetujui.',
-            ], 422);
+            return ApiResponse::fail('PDF hanya dapat di-generate untuk laporan yang sudah disubmit atau disetujui.');
         }
 
         // PDF embeds real signatures; refuse export when any involved user
@@ -50,7 +45,7 @@ class ReportPdfController extends Controller
             $report->user,
             $report->status === 'approved' ? $report->supervisor : null,
         ])) {
-            return response()->json(SignatureGuard::missingMessage($missing->name), 422);
+            return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message'], 422);
         }
 
         $isApproved = $report->status === 'approved';
@@ -123,10 +118,7 @@ class ReportPdfController extends Controller
 
         // Verify team belongs to admin's field
         if (! $fieldId || $team->field_id !== $fieldId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tim tidak ditemukan dalam bidang Anda.',
-            ], 403);
+            return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
         }
 
         $date = $request->input('date', now()->format('Y-m-d'));
@@ -175,7 +167,7 @@ class ReportPdfController extends Controller
             $admin,
             $isApproved ? $head : null,
         ])) {
-            return response()->json(SignatureGuard::missingMessage($missing->name), 422);
+            return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message'], 422);
         }
 
         // Admin (maker) signature — always shown

@@ -2,11 +2,13 @@
 
 namespace App\Domains\Wfh\Http\Controllers;
 
+use App\Domains\Wfh\Http\Resources\TeamReportResource;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Services\TeamReportStateMachine;
 use App\Models\Field;
 use App\Models\Team;
 use App\Support\Constants\Roles;
+use App\Support\Http\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,10 +31,7 @@ class TeamReportController extends Controller
         $reportFieldId = $report->team?->field_id;
 
         if (! $userFieldId || ! $reportFieldId || $userFieldId !== $reportFieldId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak berada dalam bidang Anda.',
-            ], 403);
+            return ApiResponse::fail('Laporan tidak berada dalam bidang Anda.', 403);
         }
 
         return null;
@@ -43,7 +42,7 @@ class TeamReportController extends Controller
         $this->authorize('wfh.team_report.view');
 
         $user = $request->user();
-        $perPage = min($request->integer('per_page', 15), 100);
+        $perPage = min(max($request->integer('per_page', 15), 1), 100);
 
         // Admin sees all team reports
         if ($user->hasRole(Roles::ADMIN)) {
@@ -51,15 +50,12 @@ class TeamReportController extends Controller
                 ->orderByDesc('report_date')
                 ->paginate($perPage);
 
-            return response()->json($reports);
+            return ApiResponse::paginated($reports, TeamReportResource::class);
         }
 
         $fieldId = $user->team?->field?->id;
         if (! $fieldId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User tidak terhubung dengan bidang manapun.',
-            ], 422);
+            return ApiResponse::fail('User tidak terhubung dengan bidang manapun.');
         }
 
         $isFieldHead = Field::where('id', $fieldId)->where('head_id', $user->id)->exists();
@@ -76,7 +72,7 @@ class TeamReportController extends Controller
             ->orderByDesc('report_date')
             ->paginate($perPage);
 
-        return response()->json($reports);
+        return ApiResponse::paginated($reports, TeamReportResource::class);
     }
 
     public function store(Request $request): JsonResponse
@@ -94,7 +90,7 @@ class TeamReportController extends Controller
         $team = Team::find($validated['team_id']);
 
         if (! $fieldId || $team->field_id !== $fieldId) {
-            return response()->json(['message' => 'Tim tidak ditemukan dalam bidang Anda.'], 403);
+            return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
         }
 
         $exists = WfhTeamReport::where('team_id', $validated['team_id'])
@@ -102,7 +98,7 @@ class TeamReportController extends Controller
             ->exists();
 
         if ($exists) {
-            return response()->json(['message' => 'Laporan untuk tim dan tanggal ini sudah ada.'], 422);
+            return ApiResponse::fail('Laporan untuk tim dan tanggal ini sudah ada.');
         }
 
         $report = WfhTeamReport::create([
@@ -112,7 +108,10 @@ class TeamReportController extends Controller
             'created_by' => $user->id,
         ]);
 
-        return response()->json(['data' => $report], 201);
+        return ApiResponse::created(
+            new TeamReportResource($report->load(['team', 'creator', 'supervisor'])),
+            'Laporan tim berhasil dibuat.',
+        );
     }
 
     public function approve(Request $request, int $id): JsonResponse
@@ -121,10 +120,7 @@ class TeamReportController extends Controller
 
         $report = WfhTeamReport::find($id);
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         $guard = $this->ensureSameField($request, $report);
@@ -135,10 +131,13 @@ class TeamReportController extends Controller
         try {
             $report = $this->stateMachine->approve($report, $request->user());
         } catch (\DomainException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json(['data' => $report]);
+        return ApiResponse::ok(
+            new TeamReportResource($report->load(['team', 'creator', 'supervisor'])),
+            'Laporan tim berhasil disetujui.',
+        );
     }
 
     public function reject(Request $request, int $id): JsonResponse
@@ -149,10 +148,7 @@ class TeamReportController extends Controller
 
         $report = WfhTeamReport::find($id);
         if (! $report) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Laporan tidak ditemukan.',
-            ], 404);
+            return ApiResponse::fail('Laporan tidak ditemukan.', 404);
         }
 
         $guard = $this->ensureSameField($request, $report);
@@ -163,9 +159,12 @@ class TeamReportController extends Controller
         try {
             $report = $this->stateMachine->reject($report, $request->user(), $request->input('reason'));
         } catch (\DomainException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            return ApiResponse::fail($e->getMessage());
         }
 
-        return response()->json(['data' => $report]);
+        return ApiResponse::ok(
+            new TeamReportResource($report->load(['team', 'creator', 'supervisor'])),
+            'Laporan tim ditolak.',
+        );
     }
 }
