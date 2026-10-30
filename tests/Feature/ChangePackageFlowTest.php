@@ -343,6 +343,48 @@ class ChangePackageFlowTest extends TestCase
             ->assertHeader('Content-Type', 'application/pdf');
     }
 
+    /** M3: another staf's approved package must not be exportable. */
+    public function test_initiation_pdf_rejects_other_staf_package(): void
+    {
+        $this->setUserSignature($this->staf);
+        $this->setUserSignature($this->kepalaTim);
+
+        [$initId] = $this->createSubmittedPackage();
+        Sanctum::actingAs($this->kepalaTim);
+        $this->postJson("/api/changes/{$initId}/approve");
+
+        Sanctum::actingAs($this->otherStaf);
+
+        $this->getJson("/api/changes/{$initId}/pdf/initiation")
+            ->assertStatus(403)
+            ->assertJsonPath('success', false);
+    }
+
+    /** M3: same rule for the implementation PDF. */
+    public function test_implementation_pdf_rejects_other_staf_package(): void
+    {
+        $this->setUserSignature($this->staf);
+        $this->setUserSignature($this->kepalaTim);
+
+        [$initId] = $this->createSubmittedPackage();
+        Sanctum::actingAs($this->kepalaTim);
+        $this->postJson("/api/changes/{$initId}/approve");
+
+        Sanctum::actingAs($this->otherStaf);
+
+        $this->getJson("/api/changes/{$initId}/pdf/implementation")
+            ->assertStatus(403)
+            ->assertJsonPath('success', false);
+    }
+
+    /** M3: for an authorized actor, an unknown id is a 404, not a 403. */
+    public function test_initiation_pdf_unknown_id_returns_404(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $this->getJson('/api/changes/99999/pdf/initiation')->assertStatus(404);
+    }
+
     public function test_initiation_pdf_rejected_when_signature_unset(): void
     {
         $this->setUserSignature($this->staf);

@@ -58,6 +58,21 @@ class ReportStoreUpdateTest extends TestCase
         $this->assertDatabaseCount('wfh_reports', 1);
     }
 
+    /** M1: a client-supplied status must never skip the submit flow. */
+    public function test_store_ignores_client_supplied_status(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-29',
+            'status' => 'approved',
+        ])->assertStatus(201);
+
+        $this->assertSame('draft', WfhReport::sole()->status);
+    }
+
     public function test_store_allows_draft_and_approved_same_date(): void
     {
         $user = User::factory()->create();

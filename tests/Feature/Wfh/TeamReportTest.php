@@ -242,6 +242,74 @@ class TeamReportTest extends TestCase
         ])->assertStatus(422);
     }
 
+    /** Segregation of duties: the creator cannot approve their own report. */
+    public function test_creator_cannot_approve_own_team_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $creator = User::factory()->create(['team_id' => $team->id]);
+        $creator->assignRole('kepala_bidang');
+        $field->update(['head_id' => $creator->id]);
+        Sanctum::actingAs($creator);
+
+        $report = WfhTeamReport::create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'status' => 'pending',
+            'created_by' => $creator->id,
+        ]);
+
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/approve")
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Pembuat laporan tidak dapat menyetujui laporannya sendiri.');
+
+        $this->assertSame('pending', $report->fresh()->status);
+    }
+
+    /** The same segregation rule applies to reject, not just approve. */
+    public function test_creator_cannot_reject_own_team_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $creator = User::factory()->create(['team_id' => $team->id]);
+        $creator->assignRole('kepala_bidang');
+        $field->update(['head_id' => $creator->id]);
+        Sanctum::actingAs($creator);
+
+        $report = WfhTeamReport::create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'status' => 'pending',
+            'created_by' => $creator->id,
+        ]);
+
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/reject", ['reason' => 'nope'])
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Pembuat laporan tidak dapat menolak laporannya sendiri.');
+
+        $this->assertSame('pending', $report->fresh()->status);
+    }
+
+    /** A different kepala of the same bidang still approves normally. */
+    public function test_non_creator_can_approve_team_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $kb = User::factory()->create(['team_id' => $team->id]);
+        $kb->assignRole('kepala_bidang');
+        $field->update(['head_id' => $kb->id]);
+        Sanctum::actingAs($kb);
+
+        $report = $this->createTeamReport($team);
+
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/approve")
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'approved');
+    }
+
     // === List (TDD Phase 1) ===
 
     public function test_kb_can_list_team_reports(): void

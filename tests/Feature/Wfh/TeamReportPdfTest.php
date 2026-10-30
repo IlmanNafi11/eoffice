@@ -109,6 +109,41 @@ class TeamReportPdfTest extends TestCase
         $this->assertNull($captured['signatureSupervisorPath']);
     }
 
+    /**
+     * M2: passing another team's approved report id must not stamp THIS PDF as
+     * approved — that would attach the field head's signature to a report they
+     * never approved.
+     */
+    public function test_team_pdf_ignores_approved_report_belonging_to_another_team(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $otherTeam = Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+
+        $kb = User::factory()->create(['team_id' => $team->id]);
+        $kb->assignRole('kepala_bidang');
+        $field->update(['head_id' => $kb->id]);
+        $this->setUserSignature($kb);
+
+        $admin = User::factory()->create(['team_id' => $team->id]);
+        $admin->assignRole('admin');
+        $this->setUserSignature($admin);
+        Sanctum::actingAs($admin);
+
+        $foreign = WfhTeamReport::create([
+            'team_id' => $otherTeam->id,
+            'report_date' => now()->toDateString(),
+            'status' => 'approved',
+            'created_by' => $admin->id,
+            'supervisor_id' => $kb->id,
+        ]);
+
+        $captured = $this->capturePdfViewData($team, $foreign->id);
+
+        $this->assertFalse($captured['isApproved']);
+        $this->assertNull($captured['signatureSupervisorPath']);
+    }
+
     public function test_team_report_data_contains_raw_photo_path(): void
     {
         $field = Field::create(['name' => 'Bidang Test']);

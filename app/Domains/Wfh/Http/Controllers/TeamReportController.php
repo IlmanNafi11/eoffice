@@ -140,6 +140,13 @@ class TeamReportController extends Controller
         $request->validate(['reason' => ['required', 'string']]);
 
         $report->loadMissing('team');
+
+        // Segregation of duties: the maker cannot reject their own report
+        // either — otherwise they could erase a report they disagree with.
+        if ($report->created_by === $request->user()->id) {
+            return ApiResponse::fail('Pembuat laporan tidak dapat menolak laporannya sendiri.', 403);
+        }
+
         $guard = $this->ensureSameField($request, $report->team?->field_id);
         if ($guard) {
             return $guard;

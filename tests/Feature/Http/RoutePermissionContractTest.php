@@ -172,11 +172,16 @@ class RoutePermissionContractTest extends TestCase
         $field->update(['head_id' => $user->id]);
         Sanctum::actingAs($user);
 
+        // created_by must be somebody else: the segregation guard rejects a
+        // creator acting on their own report, which would mask the route gate
+        // this test is about.
+        $creator = User::factory()->create(['team_id' => $team->id]);
+
         $report = WfhTeamReport::create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
             'status' => 'pending',
-            'created_by' => $user->id,
+            'created_by' => $creator->id,
         ]);
 
         // The reject gate must be wfh.team_report.reject, not .approve: this

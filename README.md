@@ -80,6 +80,7 @@ php artisan test
 ## API Structure
 - `/api/auth/*` — Login, me, logout
 - `/api/profile/*` — Profile view, update, signature upload
+- `/api/signatures/{user}` — Authorized e-signature image (owner, `user.manage`, or `kepala_*` of the same bidang)
 - `/api/admin/users/*` — User CRUD + Excel import
 - `/api/wfh/*` — Attendance, reports, approval flow, PDF export
 - `/api/changes/*` — Initiation, implementation, review, PDF export
@@ -89,13 +90,29 @@ php artisan test
 - Domain-driven: `app/Domains/{Auth,Organization,Wfh,ChangeManagement}`
 - Repository pattern with interfaces for testability
 - Cross-cutting services: `app/Support/{Pdf,Signature,QrCode,Import}`
-- Spatie RBAC: roles (admin, kepala_tim, staf) + 27 permissions
+- Spatie RBAC: roles (admin, kepala_bidang, kepala_tim, staf) + granular permissions
 
 ## PDF Generation
 - dompdf + Blade templates replicate government form layouts
 - Signature images rendered via `position:absolute` coordinates
 - QR codes as inline SVG (bacon/bacon-qr-code)
 - Templates: `resources/views/pdf/{wfh-report,change-initiation,change-implementation}.blade.php`
+
+## E-Signature Storage
+
+Tanda tangan disimpan di disk privat (`storage/app/signatures`, disk `local`) dan **tidak** pernah
+di-serve sebagai file statis — `/storage/signatures/*.png` tidak boleh dapat diakses. Pembacaan
+hanya lewat `GET /api/signatures/{user}` yang memeriksa hak akses per request.
+
+Saat upgrade dari versi lama (tanda tangan masih di disk publik), jalankan sekali:
+
+```bash
+php artisan signatures:migrate-private --dry-run   # lihat rencana
+php artisan signatures:migrate-private             # pindahkan + hapus salinan publik
+```
+
+Perintah ini idempoten dan juga membersihkan `public/storage/signatures` pada deployment yang
+menyalin direktori (bukan symlink).
 
 ## Config
 - `config/wfh.php` — Allowed WFH days (default: Friday)

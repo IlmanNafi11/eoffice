@@ -214,6 +214,76 @@ class WfhAdminReportTest extends TestCase
             ->assertStatus(422);
     }
 
+    /** H3: a colleague with no monitoring permission cannot fetch the PDF. */
+    public function test_non_owner_staf_cannot_export_colleague_pdf(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $owner = User::factory()->create(['team_id' => $team->id]);
+        $owner->assignRole('staf');
+        $this->setUserSignature($owner);
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $owner->id,
+            'status' => 'pending',
+        ]);
+
+        $other = User::factory()->create(['team_id' => $team->id]);
+        $other->assignRole('staf');
+        Sanctum::actingAs($other);
+
+        $this->getJson("/api/wfh/reports/{$report->id}/pdf")->assertStatus(403);
+    }
+
+    /** H3: monitoring permission alone is not enough — bidang must match. */
+    public function test_kepala_of_another_field_cannot_export_pdf(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $owner = User::factory()->create(['team_id' => $team->id]);
+        $owner->assignRole('staf');
+        $this->setUserSignature($owner);
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $owner->id,
+            'status' => 'pending',
+        ]);
+
+        $otherField = Field::create(['name' => 'Bidang Lain']);
+        $otherTeam = Team::create(['field_id' => $otherField->id, 'name' => 'Tim Lain']);
+        $outsider = User::factory()->create(['team_id' => $otherTeam->id]);
+        $outsider->assignRole('kepala_tim');
+        Sanctum::actingAs($outsider);
+
+        $this->getJson("/api/wfh/reports/{$report->id}/pdf")->assertStatus(403);
+    }
+
+    /** H3 happy path: same-bidang kepala_tim with monitoring permission can export. */
+    public function test_same_field_kepala_can_export_member_pdf(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $owner = User::factory()->create(['team_id' => $team->id]);
+        $owner->assignRole('staf');
+        $this->setUserSignature($owner);
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $owner->id,
+            'status' => 'pending',
+        ]);
+
+        $kepala = User::factory()->create(['team_id' => $team->id]);
+        $kepala->assignRole('kepala_tim');
+        Sanctum::actingAs($kepala);
+
+        $this->getJson("/api/wfh/reports/{$report->id}/pdf")
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'application/pdf');
+    }
+
     public function test_admin_report_list_excludes_verification_token(): void
     {
         $field = Field::create(['name' => 'Bidang A']);
