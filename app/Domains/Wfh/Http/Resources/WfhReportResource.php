@@ -13,7 +13,13 @@ class WfhReportResource extends JsonResource
             'user_id' => $this->user_id,
             'report_date' => $this->report_date?->format('Y-m-d'),
             'status' => $this->status,
-            'activity_count' => $this->whenLoaded('activities', fn () => $this->activities->count(), 0),
+            // List endpoints use withCount (no activity rows loaded); detail
+            // loads activities eagerly. Both must avoid lazy-loading here.
+            'activity_count' => $this->whenCounted(
+                'activities',
+                fn () => $this->activities_count,
+                fn () => $this->whenLoaded('activities', fn () => $this->activities->count(), 0),
+            ),
             'maker_signed_at' => $this->maker_signed_at,
             'supervisor_signed_at' => $this->supervisor_signed_at,
             'reject_reason' => $this->reject_reason,
