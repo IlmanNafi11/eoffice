@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -132,6 +133,37 @@ class EnvelopeContractTest extends TestCase
             $this->sortedKeys($body['data'][0]),
         );
         $this->assertStringStartsWith('http', $body['data'][0]['url']);
+    }
+
+    public function test_attachment_upload_uses_a_single_insert_for_many_files(): void
+    {
+        Storage::fake('public');
+        $package = $this->createDraft();
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->postJson("/api/changes/{$package['id']}/attachments", [
+            'files' => [
+                UploadedFile::fake()->image('a.jpg'),
+                UploadedFile::fake()->image('b.jpg'),
+                UploadedFile::fake()->image('c.jpg'),
+            ],
+        ])->assertOk();
+
+        $inserts = 0;
+        foreach (DB::getQueryLog() as $entry) {
+            if (str_starts_with(strtolower(ltrim($entry['query'])), 'insert into "change_implementation_attachments"')) {
+                $inserts++;
+            }
+        }
+        DB::flushQueryLog();
+
+        $this->assertSame(
+            1,
+            $inserts,
+            'Uploading N attachments must be one batched INSERT, not N inserts.'
+        );
     }
 
     // ─── error bodies on JSON paths ──────────────────────────────

@@ -186,16 +186,27 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
 
     public function addAttachments(int $implementationId, array $paths): void
     {
+        if (empty($paths)) {
+            return;
+        }
+
         DB::transaction(function () use ($implementationId, $paths) {
             $sortOrder = ChangeImplementationAttachment::where('change_implementation_id', $implementationId)->count();
+            $now = now();
 
+            $rows = [];
             foreach ($paths as $path) {
-                ChangeImplementationAttachment::create([
+                $rows[] = [
                     'change_implementation_id' => $implementationId,
                     'path' => $path,
                     'sort_order' => $sortOrder++,
-                ]);
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
+
+            // One INSERT for N files: sort_order is computed once above.
+            ChangeImplementationAttachment::insert($rows);
         });
     }
 
