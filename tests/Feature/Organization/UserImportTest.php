@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\Import\UserImport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Maatwebsite\Excel\Facades\Excel;
@@ -118,5 +119,63 @@ class UserImportTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonStructure(['message', 'data']);
+    }
+
+    public function test_import_endpoint_queries_do_not_grow_linearly_per_row(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $admin = User::create([
+            'team_id' => $team->id,
+            'name' => 'Admin Import',
+            'nip' => '0000000002',
+            'email' => 'adminimport@test.com',
+            'password' => Hash::make('password'),
+            'is_active' => true,
+        ]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $csv2 = "nama,nip,email,role,tim\n"
+            ."User A,0000000101,a@test.com,staf,Tim Test\n"
+            ."User B,0000000102,b@test.com,kepala_tim,Tim Test\n";
+        $csv6 = "nama,nip,email,role,tim\n"
+            ."User C,0000000103,c@test.com,staf,Tim Test\n"
+            ."User D,0000000104,d@test.com,kepala_tim,Tim Test\n"
+            ."User E,0000000105,e@test.com,staf,Tim Test\n"
+            ."User F,0000000106,f@test.com,kepala_tim,Tim Test\n"
+            ."User G,0000000107,g@test.com,staf,Tim Test\n"
+            ."User H,0000000108,h@test.com,kepala_tim,Tim Test\n";
+
+        $q2 = $this->importAndCountQueries($csv2);
+        $q6 = $this->importAndCountQueries($csv6);
+
+        $this->assertLessThanOrEqual(
+            $q6['insert'] - $q2['insert'],
+            $q6['total'] - $q2['total'],
+        );
+    }
+
+    private function importAndCountQueries(string $csv): array
+    {
+        $file = UploadedFile::fake()->createWithContent('users.csv', $csv);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->postJson('/api/admin/users/import', ['file' => $file])->assertStatus(200);
+
+        $log = DB::getQueryLog();
+        DB::flushQueryLog();
+
+        $insert = 0;
+        foreach ($log as $entry) {
+            if (str_starts_with(strtolower(ltrim($entry['query'])), 'insert')) {
+                $insert++;
+            }
+        }
+
+        return ['total' => count($log), 'insert' => $insert];
     }
 }

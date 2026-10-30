@@ -5,13 +5,16 @@ namespace App\Support\Import;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\Users\DefaultPassword;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Events\BeforeImport;
 use Spatie\Permission\Models\Role;
 
-class UserImport implements ToModel, WithHeadingRow, WithValidation
+class UserImport implements ToModel, WithEvents, WithHeadingRow, WithValidation
 {
     public array $results = [
         'imported' => 0,
@@ -23,8 +26,18 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
 
     private int $rowNumber = 1;
 
+    private ?Collection $existingNips = null;
+
+    private ?Collection $existingEmails = null;
+
+    private ?Collection $teamIdsByName = null;
+
+    private array $roleNames = [];
+
     public function model(array $row)
     {
+        $this->primeIfNeeded();
+
         $this->rowNumber++;
 
         $nip = trim($row['nip'] ?? '');
@@ -42,7 +55,7 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         }
 
         // Skip duplicate NIP
-        if (User::where('nip', $nip)->exists()) {
+        if (isset($this->existingNips[$nip])) {
             $this->results['skipped']++;
             $this->results['errors'][] = "Baris {$this->rowNumber}: NIP {$nip} sudah terdaftar.";
 
@@ -50,16 +63,16 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         }
 
         // Skip duplicate email
-        if (User::where('email', $email)->exists()) {
+        if (isset($this->existingEmails[$email])) {
             $this->results['skipped']++;
             $this->results['errors'][] = "Baris {$this->rowNumber}: Email {$email} sudah terdaftar.";
 
             return null;
         }
 
-        // Find team by name
-        $team = Team::where('name', $teamName)->first();
-        if ($teamName && ! $team) {
+        // Resolve team id from the preloaded name map
+        $teamId = $teamName !== '' ? ($this->teamIdsByName[$teamName] ?? null) : null;
+        if ($teamName !== '' && $teamId === null) {
             $this->results['skipped']++;
             $this->results['errors'][] = "Baris {$this->rowNumber}: Tim '{$teamName}' tidak ditemukan.";
 
@@ -74,7 +87,7 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         $this->roleAssignments[$email] = $roleName;
 
         return new User([
-            'team_id' => $team?->id,
+            'team_id' => $teamId,
             'name' => $name,
             'nip' => $nip,
             'email' => $email,
@@ -87,19 +100,43 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         ]);
     }
 
+    public function registerEvents(): array
+    {
+        return [
+            BeforeImport::class => fn () => $this->prime(),
+        ];
+    }
+
     public function rules(): array
     {
-        $roleNames = Role::pluck('name')->toArray();
+        if ($this->roleNames === []) {
+            $this->roleNames = Role::pluck('name')->toArray();
+        }
 
         return [
             'nama' => ['required', 'string', 'max:255'],
             'nip' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'role' => ['required', 'string', Rule::in($roleNames)],
+            'role' => ['required', 'string', Rule::in($this->roleNames)],
             'tim' => ['nullable', 'string', 'max:255'],
             'telepon' => ['nullable', 'string', 'max:20'],
             'pangkat_golongan' => ['nullable', 'string', 'max:255'],
             'jabatan' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    private function prime(): void
+    {
+        $this->existingNips = User::pluck('nip')->filter()->flip();
+        $this->existingEmails = User::pluck('email')->filter()->flip();
+        $this->teamIdsByName = Team::pluck('id', 'name');
+        $this->roleNames = Role::pluck('name')->toArray();
+    }
+
+    private function primeIfNeeded(): void
+    {
+        if ($this->existingNips === null) {
+            $this->prime();
+        }
     }
 }

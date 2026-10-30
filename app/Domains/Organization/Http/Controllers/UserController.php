@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Validators\ValidationException;
 use PhpOffice\PhpSpreadsheet\Reader\Exception as PhpSpreadsheetException;
+use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
@@ -135,11 +136,23 @@ class UserController extends Controller
         }
         // Anything else (DB, IO, ...) escapes to the Handler → 500 generic.
 
-        // Assign roles from imported role column
-        foreach ($import->roleAssignments as $email => $roleName) {
-            $user = User::where('email', $email)->first();
-            if ($user) {
-                $user->assignRole($roleName);
+        // Assign roles from imported role column (batched user + role lookup).
+        if ($import->roleAssignments !== []) {
+            $users = User::whereIn('email', array_keys($import->roleAssignments))
+                ->get(['id', 'email'])
+                ->keyBy('email');
+
+            $rolesByName = Role::query()
+                ->whereIn('name', array_unique(array_values($import->roleAssignments)))
+                ->get(['id', 'name', 'guard_name'])
+                ->keyBy('name');
+
+            foreach ($import->roleAssignments as $email => $roleName) {
+                $user = $users->get($email);
+                $role = $rolesByName->get($roleName);
+                if ($user && $role) {
+                    $user->assignRole($role);
+                }
             }
         }
 
