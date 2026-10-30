@@ -345,10 +345,9 @@ class RouteModelBindingContractTest extends TestCase
 
         $otherField = Field::create(['name' => 'Bidang B']);
         $otherTeam = Team::create(['field_id' => $otherField->id, 'name' => 'Tim B']);
-        $report = WfhTeamReport::create([
+        $report = WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $otherTeam->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => User::factory()->create(['team_id' => $otherTeam->id])->id,
         ]);
 

@@ -15,6 +15,7 @@ use App\Domains\ChangeManagement\Services\ChangePackageDecision;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
+use App\Support\Media\PublicMediaPath;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -249,5 +250,45 @@ class ChangePackageController extends Controller
             AttachmentResource::collection($attachments),
             'Lampiran berhasil diunggah.',
         );
+    }
+
+    /**
+     * Stream a change-package attachment through an authorized endpoint.
+     *
+     * Evidence files carry internal operational detail, so they are no longer
+     * web-served as static /storage URLs (ship review S2): the client receives
+     * a signed-in-only URL from AttachmentResource and this action re-checks
+     * the same package visibility as the read APIs.
+     */
+    public function downloadAttachment(Request $request, int $id, int $attachmentId): Response|JsonResponse
+    {
+        $package = $this->repo->packageVisibleTo($id, $request->user());
+
+        if (! $package) {
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
+        }
+
+        $attachment = $package->implementation?->attachments()
+            ->where('id', $attachmentId)
+            ->first();
+
+        if (! $attachment) {
+            return ApiResponse::fail('Lampiran tidak ditemukan.', 404);
+        }
+
+        $full = PublicMediaPath::resolve($attachment->path);
+
+        if (! is_file($full)) {
+            return ApiResponse::fail('Berkas lampiran tidak ditemukan.', 404);
+        }
+
+        /*
+         * BinaryFileResponse defaults to public and appends its own
+         * Cache-Control, which produced the contradictory "no-store, public".
+         * Evidence is caller-specific: mark it private explicitly.
+         */
+        return response()
+            ->file($full, ['Cache-Control' => 'no-store'])
+            ->setPrivate();
     }
 }

@@ -38,10 +38,20 @@ class ImplementationResource extends JsonResource
         }
 
         if ($this->relationLoaded('attachments')) {
+            /*
+             * Same contract as AttachmentResource (ship review S2): evidence is
+             * streamed through the authorized download endpoint, never as a
+             * static /storage URL. The two resources must not disagree, or a
+             * client picking the other field would publish an unauthenticated
+             * link.
+             */
             $data['attachments'] = $this->attachments->map(fn ($a) => [
                 'id' => $a->id,
                 'path' => $a->path,
-                'url' => asset('storage/'.$a->path),
+                'url' => route('attachments.download', [
+                    'id' => $this->change_initiation_id,
+                    'attachment' => $a->id,
+                ]),
                 'sort_order' => $a->sort_order,
             ]);
         }

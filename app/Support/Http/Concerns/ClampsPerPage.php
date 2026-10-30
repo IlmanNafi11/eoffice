@@ -11,6 +11,17 @@ trait ClampsPerPage
      */
     public static function perPage(Request $request): int
     {
-        return min(max($request->integer('per_page', 15), 1), 100);
+        /*
+         * Non-numeric input must fall back to the documented default (15),
+         * not clamp to 1: Request::integer() casts "abc" to 0, which the old
+         * min/max chain silently turned into a 1-item page (ship review C3).
+         */
+        $perPage = $request->input('per_page', 15);
+
+        if (! is_numeric($perPage)) {
+            return 15;
+        }
+
+        return min(max((int) $perPage, 1), 100);
     }
 }

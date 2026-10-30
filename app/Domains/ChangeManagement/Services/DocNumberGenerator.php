@@ -10,7 +10,9 @@ class DocNumberGenerator
     public function generate(): string
     {
         $year = now()->year;
-        $prefix = (string) config('change-mgmt.doc_prefix', '9/1.1/114');
+        // ?: rather than ?? : an empty CHANGE_DOC_PREFIX would otherwise produce
+        // a malformed number like "001//2026" instead of falling back.
+        $prefix = (string) (config('change-mgmt.doc_prefix') ?: '9/1.1/114');
 
         return DB::transaction(function () use ($year, $prefix) {
             $lastDoc = ChangeInitiation::whereYear('created_at', $year)

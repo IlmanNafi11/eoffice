@@ -39,10 +39,9 @@ class SessionConfigTest extends TestCase
         $user->assignRole('staf');
         Sanctum::actingAs($user);
 
-        $report = WfhReport::create([
+        $report = WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => now()->toDateString(),
-            'status' => 'draft',
         ]);
 
         // Default: pagi, siang, sore — all should be accepted
@@ -62,10 +61,9 @@ class SessionConfigTest extends TestCase
         $user->assignRole('staf');
         Sanctum::actingAs($user);
 
-        $report = WfhReport::create([
+        $report = WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => now()->toDateString(),
-            'status' => 'draft',
         ]);
 
         $this->postJson("/api/wfh/reports/{$report->id}/attendances", [

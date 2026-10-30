@@ -92,12 +92,13 @@ class TeamReportController extends Controller
             return ApiResponse::fail('Laporan untuk tim dan tanggal ini sudah ada.');
         }
 
-        $report = WfhTeamReport::create([
+        // status is server-owned (SEC-07): forceFill, not mass assignment.
+        $report = new WfhTeamReport([
             'team_id' => $validated['team_id'],
             'report_date' => $validated['report_date'],
-            'status' => 'pending',
             'created_by' => $user->id,
         ]);
+        $report->forceFill(['status' => 'pending'])->save();
 
         return ApiResponse::created(
             new TeamReportResource($report->load(['team', 'creator', 'supervisor'])),

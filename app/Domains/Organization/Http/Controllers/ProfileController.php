@@ -20,7 +20,7 @@ class ProfileController extends Controller
 
     public function show(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['team.field', 'team.leader', 'roles.permissions']);
+        $user = $request->user()->load(['team.field', 'team.leader', 'roles.permissions', 'permissions']);
 
         return ApiResponse::ok(new UserResource($user));
     }
@@ -30,7 +30,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $user->update($request->only(['phone', 'position', 'rank']));
 
-        $fresh = $user->fresh(['team.field', 'team.leader', 'roles.permissions']);
+        $fresh = $user->fresh(['team.field', 'team.leader', 'roles.permissions', 'permissions']);
 
         return ApiResponse::ok(new UserResource($fresh), 'Profil berhasil diperbarui.');
     }

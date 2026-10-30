@@ -23,19 +23,17 @@ class UniqueActiveDraftTest extends TestCase
     {
         $user = User::factory()->create();
 
-        WfhReport::create([
+        WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
-            'status' => 'draft',
         ]);
 
         $this->expectException(QueryException::class);
         $this->expectExceptionCode(23505);
 
-        WfhReport::create([
+        WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
-            'status' => 'draft',
         ]);
     }
 
@@ -43,19 +41,17 @@ class UniqueActiveDraftTest extends TestCase
     {
         $user = User::factory()->create();
 
-        WfhReport::create([
+        WfhReport::factory()->status('rejected')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
-            'status' => 'rejected',
         ]);
 
         $this->expectException(QueryException::class);
         $this->expectExceptionCode(23505);
 
-        WfhReport::create([
+        WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
-            'status' => 'draft',
         ]);
     }
 
@@ -63,16 +59,14 @@ class UniqueActiveDraftTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $draft = WfhReport::create([
+        $draft = WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
-            'status' => 'draft',
         ]);
 
-        $approved = WfhReport::create([
+        $approved = WfhReport::factory()->status('approved')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
-            'status' => 'approved',
         ]);
 
         $this->assertDatabaseHas('wfh_reports', ['id' => $draft->id]);

@@ -33,11 +33,12 @@ trait TransitionsReportState
     {
         $this->assertPending($report, 'disetujui');
 
-        $report->update(array_merge([
+        // Workflow state is not fillable (SEC-07): write it explicitly.
+        $report->forceFill(array_merge([
             'status' => 'approved',
             'supervisor_signed_at' => now(),
             'verification_token' => $this->ensureVerificationToken($report),
-        ], $extra));
+        ], $extra))->save();
 
         return $report->fresh();
     }
@@ -46,10 +47,10 @@ trait TransitionsReportState
     {
         $this->assertPending($report, 'ditolak');
 
-        $report->update([
+        $report->forceFill([
             'status' => 'rejected',
             'reject_reason' => $reason,
-        ]);
+        ])->save();
 
         return $report->fresh();
     }

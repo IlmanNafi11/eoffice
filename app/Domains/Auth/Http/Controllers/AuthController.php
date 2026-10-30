@@ -35,7 +35,7 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
-        $user->load(['team.field', 'team.leader', 'roles.permissions']);
+        $user->load(['team.field', 'team.leader', 'roles.permissions', 'permissions']);
 
         return ApiResponse::ok([
             'token' => $token,
@@ -45,7 +45,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['team.field', 'team.leader', 'roles.permissions']);
+        $user = $request->user()->load(['team.field', 'team.leader', 'roles.permissions', 'permissions']);
 
         return ApiResponse::ok(new UserResource($user));
     }

@@ -33,9 +33,21 @@ final class ApiResponse
         return response()->noContent();
     }
 
+    /**
+     * @param  class-string<JsonResource>  $resource
+     *
+     * A typo'd resource FQCN used to be a runtime fatality in every list
+     * endpoint; the guard turns it into a loud failure at the call site
+     * (ship review R1).
+     */
     public static function paginated(LengthAwarePaginator $page, string $resource): JsonResponse
     {
-        /** @var JsonResource $resource */
+        if (! is_a($resource, JsonResource::class, true)) {
+            throw new \InvalidArgumentException(
+                "ApiResponse::paginated expects a JsonResource class-string, got [{$resource}]."
+            );
+        }
+
         $data = $resource::collection($page->items())->resolve();
 
         return response()->json([

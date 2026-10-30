@@ -80,10 +80,9 @@ class ReportStoreUpdateTest extends TestCase
         Sanctum::actingAs($user);
 
         // Create approved report
-        WfhReport::create([
+        WfhReport::factory()->status('approved')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-28',
-            'status' => 'approved',
         ]);
 
         // Creating a draft for same date should still work (get-or-create returns existing draft,

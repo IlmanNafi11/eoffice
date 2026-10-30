@@ -24,10 +24,9 @@ class ReportAttendanceSubResourceTest extends TestCase
 
     private function createDraftReport(User $user, string $date = '2026-07-28'): WfhReport
     {
-        return WfhReport::create([
+        return WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => $date,
-            'status' => 'draft',
         ]);
     }
 
@@ -123,10 +122,9 @@ class ReportAttendanceSubResourceTest extends TestCase
         $user->assignRole('staf');
         Sanctum::actingAs($user);
 
-        $report = WfhReport::create([
+        $report = WfhReport::factory()->status('approved')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-28',
-            'status' => 'approved',
         ]);
 
         $response = $this->postJson("/api/wfh/reports/{$report->id}/attendances", [
@@ -228,10 +226,9 @@ class ReportAttendanceSubResourceTest extends TestCase
         $user->assignRole('staf');
         Sanctum::actingAs($user);
 
-        $report = WfhReport::create([
+        $report = WfhReport::factory()->status('approved')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-28',
-            'status' => 'approved',
         ]);
         $attendance = WfhAttendance::create([
             'user_id' => $user->id,

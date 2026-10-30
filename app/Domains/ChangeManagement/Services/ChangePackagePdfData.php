@@ -4,6 +4,7 @@ namespace App\Domains\ChangeManagement\Services;
 
 use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
+use App\Support\Media\PublicMediaPath;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 
@@ -93,10 +94,26 @@ class ChangePackagePdfData
 
     private function resolveSignature(?string $path): string
     {
-        return $path ? $this->fileDataUri($path, 'image/png') : '';
+        // Signatures live on the private disk — a different disk from the
+        // attachments below (ship review SEC-03).
+        if (! $path) {
+            return '';
+        }
+
+        $full = SignaturePath::resolve($path);
+
+        return is_file($full)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($full))
+            : '';
     }
 
-    /** @return list<string> base64 data URIs of the implementation attachments (images only). */
+    /**
+     * @return list<string> base64 data URIs of the implementation attachments.
+     *
+     * Images are embedded directly; a PDF is embedded as a data URI when the
+     * renderer can inline it, and anything else is skipped rather than
+     * silently rendering blank (ship review SEC-03 / TestCoverage #7).
+     */
     private function resolveAttachmentImages(ChangeImplementation $impl): array
     {
         $images = [];
@@ -105,10 +122,17 @@ class ChangePackagePdfData
             $mime = match (strtolower(pathinfo($attachment->path, PATHINFO_EXTENSION))) {
                 'png' => 'image/png',
                 'jpg', 'jpeg' => 'image/jpeg',
+                'pdf' => 'application/pdf',
                 default => null,
             };
 
-            if ($mime !== null && ($uri = $this->fileDataUri($attachment->path, $mime)) !== '') {
+            if ($mime === null) {
+                continue;
+            }
+
+            $uri = $this->fileDataUri($attachment->path, $mime);
+
+            if ($uri !== '') {
                 $images[] = $uri;
             }
         }
@@ -116,9 +140,17 @@ class ChangePackagePdfData
         return $images;
     }
 
+    /**
+     * Attachments are stored on the `public` disk — resolving them through
+     * SignaturePath (the private `local` disk) made is_file() fail for every
+     * row, so exported PDFs silently lost all evidence images. Try the disk
+     * the file actually lives on, then fall back to the legacy private path
+     * so pre-migration rows still render (ship review SEC-03).
+     */
     private function fileDataUri(string $path, string $mime): string
     {
-        $full = SignaturePath::resolve($path);
+        $full = PublicMediaPath::resolve($path);
+
         if (! is_file($full)) {
             return '';
         }

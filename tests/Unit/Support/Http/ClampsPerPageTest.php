@@ -43,8 +43,11 @@ class ClampsPerPageTest extends TestCase
         $this->assertSame(1, $this->controller->perPage(new Request(['per_page' => '-5'])));
     }
 
-    public function test_non_numeric_input_becomes_zero_and_clamps_to_one(): void
+    public function test_non_numeric_input_falls_back_to_the_default_page_size(): void
     {
-        $this->assertSame(1, $this->controller->perPage(new Request(['per_page' => 'abc'])));
+        // Ship review C3: "abc" used to cast to 0 and clamp to a 1-item page,
+        // which silently contradicted the documented default of 15.
+        $this->assertSame(15, $this->controller->perPage(new Request(['per_page' => 'abc'])));
+        $this->assertSame(15, $this->controller->perPage(new Request(['per_page' => []])));
     }
 }

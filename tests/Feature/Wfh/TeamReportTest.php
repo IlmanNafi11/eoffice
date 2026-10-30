@@ -253,10 +253,9 @@ class TeamReportTest extends TestCase
         $field->update(['head_id' => $creator->id]);
         Sanctum::actingAs($creator);
 
-        $report = WfhTeamReport::create([
+        $report = WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => $creator->id,
         ]);
 
@@ -278,10 +277,9 @@ class TeamReportTest extends TestCase
         $field->update(['head_id' => $creator->id]);
         Sanctum::actingAs($creator);
 
-        $report = WfhTeamReport::create([
+        $report = WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => $creator->id,
         ]);
 
@@ -452,7 +450,8 @@ class TeamReportTest extends TestCase
         $report = $this->createTeamReport($team);
         // Set a supervisor_id first, then confirm reject doesn't clear it
         $otherUser = User::factory()->create();
-        $report->update(['supervisor_id' => $otherUser->id]);
+        // supervisor_id is non-fillable (SEC-07): seed it explicitly.
+        $report->forceFill(['supervisor_id' => $otherUser->id])->save();
         Sanctum::actingAs($kb);
 
         $this->postJson("/api/admin/wfh/team-reports/{$report->id}/reject", [
@@ -491,10 +490,9 @@ class TeamReportTest extends TestCase
         $admin = User::factory()->create(['team_id' => $team->id]);
         $admin->assignRole('admin');
 
-        return WfhTeamReport::create([
+        return WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => $admin->id,
         ]);
     }

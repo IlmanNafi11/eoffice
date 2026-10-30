@@ -13,15 +13,16 @@ class WfhReport extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /*
+     * Only creation metadata is fillable. Workflow state (status, signature
+     * timestamps, supervisor_id, verification_token) is written exclusively
+     * through forceFill() in the state machines, never from client input
+     * (ship review SEC-07 — defence in depth behind the controller allowlists).
+     */
     protected $fillable = [
         'user_id',
         'report_date',
-        'status',
-        'maker_signed_at',
-        'supervisor_id',
-        'supervisor_signed_at',
         'reject_reason',
-        'verification_token',
     ];
 
     protected $casts = [

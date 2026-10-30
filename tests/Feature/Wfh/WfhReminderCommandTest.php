@@ -56,10 +56,9 @@ class WfhReminderCommandTest extends TestCase
         Notification::fake();
 
         $user = User::factory()->create();
-        WfhReport::create([
+        WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => now()->toDateString(),
-            'status' => 'draft',
         ]);
 
         $this->artisan('wfh:send-reminders');
@@ -79,10 +78,9 @@ class WfhReminderCommandTest extends TestCase
             'photo_path' => 'test.jpg',
             'check_in_at' => now(),
         ]);
-        WfhReport::create([
+        WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => now()->toDateString(),
-            'status' => 'draft',
         ]);
 
         $this->artisan('wfh:send-reminders');
@@ -141,10 +139,9 @@ class WfhReminderCommandTest extends TestCase
             'photo_path' => 'test.jpg',
             'check_in_at' => now(),
         ]);
-        WfhReport::create([
+        WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => now()->toDateString(),
-            'status' => 'draft',
         ]);
 
         $this->artisan('wfh:send-reminders');

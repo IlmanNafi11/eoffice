@@ -37,6 +37,10 @@ return [
     'env' => env('APP_ENV', 'production'),
     'admin_password' => env('APP_ADMIN_PASSWORD'),
 
+    // Local-only demo-account password (DemoUsersSeeder). Empty = generate a
+    // random one-time password instead of shipping a documented credential.
+    'demo_password' => env('APP_DEMO_PASSWORD'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Debug Mode

@@ -21,7 +21,7 @@ class UserResource extends JsonResource
             'must_change_password' => $this->must_change_password,
             'is_active' => $this->is_active,
             'roles' => $this->whenLoaded('roles', fn () => $this->getRoleNames()),
-            'permissions' => $this->whenLoaded('roles', fn () => $this->getAllPermissions()->pluck('name')->values()),
+            'permissions' => $this->whenLoaded('roles', fn () => $this->effectivePermissionNames()),
             'created_at' => $this->created_at,
         ];
 
@@ -49,5 +49,32 @@ class UserResource extends JsonResource
         }
 
         return $data;
+    }
+
+    /**
+     * Effective permission names from pre-loaded relations only.
+     *
+     * Spatie's getAllPermissions() re-reads the direct pivot per model, which
+     * reintroduced the exact N+1 the query-hygiene module closed (ship review
+     * P1: /admin/users issued one model_has_permissions SELECT per row). When
+     * `permissions` and `roles.permissions` are eager-loaded, derive the set
+     * from memory; the direct-pivot relation is deliberately loaded but only
+     * for users that carry one.
+     */
+    private function effectivePermissionNames(): array
+    {
+        $names = collect();
+
+        if ($this->relationLoaded('permissions')) {
+            $names = $names->merge($this->permissions->pluck('name'));
+        }
+
+        foreach ($this->roles as $role) {
+            if ($role->relationLoaded('permissions')) {
+                $names = $names->merge($role->permissions->pluck('name'));
+            }
+        }
+
+        return $names->unique()->sort()->values()->all();
     }
 }

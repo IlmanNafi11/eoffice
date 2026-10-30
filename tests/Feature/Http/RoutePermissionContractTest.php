@@ -177,10 +177,9 @@ class RoutePermissionContractTest extends TestCase
         // this test is about.
         $creator = User::factory()->create(['team_id' => $team->id]);
 
-        $report = WfhTeamReport::create([
+        $report = WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => $creator->id,
         ]);
 

@@ -318,10 +318,9 @@ class EnvelopeContractTest extends TestCase
 
     private function createTeamReport(Team $team): WfhTeamReport
     {
-        return WfhTeamReport::create([
+        return WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => User::factory()->create(['team_id' => $team->id])->id,
         ]);
     }

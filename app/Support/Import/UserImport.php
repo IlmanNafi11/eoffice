@@ -24,6 +24,9 @@ class UserImport implements ToModel, WithEvents, WithHeadingRow, WithValidation
 
     public array $roleAssignments = [];
 
+    /** NIPs and emails already seen in this file: blocks intra-file duplicates (C2). */
+    private array $seenInFile = [];
+
     private int $rowNumber = 1;
 
     private ?Collection $existingNips = null;
@@ -54,21 +57,28 @@ class UserImport implements ToModel, WithEvents, WithHeadingRow, WithValidation
             return null;
         }
 
-        // Skip duplicate NIP
-        if (isset($this->existingNips[$nip])) {
+        // Skip duplicate NIP (already in DB, or repeated earlier in this file)
+        if (isset($this->existingNips[$nip]) || isset($this->seenInFile[$nip])) {
             $this->results['skipped']++;
             $this->results['errors'][] = "Baris {$this->rowNumber}: NIP {$nip} sudah terdaftar.";
 
             return null;
         }
 
-        // Skip duplicate email
-        if (isset($this->existingEmails[$email])) {
+        // Skip duplicate email (already in DB, or repeated earlier in this file)
+        if (isset($this->existingEmails[$email]) || isset($this->seenInFile[$email])) {
             $this->results['skipped']++;
             $this->results['errors'][] = "Baris {$this->rowNumber}: Email {$email} sudah terdaftar.";
 
             return null;
         }
+
+        // Reserve the identity now: intra-file duplicates must be caught by the
+        // checks above instead of reaching the unique index and 500-ing the
+        // whole import (ship review C2). NIPs and emails share one namespace
+        // here because both must be unique across the same column set.
+        $this->seenInFile[$nip] = true;
+        $this->seenInFile[$email] = true;
 
         // Resolve team id from the preloaded name map
         $teamId = $teamName !== '' ? ($this->teamIdsByName[$teamName] ?? null) : null;

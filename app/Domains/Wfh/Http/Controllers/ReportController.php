@@ -18,6 +18,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class ReportController extends Controller
@@ -55,6 +56,10 @@ class ReportController extends Controller
             'month' => ['nullable', 'date_format:Y-m'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
+            // Passed raw into whereHas() below; unvalidated garbage reaches
+            // Postgres as a bigint cast and 500s (22P02). Ship review SEC-01.
+            'status' => ['nullable', Rule::in(['draft', 'pending', 'approved', 'rejected'])],
+            'team_id' => ['nullable', 'integer', 'exists:teams,id'],
         ]);
 
         // Eager-load the actor's team.field so the scope lookup below is not a

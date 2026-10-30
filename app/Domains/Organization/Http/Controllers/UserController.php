@@ -36,7 +36,7 @@ class UserController extends Controller
 
         $users = $this->userRepository->paginateWithRelations(
             perPage: self::perPage($request),
-            relations: ['team.field', 'roles.permissions'],
+            relations: ['team.field', 'roles.permissions', 'permissions'],
         );
 
         return ApiResponse::paginated($users, UserResource::class);
@@ -66,7 +66,7 @@ class UserController extends Controller
         }
 
         return ApiResponse::created(
-            new UserResource($user->load(['team.field', 'roles', 'permissions'])),
+            new UserResource($user->load(['team.field', 'roles.permissions', 'permissions'])),
             'User berhasil dibuat.',
         );
     }
@@ -75,7 +75,7 @@ class UserController extends Controller
     {
         $this->authorize('user.manage');
 
-        $user->load(['team.field', 'roles', 'permissions']);
+        $user->load(['team.field', 'roles.permissions', 'permissions']);
 
         return ApiResponse::ok(new UserResource($user));
     }
@@ -102,7 +102,7 @@ class UserController extends Controller
         }
 
         return ApiResponse::ok(
-            new UserResource($user->fresh(['team.field', 'roles', 'permissions'])),
+            new UserResource($user->fresh(['team.field', 'roles.permissions', 'permissions'])),
             'User berhasil diperbarui.',
         );
     }

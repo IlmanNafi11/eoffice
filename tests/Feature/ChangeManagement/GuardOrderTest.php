@@ -16,8 +16,13 @@ use Tests\TestCase;
 /**
  * Authorization-consistency module (Task 2) — AC#2: every listed change-package
  * action answers 403 for a cross-owner actor and 404 for a missing resource,
- * proving resource resolution precedes the ownership guard (canonical order:
- * authorize → 404 → ownership/role → 403 → state → 422 → execute).
+ * proving resource resolution precedes the ownership guard.
+ *
+ * Canonical order as shipped in ChangePackageDecision::decide():
+ *   state (422) → visibility (403/404) → self-approval (403) → execute
+ * The 422-before-403 ordering is deliberate and pinned by
+ * SegregationOfDutiesTest::test_non_pending_state_returns_422_before_self_check;
+ * an earlier version of this header described the reverse order (ship review C4).
  *
  * approve/reject guard order is covered in SegregationOfDutiesTest (Task 1).
  */

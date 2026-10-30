@@ -102,7 +102,16 @@ class WfhReportPdfDataTest extends TestCase
         $this->assertNull($data['qrSvg']);
         $this->assertNull($data['signatureSupervisorPath']);
         $this->assertSame(
-            [['waktu' => '2026-10-30 08:00:00 – 2026-10-30 09:00:00', 'kegiatan' => 'Menyusun laporan', 'links' => ['https://example.test/doc']]],
+            [[
+                // start_time/end_time are datetime casts, so the rendered value
+                // carries whatever date the row was written on. Derive it from
+                // the persisted row instead of hard-coding today's date, which
+                // made this test expire at midnight.
+                'waktu' => $activity->fresh()->start_time->format('Y-m-d H:i:s')
+                    .' – '.$activity->fresh()->end_time->format('Y-m-d H:i:s'),
+                'kegiatan' => 'Menyusun laporan',
+                'links' => ['https://example.test/doc'],
+            ]],
             $data['kegiatan'],
         );
     }

@@ -38,4 +38,25 @@ class DefaultPasswordTest extends TestCase
 
         $this->assertSame('rotated-admin-pass', DefaultPassword::forRoles(['admin']));
     }
+
+    public function test_for_roles_falls_back_to_random_when_settings_missing(): void
+    {
+        // Ship review S3: a fresh DB seeded out of order must not silently
+        // issue the old hardcoded "admin123"/"user1234" fallbacks.
+        // The seeder warms Setting's process-level static cache; without this
+        // reset the assertions below would pass vacuously on cached values.
+        $cache = new \ReflectionProperty(Setting::class, 'cache');
+        $cache->setAccessible(true);
+        $cache->setValue(null, []);
+
+        Setting::query()->delete();
+
+        $adminPassword = DefaultPassword::forRoles(['admin']);
+        $userPassword = DefaultPassword::forRoles(['staf']);
+
+        $this->assertNotSame('admin123', $adminPassword);
+        $this->assertNotSame('user1234', $userPassword);
+        $this->assertNotSame($adminPassword, $userPassword);
+        $this->assertSame(24, strlen($adminPassword));
+    }
 }

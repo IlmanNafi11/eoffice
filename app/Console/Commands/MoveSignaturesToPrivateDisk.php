@@ -58,7 +58,13 @@ class MoveSignaturesToPrivateDisk extends Command
         // every signature stays downloadable at /storage/signatures/*.png.
         $webCopy = public_path('storage/signatures');
         if (is_dir($webCopy) && realpath($webCopy) !== realpath(storage_path('app/public/signatures'))) {
-            $webFiles = glob($webCopy.'/*.png') ?: [];
+            // Globs every file, not just *.png: signatures are normalised to
+            // PNG today, but a stray extension must never stay web-served
+            // (ship review C5).
+            $webFiles = array_filter(
+                glob($webCopy.'/*') ?: [],
+                'is_file',
+            );
             $this->line(($dryRun ? '[dry-run] ' : '').count($webFiles).' berkas di public/storage/signatures dihapus.');
 
             if (! $dryRun) {

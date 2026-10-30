@@ -34,10 +34,9 @@ class TeamReportPdfTest extends TestCase
         Sanctum::actingAs($admin);
         $this->setUserSignature($admin);
 
-        $teamReport = WfhTeamReport::create([
+        $teamReport = WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => $admin->id,
         ]);
 
@@ -62,10 +61,9 @@ class TeamReportPdfTest extends TestCase
         $this->setUserSignature($kb);
         Sanctum::actingAs($admin);
 
-        $teamReport = WfhTeamReport::create([
+        $teamReport = WfhTeamReport::factory()->status('approved')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'approved',
             'created_by' => $admin->id,
             'supervisor_id' => $kb->id,
             'supervisor_signed_at' => now(),
@@ -130,10 +128,9 @@ class TeamReportPdfTest extends TestCase
         $this->setUserSignature($admin);
         Sanctum::actingAs($admin);
 
-        $foreign = WfhTeamReport::create([
+        $foreign = WfhTeamReport::factory()->status('approved')->create([
             'team_id' => $otherTeam->id,
             'report_date' => now()->toDateString(),
-            'status' => 'approved',
             'created_by' => $admin->id,
             'supervisor_id' => $kb->id,
         ]);
@@ -190,10 +187,9 @@ class TeamReportPdfTest extends TestCase
             'team_id' => $team->id, 'is_active' => true, 'name' => 'User C',
         ]);
 
-        WfhTeamReport::create([
+        WfhTeamReport::factory()->status('pending')->create([
             'team_id' => $team->id,
             'report_date' => now()->toDateString(),
-            'status' => 'pending',
             'created_by' => $admin->id,
         ]);
 
