@@ -8,6 +8,7 @@ use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignatureGuard;
+use App\Support\Signature\SignaturePath;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -191,7 +192,7 @@ class ChangeManagementPdfController extends Controller
 
     private function fileDataUri(string $path, string $mime): string
     {
-        $full = public_path('storage/'.$path);
+        $full = SignaturePath::resolve($path);
         if (! is_file($full)) {
             return '';
         }

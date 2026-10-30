@@ -21,7 +21,7 @@ class SignatureGuard
     public static function missing(array $users): ?User
     {
         foreach ($users as $user) {
-            if ($user !== null && (! $user->signature_path || ! is_file(public_path('storage/'.$user->signature_path)))) {
+            if ($user !== null && (! $user->signature_path || ! SignaturePath::exists($user->signature_path))) {
                 return $user;
             }
         }

@@ -11,6 +11,7 @@ use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignatureGuard;
+use App\Support\Signature\SignaturePath;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,14 +69,12 @@ class ReportPdfController extends Controller
             $qrSvg = $this->qrCodeService->generate($verifyUrl);
         }
         // Signature paths (absolute for dompdf)
-        $makerSig = $user->signature_path
-            ? public_path('storage/'.$user->signature_path)
-            : null;
+        $makerSig = SignaturePath::resolve($user->signature_path) ?: null;
 
         // Supervisor signature only shown when approved
         $supervisorSig = null;
         if ($isApproved && $supervisor?->signature_path) {
-            $supervisorSig = public_path('storage/'.$supervisor->signature_path);
+            $supervisorSig = SignaturePath::resolve($supervisor->signature_path);
         }
 
         $data = [
@@ -143,8 +142,8 @@ class ReportPdfController extends Controller
                 $entries[] = [
                     'no' => $i + 1,
                     'name' => $member['name'],
-                    'photo' => $photoPath && file_exists(public_path('storage/'.$photoPath))
-                        ? public_path('storage/'.$photoPath)
+                    'photo' => SignaturePath::exists($photoPath)
+                        ? SignaturePath::resolve($photoPath)
                         : null,
                 ];
             }
@@ -168,14 +167,12 @@ class ReportPdfController extends Controller
         }
 
         // Admin (maker) signature — always shown
-        $makerSig = $admin->signature_path
-            ? public_path('storage/'.$admin->signature_path)
-            : null;
+        $makerSig = SignaturePath::resolve($admin->signature_path) ?: null;
 
         // KB (atasan langsung) signature — only when team report is approved
         $supervisorSig = null;
         if ($isApproved && $head?->signature_path) {
-            $supervisorSig = public_path('storage/'.$head->signature_path);
+            $supervisorSig = SignaturePath::resolve($head->signature_path);
         }
 
         $tanggal = Carbon::parse($date)->isoFormat('D MMMM Y');
