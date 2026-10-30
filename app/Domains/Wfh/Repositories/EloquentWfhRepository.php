@@ -86,9 +86,11 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
     /**
      * Relations a report read needs; the same list `findReportWithRelations()`
-     * used before route-model binding took over resolution.
+     * used before route-model binding took over resolution. `user.team.field`
+     * is included because the personal PDF export reads `$team?->field`
+     * (WfhReportPdfData), which would otherwise be one lazy query per export.
      */
-    private const REPORT_RELATIONS = ['activities.links', 'attendances', 'user.team', 'supervisor'];
+    private const REPORT_RELATIONS = ['activities.links', 'attendances', 'user.team.field', 'supervisor'];
 
     public function loadReportWithRelations(WfhReport $report): WfhReport
     {

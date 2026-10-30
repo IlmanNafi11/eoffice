@@ -13,10 +13,14 @@ trait EnsuresSameField
      * field as the report, or null when the guard passes.
      *
      * A null field id (actor or report) is denied, matching the shipped guard.
+     * The actor's `team.field` chain is eager-loaded once here so the guard
+     * never emits a hidden per-request lazy query on the approval path.
      */
     private function ensureSameField(Request $request, ?int $reportFieldId): ?JsonResponse
     {
-        $userFieldId = $request->user()->team?->field?->id;
+        $actor = $request->user();
+        $actor->loadMissing('team.field');
+        $userFieldId = $actor->team?->field?->id;
 
         if (! $userFieldId || ! $reportFieldId || $userFieldId !== $reportFieldId) {
             return ApiResponse::fail('Laporan tidak berada dalam bidang Anda.', 403);

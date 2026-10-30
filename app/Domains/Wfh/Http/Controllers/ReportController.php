@@ -55,6 +55,9 @@ class ReportController extends Controller
             'date_to' => ['nullable', 'date'],
         ]);
 
+        // Eager-load the actor's team.field so the scope lookup below is not a
+        // hidden per-request lazy query.
+        $request->user()->loadMissing('team.field');
         $fieldId = $request->user()->team?->field?->id;
 
         if (! $fieldId) {

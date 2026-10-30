@@ -9,6 +9,7 @@ use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -306,5 +307,45 @@ class SegregationOfDutiesTest extends TestCase
         $this->postJson("/api/changes/{$initiation->id}/approve")
             ->assertStatus(200)
             ->assertJsonPath('data.initiation.status', 'approved');
+    }
+
+    /**
+     * WFH approval: the field guard must not lazy-load team.field.
+     */
+    public function test_wfh_approve_does_not_lazy_load_team_field(): void
+    {
+        $field = Field::factory()->create();
+        $team = Team::factory()->create(['field_id' => $field->id]);
+        $maker = $this->createUserWithRole('staf', $team);
+        $supervisor = $this->createUserWithRole('kepala_bidang', $team);
+        $field->update(['head_id' => $supervisor->id]);
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $maker->id,
+            'status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($supervisor);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->postJson("/api/wfh/reports/{$report->id}/approve")
+            ->assertStatus(200);
+
+        $lazyFieldReads = 0;
+        foreach (DB::getQueryLog() as $entry) {
+            $query = strtolower(ltrim($entry['query']));
+            if (str_starts_with($query, 'select * from "fields"') && str_contains($query, 'limit 1')) {
+                $lazyFieldReads++;
+            }
+        }
+        DB::flushQueryLog();
+
+        $this->assertSame(
+            0,
+            $lazyFieldReads,
+            'Approval must not lazy-load team.field for the actor or the report owner.'
+        );
     }
 }

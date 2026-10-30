@@ -42,6 +42,7 @@ class TeamReportController extends Controller
             return ApiResponse::paginated($reports, TeamReportResource::class);
         }
 
+        $user->loadMissing('team.field');
         $fieldId = $user->team?->field?->id;
         if (! $fieldId) {
             return ApiResponse::fail('User tidak terhubung dengan bidang manapun.');
@@ -69,6 +70,7 @@ class TeamReportController extends Controller
         $this->authorize('wfh.team_report.create');
 
         $user = $request->user();
+        $user->loadMissing('team.field');
         $fieldId = $user->team?->field?->id;
 
         $validated = $request->validate([
@@ -107,6 +109,7 @@ class TeamReportController extends Controller
     {
         $this->authorize('wfh.team_report.approve');
 
+        $report->loadMissing('team');
         $guard = $this->ensureSameField($request, $report->team?->field_id);
         if ($guard) {
             return $guard;
@@ -130,6 +133,7 @@ class TeamReportController extends Controller
 
         $request->validate(['reason' => ['required', 'string']]);
 
+        $report->loadMissing('team');
         $guard = $this->ensureSameField($request, $report->team?->field_id);
         if ($guard) {
             return $guard;

@@ -10,6 +10,7 @@ use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -236,5 +237,45 @@ class WfhReportPdfDataTest extends TestCase
         $this->getJson("/api/admin/wfh/teams/{$team->id}/pdf")->assertStatus(200);
 
         return $captured;
+    }
+
+    public function test_personal_pdf_export_does_not_lazy_load_team_field(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $staf = User::factory()->create(['team_id' => $team->id]);
+        $staf->assignRole('staf');
+        $this->setUserSignature($staf);
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $staf->id,
+            'status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($staf);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->getJson("/api/wfh/reports/{$report->id}/pdf")->assertStatus(200);
+
+        // A lazy BelongsTo read is `... where "fields"."id" = ? ... limit 1`;
+        // an eager load batches with `where "fields"."id" in (...)`. Only the
+        // former is the hidden per-export query this task removes.
+        $lazyFieldReads = 0;
+        foreach (DB::getQueryLog() as $entry) {
+            $query = strtolower(ltrim($entry['query']));
+            if (str_starts_with($query, 'select * from "fields"') && str_contains($query, 'limit 1')) {
+                $lazyFieldReads++;
+            }
+        }
+        DB::flushQueryLog();
+
+        $this->assertSame(
+            0,
+            $lazyFieldReads,
+            'PDF export must eager-load user.team.field, not lazy-load it.'
+        );
     }
 }

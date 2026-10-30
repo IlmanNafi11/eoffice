@@ -43,6 +43,7 @@ class ReportApprovalController extends Controller
     {
         $this->authorize('wfh.report.approve');
 
+        $report->loadMissing('user.team');
         $guard = $this->ensureSameField($request, $report->user->team?->field_id);
         if ($guard) {
             return $guard;
@@ -68,6 +69,7 @@ class ReportApprovalController extends Controller
             'reason' => ['required', 'string'],
         ]);
 
+        $report->loadMissing('user.team');
         $guard = $this->ensureSameField($request, $report->user->team?->field_id);
         if ($guard) {
             return $guard;
