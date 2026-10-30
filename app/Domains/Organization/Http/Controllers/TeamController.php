@@ -33,6 +33,7 @@ class TeamController extends Controller
 
         // Everyone else (staf, kepala_tim, kepala_bidang) is scoped to their
         // own bidang; any `field_id` param is ignored.
+        $user->loadMissing('team.field');
         $fieldId = $user->team?->field_id;
 
         if ($fieldId === null) {

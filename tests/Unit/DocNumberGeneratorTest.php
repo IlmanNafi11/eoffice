@@ -77,10 +77,11 @@ class DocNumberGeneratorTest extends TestCase
         );
     }
 
-    public function test_uses_custom_prefix_from_env(): void
+    public function test_uses_custom_prefix_from_config(): void
     {
-        $_ENV['CHANGE_DOC_PREFIX'] = 'X/9.9/999';
-        $_SERVER['CHANGE_DOC_PREFIX'] = 'X/9.9/999';
+        // The prefix is read through config(), so `config:cache` (which nulls
+        // env()) keeps producing well-formed document numbers.
+        config(['change-mgmt.doc_prefix' => 'X/9.9/999']);
 
         try {
             $docNumber = $this->generator->generate();
@@ -90,7 +91,7 @@ class DocNumberGeneratorTest extends TestCase
                 $docNumber
             );
         } finally {
-            unset($_ENV['CHANGE_DOC_PREFIX'], $_SERVER['CHANGE_DOC_PREFIX']);
+            config(['change-mgmt.doc_prefix' => '9/1.1/114']);
         }
     }
 

@@ -260,6 +260,50 @@ class WfhAdminReportTest extends TestCase
         $this->getJson("/api/wfh/reports/{$report->id}/pdf")->assertStatus(403);
     }
 
+    /** The JSON detail endpoint must be bidang-scoped just like the PDF. */
+    public function test_show_rejects_cross_field_viewer(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $owner = User::factory()->create(['team_id' => $team->id]);
+        $owner->assignRole('staf');
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $owner->id,
+            'status' => 'pending',
+        ]);
+
+        $otherField = Field::create(['name' => 'Bidang Lain']);
+        $otherTeam = Team::create(['field_id' => $otherField->id, 'name' => 'Tim Lain']);
+        $outsider = User::factory()->create(['team_id' => $otherTeam->id]);
+        $outsider->assignRole('kepala_tim');
+        Sanctum::actingAs($outsider);
+
+        $this->getJson("/api/wfh/reports/{$report->id}")->assertStatus(403);
+    }
+
+    /** Same-bidang monitoring still works. */
+    public function test_same_field_kepala_can_show_member_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $owner = User::factory()->create(['team_id' => $team->id]);
+        $owner->assignRole('staf');
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $owner->id,
+            'status' => 'pending',
+        ]);
+
+        $kepala = User::factory()->create(['team_id' => $team->id]);
+        $kepala->assignRole('kepala_tim');
+        Sanctum::actingAs($kepala);
+
+        $this->getJson("/api/wfh/reports/{$report->id}")->assertStatus(200);
+    }
+
     /** H3 happy path: same-bidang kepala_tim with monitoring permission can export. */
     public function test_same_field_kepala_can_export_member_pdf(): void
     {

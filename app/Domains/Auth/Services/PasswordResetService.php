@@ -97,6 +97,10 @@ class PasswordResetService
             'must_change_password' => false,
         ]);
 
+        // A reset is the recovery path for a compromised account: every
+        // outstanding token dies with the old password.
+        $user->tokens()->delete();
+
         return true;
     }
 }

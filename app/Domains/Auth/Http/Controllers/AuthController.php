@@ -66,6 +66,11 @@ class AuthController extends Controller
             'must_change_password' => false,
         ]);
 
+        // Rotation invalidates every other session: a token stolen before the
+        // change must not survive it. The caller keeps their current token.
+        $currentId = $user->currentAccessToken()?->id;
+        $user->tokens()->when($currentId, fn ($q) => $q->where('id', '!=', $currentId))->delete();
+
         return ApiResponse::ok(null, 'Password berhasil diubah.');
     }
 

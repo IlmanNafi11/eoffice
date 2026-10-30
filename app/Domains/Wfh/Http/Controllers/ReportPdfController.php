@@ -81,7 +81,13 @@ class ReportPdfController extends Controller
             return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
         }
 
-        $date = $request->input('date', now()->format('Y-m-d'));
+        // Untrusted input: a garbage date used to reach Carbon::parse and 500.
+        $validated = $request->validate([
+            'date' => ['nullable', 'date'],
+            'team_report_id' => ['nullable', 'integer'],
+        ]);
+
+        $date = $validated['date'] ?? now()->format('Y-m-d');
 
         $team->load(['field.head']);
         $head = $team->field?->head;
@@ -90,7 +96,7 @@ class ReportPdfController extends Controller
         // team: passing another team's approved report id must not stamp THIS
         // PDF as approved (it would carry the field head's signature).
         $isApproved = false;
-        if ($teamReportId = $request->input('team_report_id')) {
+        if ($teamReportId = $validated['team_report_id'] ?? null) {
             $teamReport = WfhTeamReport::where('team_id', $team->id)->find($teamReportId);
             $isApproved = $teamReport !== null && $teamReport->status === 'approved';
         }

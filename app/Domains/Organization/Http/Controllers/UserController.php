@@ -36,7 +36,7 @@ class UserController extends Controller
 
         $users = $this->userRepository->paginateWithRelations(
             perPage: self::perPage($request),
-            relations: ['team.field', 'roles'],
+            relations: ['team.field', 'roles.permissions'],
         );
 
         return ApiResponse::paginated($users, UserResource::class);

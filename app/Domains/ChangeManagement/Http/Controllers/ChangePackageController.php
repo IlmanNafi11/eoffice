@@ -36,9 +36,14 @@ class ChangePackageController extends Controller
     {
         $this->authorize('change.initiation.view');
 
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', 'in:draft,pending,approved,rejected'],
+            'field_id' => ['nullable', 'integer', 'exists:fields,id'],
+        ]);
+
         $page = $this->repo->paginatePackages(
             perPage: self::perPage($request),
-            filters: $request->only(['status', 'field_id']),
+            filters: $validated,
             actor: $request->user(),
         );
 

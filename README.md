@@ -70,7 +70,9 @@ php artisan db:seed --class=ChangeTypeSeeder
 php artisan db:seed --class=AdminUserSeeder
 ```
 
-Default admin: `admin@kominfo.go.id` / `password`
+Default admin: `admin@kominfo.go.id`. Password-nya diambil dari `APP_ADMIN_PASSWORD`; jika variabel itu
+kosong, seeder membuat password acak dan mencetaknya **sekali** ke stdout. Akun admin hasil seeder selalu
+memiliki `must_change_password=true`, jadi password tersebut wajib diganti saat login pertama.
 
 ## Test
 ```bash

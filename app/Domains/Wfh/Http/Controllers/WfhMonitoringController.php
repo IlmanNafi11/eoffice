@@ -24,9 +24,16 @@ class WfhMonitoringController extends Controller
     {
         $this->authorize('wfh.monitoring.view');
 
+        // Untrusted input: raw strings used to hit date/team columns produced
+        // 500s (22007/22P02) instead of a 422.
+        $validated = $request->validate([
+            'date' => ['nullable', 'date'],
+            'team_id' => ['nullable', 'integer'],
+        ]);
+
         $user = $request->user();
-        $date = $request->input('date', now()->toDateString());
-        $teamId = $request->input('team_id') ? (int) $request->input('team_id') : null;
+        $date = $validated['date'] ?? now()->toDateString();
+        $teamId = isset($validated['team_id']) ? (int) $validated['team_id'] : null;
         $fieldId = null;
 
         // Admin sees all (no filters)

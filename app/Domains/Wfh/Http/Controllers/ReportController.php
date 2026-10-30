@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Controllers;
 
+use App\Domains\Wfh\Http\Controllers\Concerns\EnsuresSameField;
 use App\Domains\Wfh\Http\Requests\StoreReportRequest;
 use App\Domains\Wfh\Http\Resources\WfhReportResource;
 use App\Domains\Wfh\Models\WfhReport;
@@ -23,6 +24,7 @@ class ReportController extends Controller
 {
     use AuthorizesRequests;
     use ClampsPerPage;
+    use EnsuresSameField;
 
     public function __construct(
         private WfhRepositoryInterface $wfhRepository,
@@ -167,13 +169,20 @@ class ReportController extends Controller
 
     public function show(Request $request, WfhReport $report): JsonResponse
     {
+        $report = $this->wfhRepository->loadReportWithRelations($report);
+
         if ($report->user_id !== $request->user()->id) {
             $this->authorize('wfh.monitoring.view');
+
+            // Monitoring is bidang-scoped: without this a kepala_tim in Bidang A
+            // can read every report in Bidang B by walking ids — including NIP,
+            // attendance photo URLs and signature URLs.
+            if ($guard = $this->ensureSameField($request, $report->user->team?->field_id)) {
+                return $guard;
+            }
         }
 
-        return ApiResponse::ok(new WfhReportResource(
-            $this->wfhRepository->loadReportWithRelations($report),
-        ));
+        return ApiResponse::ok(new WfhReportResource($report));
     }
 
     public function update(StoreReportRequest $request, WfhReport $report): JsonResponse
