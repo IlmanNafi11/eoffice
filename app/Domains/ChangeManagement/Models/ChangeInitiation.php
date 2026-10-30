@@ -14,20 +14,17 @@ class ChangeInitiation extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /**
+     * Business fields only. Workflow state (status, initiator_id, reviewer_id,
+     * doc_number, review_*, *_signed_at, verification_token) is written
+     * exclusively through transitionPackage()/forceFill so a request payload
+     * can never set it.
+     */
     protected $fillable = [
         'field_id',
-        'initiator_id',
-        'reviewer_id',
-        'doc_number',
-        'initiation_date',
         'needed_by_date',
         'description',
         'reason',
-        'status',
-        'review_status',
-        'reviewed_at',
-        'initiator_signed_at',
-        'verification_token',
     ];
 
     protected $casts = [

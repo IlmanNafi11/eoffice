@@ -50,6 +50,8 @@ class QrVerificationTest extends TestCase
             'user_id' => $this->initiator->id,
             'status' => 'approved',
             'verification_token' => $token,
+            'maker_signed_at' => now(),
+            'supervisor_signed_at' => now(),
         ]);
 
         $response = $this->getJson("/api/verify/{$token}");
@@ -71,6 +73,9 @@ class QrVerificationTest extends TestCase
             'field_id' => $this->field->id,
             'initiator_id' => $this->initiator->id,
             'verification_token' => $token,
+            'status' => 'approved',
+            'initiator_signed_at' => now(),
+            'reviewed_at' => now(),
         ]);
 
         $response = $this->getJson("/api/verify/{$token}");
@@ -80,5 +85,50 @@ class QrVerificationTest extends TestCase
             ->assertJsonPath('data.doc_type', 'Change Initiation')
             ->assertJsonPath('data.doc_number', $initiation->doc_number)
             ->assertJsonPath('data.status', 'terverifikasi');
+    }
+
+    /** A draft package whose token was forged client-side must NOT verify. */
+    public function test_verify_endpoint_rejects_draft_change_token(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        ChangeInitiation::factory()->create([
+            'field_id' => $this->field->id,
+            'initiator_id' => $this->initiator->id,
+            'verification_token' => $token,
+            'status' => 'draft',
+        ]);
+
+        $this->getJson("/api/verify/{$token}")->assertStatus(404);
+    }
+
+    /** An approved package still missing the reviewer signature must NOT verify. */
+    public function test_verify_endpoint_rejects_unsigned_approved_change(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        ChangeInitiation::factory()->create([
+            'field_id' => $this->field->id,
+            'initiator_id' => $this->initiator->id,
+            'verification_token' => $token,
+            'status' => 'approved',
+            'initiator_signed_at' => now(),
+            'reviewed_at' => null,
+        ]);
+
+        $this->getJson("/api/verify/{$token}")->assertStatus(404);
+    }
+
+    /** A pending WFH report must NOT verify: only approved+fully-signed docs do. */
+    public function test_verify_endpoint_rejects_unsigned_wfh_report(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        WfhReport::factory()->create([
+            'user_id' => $this->initiator->id,
+            'status' => 'pending',
+            'verification_token' => $token,
+            'maker_signed_at' => now(),
+            'supervisor_signed_at' => null,
+        ]);
+
+        $this->getJson("/api/verify/{$token}")->assertStatus(404);
     }
 }

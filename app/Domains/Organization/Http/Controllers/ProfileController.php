@@ -6,6 +6,7 @@ use App\Domains\Organization\Http\Requests\UpdateProfileRequest;
 use App\Domains\Organization\Http\Requests\UploadSignatureRequest;
 use App\Domains\Organization\Http\Resources\UserResource;
 use App\Support\Http\ApiResponse;
+use App\Support\Signature\SignaturePath;
 use App\Support\Signature\SignatureServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,8 +48,7 @@ class ProfileController extends Controller
         $user->update(['signature_path' => $path]);
 
         return ApiResponse::ok([
-            'signature_path' => $path,
-            'signature_url' => asset("storage/{$path}"),
+            'signature_url' => SignaturePath::urlFor($user->id, $path),
         ], 'Tanda tangan berhasil diunggah.');
     }
 }

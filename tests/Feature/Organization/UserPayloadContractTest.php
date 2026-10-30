@@ -21,7 +21,7 @@ class UserPayloadContractTest extends TestCase
 
     private const SHARED_KEYS = [
         'id', 'name', 'nip', 'email', 'rank', 'position', 'phone',
-        'signature_path', 'signature_url', 'must_change_password', 'is_active',
+        'signature_url', 'must_change_password', 'is_active',
         'roles', 'permissions', 'team',
     ];
 

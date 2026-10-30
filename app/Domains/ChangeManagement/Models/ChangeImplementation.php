@@ -13,6 +13,11 @@ class ChangeImplementation extends Model
 {
     use SoftDeletes;
 
+    /**
+     * Business fields only. Workflow state (status, review_status, reviewer_id,
+     * responsible_id, *_signed_at) is written exclusively through
+     * transitionPackage()/forceFill so a request payload can never set it.
+     */
     protected $fillable = [
         'change_initiation_id',
         'priority',
@@ -24,17 +29,10 @@ class ChangeImplementation extends Model
         'resources',
         'test_plan',
         'evaluator_id',
-        'evaluator_signed_at',
-        'review_status',
         'review_response',
         'execution_date',
-        'reviewer_id',
-        'reviewer_signed_at',
         'implementation_result',
         'release_date',
-        'responsible_id',
-        'responsible_signed_at',
-        'status',
     ];
 
     protected $casts = [

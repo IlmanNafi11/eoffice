@@ -2,16 +2,19 @@
 
 namespace App\Support\Signature;
 
+use Illuminate\Support\Facades\Storage;
+
 /**
- * Single home for resolving storage-relative paths to absolute public files.
- * This is the only place allowed to build the public storage prefix, so callers
- * stop repeating the prefix and the path convention stay in one file.
+ * Single home for resolving storage-relative signature paths to absolute
+ * files. Signatures live on the private `local` disk (storage/app/signatures)
+ * and are never web-served: callers either embed the bytes into a PDF or hand
+ * the client an authorized URL from {@see self::urlFor()}.
  */
 class SignaturePath
 {
     /**
-     * Absolute public path for a storage-relative path, or '' when no path is
-     * given. Callers decide whether the file must actually exist.
+     * Absolute path on the private disk, or '' when no path is given.
+     * Callers decide whether the file must actually exist.
      */
     public static function resolve(?string $relative): string
     {
@@ -19,7 +22,7 @@ class SignaturePath
             return '';
         }
 
-        return public_path('storage/'.$relative);
+        return Storage::disk('local')->path($relative);
     }
 
     /**
@@ -27,6 +30,19 @@ class SignaturePath
      */
     public static function exists(?string $relative): bool
     {
-        return $relative !== null && $relative !== '' && is_file(self::resolve($relative));
+        return $relative !== null && $relative !== '' && Storage::disk('local')->exists($relative);
+    }
+
+    /**
+     * Authorized URL for a signature file, or null when the user has none.
+     * The client must be authenticated; the endpoint re-checks visibility.
+     */
+    public static function urlFor(int $userId, ?string $relative): ?string
+    {
+        if ($relative === null || $relative === '') {
+            return null;
+        }
+
+        return route('signatures.show', ['user' => $userId]);
     }
 }

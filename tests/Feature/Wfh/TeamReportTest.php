@@ -218,7 +218,7 @@ class TeamReportTest extends TestCase
         Sanctum::actingAs($kb);
 
         $report = $this->createTeamReport($team);
-        $report->update(['status' => 'approved']);
+        $report->forceFill(['status' => 'approved'])->save();
 
         $this->postJson("/api/admin/wfh/team-reports/{$report->id}/approve")
             ->assertStatus(422);
@@ -235,7 +235,7 @@ class TeamReportTest extends TestCase
         Sanctum::actingAs($kb);
 
         $report = $this->createTeamReport($team);
-        $report->update(['status' => 'rejected']);
+        $report->forceFill(['status' => 'rejected'])->save();
 
         $this->postJson("/api/admin/wfh/team-reports/{$report->id}/reject", [
             'reason' => 'Already rejected',

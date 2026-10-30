@@ -41,7 +41,7 @@ class SegregationOfDutiesTest extends TestCase
             'priority' => 'normal',
             'impact' => 'Minor',
         ]);
-        $initiation->update(['status' => 'pending']);
+        $initiation->forceFill(['status' => 'pending'])->save();
 
         return $initiation->fresh();
     }
@@ -280,7 +280,7 @@ class SegregationOfDutiesTest extends TestCase
     {
         $initiator = $this->createUserWithRole('kepala_tim');
         $initiation = $this->createPendingPackage($initiator);
-        $initiation->update(['status' => 'approved']);
+        $initiation->forceFill(['status' => 'approved'])->save();
 
         Sanctum::actingAs($initiator);
 

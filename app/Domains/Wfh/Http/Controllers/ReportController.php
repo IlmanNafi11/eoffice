@@ -140,7 +140,7 @@ class ReportController extends Controller
                 reportData: [
                     'user_id' => $user->id,
                     'report_date' => $date,
-                    'status' => $request->input('status', 'draft'),
+                    'status' => 'draft',
                 ],
                 activities: $request->input('activities', []),
                 attendances: $attendances,

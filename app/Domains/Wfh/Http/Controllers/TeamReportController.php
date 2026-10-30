@@ -110,6 +110,12 @@ class TeamReportController extends Controller
         $this->authorize('wfh.team_report.approve');
 
         $report->loadMissing('team');
+
+        // Segregation of duties: the maker cannot approve their own report.
+        if ($report->created_by === $request->user()->id) {
+            return ApiResponse::fail('Pembuat laporan tidak dapat menyetujui laporannya sendiri.', 403);
+        }
+
         $guard = $this->ensureSameField($request, $report->team?->field_id);
         if ($guard) {
             return $guard;

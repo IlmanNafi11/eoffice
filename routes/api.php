@@ -20,6 +20,7 @@ use App\Domains\Wfh\Http\Controllers\TeamReportController;
 use App\Domains\Wfh\Http\Controllers\WfhMonitoringController;
 use App\Http\Controllers\QrVerificationController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SignatureController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth');
@@ -42,6 +43,9 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/signature', [ProfileController::class, 'uploadSignature']);
+
+    // Signatures (private disk; access re-checked per request)
+    Route::get('/signatures/{user}', [SignatureController::class, 'show'])->name('signatures.show');
 
     // Teams (dropdown options)
     Route::get('/teams', [TeamController::class, 'index']);

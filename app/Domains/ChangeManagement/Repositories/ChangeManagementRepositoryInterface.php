@@ -17,6 +17,9 @@ interface ChangeManagementRepositoryInterface extends RepositoryInterface
 
     public function packageVisibleTo(int $id, User $actor): ?ChangeInitiation;
 
+    /** Key-only existence check (no relation hydration) for 404/403 disambiguation. */
+    public function packageExists(int $id): bool;
+
     public function paginatePackages(int $perPage, array $filters, ?User $actor): LengthAwarePaginator;
 
     public function transitionPackage(int $id, string $parentStatus, array $parentExtra = [], array $childExtra = []): void;

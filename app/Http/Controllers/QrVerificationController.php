@@ -17,7 +17,11 @@ class QrVerificationController extends Controller
             return ApiResponse::fail('Token verifikasi tidak valid.', 404);
         }
 
-        $report = WfhReport::where('verification_token', $token)->first();
+        $report = WfhReport::where('verification_token', $token)
+            ->where('status', 'approved')
+            ->whereNotNull('maker_signed_at')
+            ->whereNotNull('supervisor_signed_at')
+            ->first();
 
         if ($report) {
             return ApiResponse::ok([
@@ -29,7 +33,11 @@ class QrVerificationController extends Controller
             ]);
         }
 
-        $initiation = ChangeInitiation::where('verification_token', $token)->first();
+        $initiation = ChangeInitiation::where('verification_token', $token)
+            ->where('status', 'approved')
+            ->whereNotNull('initiator_signed_at')
+            ->whereNotNull('reviewed_at')
+            ->first();
 
         if ($initiation) {
             return ApiResponse::ok([

@@ -2,6 +2,7 @@
 
 namespace App\Domains\ChangeManagement\Http\Resources;
 
+use App\Support\Signature\SignaturePath;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class InitiationResource extends JsonResource
@@ -36,7 +37,7 @@ class InitiationResource extends JsonResource
                 'nip' => $this->initiator->nip,
                 'position' => $this->initiator->position,
                 'rank' => $this->initiator->rank,
-                'signature_path' => $this->initiator->signature_path,
+                'signature_url' => SignaturePath::urlFor($this->initiator->id, $this->initiator->signature_path),
             ];
         }
 

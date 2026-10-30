@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Controllers;
 
+use App\Domains\Wfh\Http\Controllers\Concerns\EnsuresSameField;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
@@ -19,6 +20,7 @@ use Illuminate\Routing\Controller;
 class ReportPdfController extends Controller
 {
     use AuthorizesRequests;
+    use EnsuresSameField;
 
     public function __construct(
         private WfhRepositoryInterface $wfhRepository,
@@ -26,9 +28,21 @@ class ReportPdfController extends Controller
         private WfhReportPdfData $pdfData,
     ) {}
 
-    public function export(WfhReport $report): Response|JsonResponse
+    public function export(Request $request, WfhReport $report): Response|JsonResponse
     {
         $report = $this->wfhRepository->loadReportWithRelations($report);
+
+        // Same visibility rule as ReportController::show: the maker sees their
+        // own report; anyone else needs the monitoring permission AND a shared
+        // bidang. Without this a staf could walk /wfh/reports/{id}/pdf and
+        // harvest every colleague's PDF (name, NIP, activities, photos, sigs).
+        if ($report->user_id !== $request->user()->id) {
+            $this->authorize('wfh.monitoring.view');
+
+            if ($guard = $this->ensureSameField($request, $report->user->team?->field_id)) {
+                return $guard;
+            }
+        }
 
         if (! in_array($report->status, ['pending', 'approved'])) {
             return ApiResponse::fail('PDF hanya dapat di-generate untuk laporan yang sudah disubmit atau disetujui.');
@@ -58,6 +72,8 @@ class ReportPdfController extends Controller
         $this->authorize('wfh.report.export_pdf');
 
         $admin = $request->user();
+        // Eager-load once: the guard and the PDF builder both read this chain.
+        $admin->loadMissing('team.field');
         $fieldId = $admin->team?->field?->id;
 
         // Verify team belongs to admin's field
@@ -70,11 +86,13 @@ class ReportPdfController extends Controller
         $team->load(['field.head']);
         $head = $team->field?->head;
 
-        // Check team report status if team_report_id provided
+        // Check team report status if team_report_id provided. Scoped to this
+        // team: passing another team's approved report id must not stamp THIS
+        // PDF as approved (it would carry the field head's signature).
         $isApproved = false;
         if ($teamReportId = $request->input('team_report_id')) {
-            $teamReport = WfhTeamReport::find($teamReportId);
-            $isApproved = $teamReport && $teamReport->status === 'approved';
+            $teamReport = WfhTeamReport::where('team_id', $team->id)->find($teamReportId);
+            $isApproved = $teamReport !== null && $teamReport->status === 'approved';
         }
 
         // PDF embeds real signatures; refuse export when any involved user

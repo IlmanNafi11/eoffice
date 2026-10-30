@@ -9,6 +9,7 @@ use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -169,12 +170,9 @@ class TeamReportPdfTest extends TestCase
             'check_in_at' => now(),
         ]);
 
-        // Create dummy photo file so file_exists() check passes
-        $photoDir = public_path('storage/attendances/test');
-        if (! is_dir($photoDir)) {
-            mkdir($photoDir, 0755, true);
-        }
-        file_put_contents($photoDir.'/pagi.jpg', 'dummy');
+        // Photos are stored on the `public` disk in production, so the fixture
+        // must land where Storage::disk('public') resolves.
+        Storage::disk('public')->put('attendances/test/pagi.jpg', 'dummy');
 
         $captured = $this->capturePdfViewData($team, null);
 
@@ -270,13 +268,9 @@ class TeamReportPdfTest extends TestCase
             ]);
         }
 
-        // Create dummy photos for both sessions
+        // Create dummy photos for both sessions on the public disk.
         foreach (['pagi', 'siang'] as $session) {
-            $dir = public_path('storage/attendances/test');
-            if (! is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-            file_put_contents($dir."/{$session}.jpg", 'dummy');
+            Storage::disk('public')->put("attendances/test/{$session}.jpg", 'dummy');
         }
 
         $captured = $this->capturePdfViewData($team, null);

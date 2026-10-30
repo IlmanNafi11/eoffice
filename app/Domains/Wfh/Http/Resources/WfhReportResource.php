@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Resources;
 
+use App\Support\Signature\SignaturePath;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class WfhReportResource extends JsonResource
@@ -42,7 +43,7 @@ class WfhReportResource extends JsonResource
                 'nip' => $this->user->nip,
                 'position' => $this->user->position,
                 'rank' => $this->user->rank,
-                'signature_path' => $this->user->signature_path,
+                'signature_url' => SignaturePath::urlFor($this->user->id, $this->user->signature_path),
             ];
         }
 
@@ -53,7 +54,7 @@ class WfhReportResource extends JsonResource
                 'nip' => $this->supervisor->nip,
                 'position' => $this->supervisor->position,
                 'rank' => $this->supervisor->rank,
-                'signature_path' => $this->supervisor->signature_path,
+                'signature_url' => SignaturePath::urlFor($this->supervisor->id, $this->supervisor->signature_path),
             ];
         }
 

@@ -7,6 +7,7 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Media\PublicMediaPath;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 use Illuminate\Support\Carbon;
@@ -100,8 +101,8 @@ class WfhReportPdfData
                 $entries[] = [
                     'no' => $i + 1,
                     'name' => $member['name'],
-                    'photo' => SignaturePath::exists($photoPath)
-                        ? SignaturePath::resolve($photoPath)
+                    'photo' => PublicMediaPath::exists($photoPath)
+                        ? PublicMediaPath::resolve($photoPath)
                         : null,
                 ];
             }

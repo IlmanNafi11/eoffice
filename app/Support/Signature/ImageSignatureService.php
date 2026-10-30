@@ -20,8 +20,8 @@ class ImageSignatureService implements SignatureServiceInterface
         $image->scale(width: self::MAX_WIDTH, height: self::MAX_HEIGHT);
 
         $relativePath = "signatures/{$userId}.png";
-        Storage::disk('public')->makeDirectory('signatures');
-        $fullPath = Storage::disk('public')->path($relativePath);
+        Storage::disk('local')->makeDirectory('signatures');
+        $fullPath = Storage::disk('local')->path($relativePath);
 
         $image->save($fullPath);
 

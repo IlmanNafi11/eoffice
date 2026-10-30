@@ -87,6 +87,12 @@ class UserController extends Controller
         $data = $request->only(['name', 'nip', 'email', 'team_id', 'rank', 'position', 'phone', 'is_active']);
         $this->userRepository->update($user->id, $data);
 
+        // Offboarding control: deactivation revokes every issued token so the
+        // account is cut off immediately, not at token expiry.
+        if (array_key_exists('is_active', $data) && $data['is_active'] === false) {
+            $user->tokens()->delete();
+        }
+
         if ($request->has('roles')) {
             $user->syncRoles($request->input('roles', []));
         }
@@ -105,6 +111,7 @@ class UserController extends Controller
     {
         $this->authorize('user.manage');
 
+        $user->tokens()->delete();
         $user->delete();
 
         return ApiResponse::deleted();

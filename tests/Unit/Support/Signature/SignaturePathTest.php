@@ -12,9 +12,16 @@ class SignaturePathTest extends TestCase
         $this->assertSame('', SignaturePath::resolve(null));
     }
 
-    public function test_resolve_returns_absolute_storage_path_for_relative(): void
+    public function test_resolve_returns_absolute_private_storage_path(): void
     {
-        $this->assertSame(public_path('storage/signatures/a.png'), SignaturePath::resolve('signatures/a.png'));
+        $this->assertSame(storage_path('app/signatures/a.png'), SignaturePath::resolve('signatures/a.png'));
+    }
+
+    public function test_resolve_never_points_at_the_public_disk(): void
+    {
+        $resolved = SignaturePath::resolve('signatures/1.png');
+
+        $this->assertStringNotContainsString('public', $resolved);
     }
 
     public function test_exists_returns_false_for_null(): void
@@ -30,12 +37,13 @@ class SignaturePathTest extends TestCase
     public function test_exists_returns_true_for_present_file(): void
     {
         $relative = 'signatures/'.uniqid('probe-', true).'.png';
-        file_put_contents(public_path('storage/'.$relative), 'x');
+        @mkdir(storage_path('app/signatures'), 0755, true);
+        file_put_contents(storage_path('app/'.$relative), 'x');
 
         try {
             $this->assertTrue(SignaturePath::exists($relative));
         } finally {
-            unlink(public_path('storage/'.$relative));
+            unlink(storage_path('app/'.$relative));
         }
     }
 }

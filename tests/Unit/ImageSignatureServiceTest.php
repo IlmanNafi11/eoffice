@@ -16,7 +16,7 @@ class ImageSignatureServiceTest extends TestCase
     {
         parent::setUp();
         $this->service = app(ImageSignatureService::class);
-        Storage::fake('public');
+        Storage::fake('local');
     }
 
     public function test_normalizes_and_stores_png_signature(): void
@@ -28,7 +28,7 @@ class ImageSignatureServiceTest extends TestCase
         $this->assertStringEndsWith('.png', $path);
         $this->assertStringContainsString('signatures/1.png', $path);
 
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('local')->assertExists($path);
     }
 
     public function test_normalization_resizes_large_image(): void
@@ -37,10 +37,10 @@ class ImageSignatureServiceTest extends TestCase
 
         $path = $this->service->normalize($file->getRealPath(), 2);
 
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('local')->assertExists($path);
 
         // Verify dimensions
-        $storedPath = Storage::disk('public')->path($path);
+        $storedPath = Storage::disk('local')->path($path);
         [$width, $height] = getimagesize($storedPath);
 
         $this->assertLessThanOrEqual(300, $width, 'Width should be <= 300px');

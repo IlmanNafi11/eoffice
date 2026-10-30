@@ -2,6 +2,7 @@
 
 namespace App\Domains\ChangeManagement\Http\Controllers;
 
+use App\Domains\ChangeManagement\Http\Requests\ChangePackageRules;
 use App\Domains\ChangeManagement\Http\Requests\DecideChangePackageRequest;
 use App\Domains\ChangeManagement\Http\Requests\StoreChangePackageRequest;
 use App\Domains\ChangeManagement\Http\Requests\SubmitChangePackageRequest;
@@ -51,13 +52,13 @@ class ChangePackageController extends Controller
         $docNumber = $this->docNumberGenerator->generate();
 
         $package = $this->repo->createPackage(
-            initiation: array_merge($request->input('initiation', []), [
+            initiation: array_merge(ChangePackageRules::initiationPayload($request), [
                 'initiator_id' => $request->user()->id,
                 'doc_number' => $docNumber,
                 'initiation_date' => now()->toDateString(),
             ]),
-            implementation: $request->input('implementation', []),
-            typeIds: $request->input('implementation.change_type_ids', []),
+            implementation: ChangePackageRules::implementationPayload($request),
+            typeIds: ChangePackageRules::typeIdsPayload($request),
         );
 
         return ApiResponse::created(
@@ -76,8 +77,9 @@ class ChangePackageController extends Controller
             return ApiResponse::ok(new ChangePackageResource($package));
         }
 
-        // Null conflates 404 and 403; resolve which by re-fetching without scope.
-        if ($this->repo->findPackage($id)) {
+        // Null conflates 404 and 403; resolve which with a key-only existence
+        // check (no 8-relation hydration just to disambiguate).
+        if ($this->repo->packageExists($id)) {
             return ApiResponse::fail('Anda tidak memiliki akses ke paket ini.', 403);
         }
 
@@ -104,9 +106,9 @@ class ChangePackageController extends Controller
 
         $updated = $this->repo->updatePackage(
             id: $id,
-            initiation: $request->input('initiation', []),
-            implementation: $request->input('implementation', []),
-            typeIds: $request->input('implementation.change_type_ids', []),
+            initiation: ChangePackageRules::initiationPayload($request),
+            implementation: ChangePackageRules::implementationPayload($request),
+            typeIds: ChangePackageRules::typeIdsPayload($request),
         );
 
         return ApiResponse::ok(
@@ -159,9 +161,9 @@ class ChangePackageController extends Controller
         // Persist the submit payload (staf fills all business fields) before transition.
         $this->repo->updatePackage(
             id: $id,
-            initiation: $request->input('initiation', []),
-            implementation: $request->input('implementation', []),
-            typeIds: $request->input('implementation.change_type_ids', []),
+            initiation: ChangePackageRules::initiationPayload($request),
+            implementation: ChangePackageRules::implementationPayload($request),
+            typeIds: ChangePackageRules::typeIdsPayload($request),
         );
 
         $this->repo->transitionPackage($id, 'pending', [

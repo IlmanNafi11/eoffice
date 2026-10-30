@@ -59,17 +59,28 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
     public function createPackage(array $initiation, array $implementation, array $typeIds): ChangeInitiation
     {
         return DB::transaction(function () use ($initiation, $implementation, $typeIds) {
-            $parent = ChangeInitiation::create(array_merge([
+            // $fillable holds business fields; workflow state goes through
+            // forceFill so ONLY this layer can write it.
+            $parent = new ChangeInitiation;
+            $parent->fill($initiation);
+            $parent->forceFill([
                 'status' => 'draft',
-            ], $initiation));
+                'initiator_id' => $initiation['initiator_id'],
+                'doc_number' => $initiation['doc_number'],
+                'initiation_date' => $initiation['initiation_date'],
+            ]);
+            $parent->save();
 
-            $impl = ChangeImplementation::create(array_merge([
+            $impl = new ChangeImplementation;
+            $impl->fill($implementation);
+            $impl->forceFill([
                 'status' => 'draft',
-                'priority' => 'normal',
-                'impact' => 'Minor',
-            ], $implementation, [
                 'change_initiation_id' => $parent->id,
-            ]));
+            ]);
+            // Defaults kept for callers that omit them (draft payloads).
+            $impl->priority = $impl->priority ?? 'normal';
+            $impl->impact = $impl->impact ?? 'Minor';
+            $impl->save();
 
             if (! empty($typeIds)) {
                 $impl->changeTypes()->sync($typeIds);
@@ -84,20 +95,22 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
         return DB::transaction(function () use ($id, $initiation, $implementation, $typeIds) {
             $parent = ChangeInitiation::findOrFail($id);
             if (! empty($initiation)) {
-                $parent->update($initiation);
+                $parent->fill($initiation)->save();
             }
 
             $impl = $parent->implementation;
             if (! $impl) {
-                $impl = ChangeImplementation::create(array_merge([
+                $impl = new ChangeImplementation;
+                $impl->fill($implementation);
+                $impl->forceFill([
                     'status' => 'draft',
-                    'priority' => 'normal',
-                    'impact' => 'Minor',
-                ], $implementation, [
                     'change_initiation_id' => $parent->id,
-                ]));
+                ]);
+                $impl->priority = $impl->priority ?? 'normal';
+                $impl->impact = $impl->impact ?? 'Minor';
+                $impl->save();
             } elseif (! empty($implementation)) {
-                $impl->update($implementation);
+                $impl->fill($implementation)->save();
             }
 
             if (! empty($typeIds)) {
@@ -111,6 +124,11 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
     public function findPackage(int $id): ?ChangeInitiation
     {
         return ChangeInitiation::with(self::PACKAGE_RELATIONS)->find($id);
+    }
+
+    public function packageExists(int $id): bool
+    {
+        return ChangeInitiation::whereKey($id)->exists();
     }
 
     public function paginatePackages(int $perPage, array $filters, ?User $actor): LengthAwarePaginator
@@ -146,7 +164,9 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
         }
 
         DB::transaction(function () use ($id, $parentStatus, $parentExtra, $childExtra) {
-            $parent = ChangeInitiation::findOrFail($id);
+            // Row lock: two concurrent approve/reject calls must not both pass
+            // the state check. The loser re-reads the committed status and 422s.
+            $parent = ChangeInitiation::lockForUpdate()->findOrFail($id);
 
             $current = $parent->status;
             $allowed = self::ALLOWED_TRANSITIONS[$current] ?? [];
@@ -157,13 +177,15 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
                 );
             }
 
-            $parent->update(array_merge($parentExtra, ['status' => $parentStatus]));
+            // State columns are not $fillable: forceFill keeps them writable
+            // from this single, guarded transition path only.
+            $parent->forceFill(array_merge($parentExtra, ['status' => $parentStatus]))->save();
 
             $impl = $parent->implementation;
             if ($impl) {
-                $impl->update(array_merge($childExtra, [
+                $impl->forceFill(array_merge($childExtra, [
                     'status' => self::CHILD_STATUS_MIRROR[$parentStatus],
-                ]));
+                ]))->save();
             }
         });
     }

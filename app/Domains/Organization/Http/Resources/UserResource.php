@@ -2,6 +2,7 @@
 
 namespace App\Domains\Organization\Http\Resources;
 
+use App\Support\Signature\SignaturePath;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
@@ -16,10 +17,7 @@ class UserResource extends JsonResource
             'rank' => $this->rank,
             'position' => $this->position,
             'phone' => $this->phone,
-            'signature_path' => $this->signature_path,
-            'signature_url' => $this->signature_path
-                ? asset("storage/{$this->signature_path}")
-                : null,
+            'signature_url' => SignaturePath::urlFor($this->id, $this->signature_path),
             'must_change_password' => $this->must_change_password,
             'is_active' => $this->is_active,
             'roles' => $this->whenLoaded('roles', fn () => $this->getRoleNames()),
