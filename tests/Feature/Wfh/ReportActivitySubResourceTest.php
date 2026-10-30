@@ -5,6 +5,7 @@ namespace Tests\Feature\Wfh;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -359,5 +360,34 @@ class ReportActivitySubResourceTest extends TestCase
         $response = $this->patchJson("/api/wfh/reports/{$report->id}/activities/reorder", []);
 
         $response->assertStatus(422);
+    }
+
+    public function test_reorder_activities_issues_a_single_update(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user);
+        $a1 = $report->activities()->create(['activity' => 'A', 'sort_order' => 0]);
+        $a2 = $report->activities()->create(['activity' => 'B', 'sort_order' => 1]);
+        $a3 = $report->activities()->create(['activity' => 'C', 'sort_order' => 2]);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->patchJson("/api/wfh/reports/{$report->id}/activities/reorder", [
+            'ids' => [$a3->id, $a1->id, $a2->id],
+        ])->assertStatus(200);
+
+        $updates = 0;
+        foreach (DB::getQueryLog() as $entry) {
+            if (str_starts_with(strtolower(ltrim($entry['query'])), 'update')) {
+                $updates++;
+            }
+        }
+        DB::flushQueryLog();
+
+        $this->assertSame(1, $updates, 'Reorder must issue exactly one UPDATE.');
     }
 }

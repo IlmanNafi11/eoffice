@@ -255,9 +255,22 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
             throw new ApiException('Some activity ids do not belong to this report.', 422);
         }
 
-        foreach ($ids as $index => $id) {
-            WfhReportActivity::where('id', $id)->update(['sort_order' => $index]);
+        if (empty($ids)) {
+            return;
         }
+
+        // One statement instead of one UPDATE per id. Values come from the
+        // validated $ids, so they are integers; the ids are inlined because a
+        // CASE expression cannot be parameterised per-row portably.
+        $cases = [];
+        foreach ($ids as $index => $id) {
+            $cases[] = 'WHEN '.(int) $id.' THEN '.(int) $index;
+        }
+
+        WfhReportActivity::whereIn('id', $ids)
+            ->update([
+                'sort_order' => DB::raw('CASE id '.implode(' ', $cases).' END'),
+            ]);
     }
 
     public function addAttendanceToReport(WfhReport $report, array $data): WfhAttendance
