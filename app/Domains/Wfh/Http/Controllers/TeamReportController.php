@@ -10,6 +10,7 @@ use App\Models\Field;
 use App\Models\Team;
 use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
+use App\Support\Http\Concerns\ClampsPerPage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ use Illuminate\Routing\Controller;
 class TeamReportController extends Controller
 {
     use AuthorizesRequests;
+    use ClampsPerPage;
     use EnsuresSameField;
 
     public function __construct(
@@ -29,7 +31,7 @@ class TeamReportController extends Controller
         $this->authorize('wfh.team_report.view');
 
         $user = $request->user();
-        $perPage = min(max($request->integer('per_page', 15), 1), 100);
+        $perPage = self::perPage($request);
 
         // Admin sees all team reports
         if ($user->hasRole(Roles::ADMIN)) {

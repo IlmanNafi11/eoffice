@@ -10,6 +10,7 @@ use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Support\Constants\Roles;
 use App\Support\Dates\DateRangeHelper;
 use App\Support\Http\ApiResponse;
+use App\Support\Http\Concerns\ClampsPerPage;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -21,6 +22,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ReportController extends Controller
 {
     use AuthorizesRequests;
+    use ClampsPerPage;
 
     public function __construct(
         private WfhRepositoryInterface $wfhRepository,
@@ -75,14 +77,6 @@ class ReportController extends Controller
         $reports = $this->wfhRepository->paginateAllReports($perPage, $filters);
 
         return $this->paginatedReportResponse($reports);
-    }
-
-    /**
-     * Uniform list clamp: per_page is bounded to 1..100 (SPEC-envelope item 3).
-     */
-    private static function perPage(Request $request): int
-    {
-        return min(max($request->integer('per_page', 15), 1), 100);
     }
 
     /**

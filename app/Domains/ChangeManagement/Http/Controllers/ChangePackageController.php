@@ -13,6 +13,7 @@ use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterfac
 use App\Domains\ChangeManagement\Services\ChangePackageDecision;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Support\Http\ApiResponse;
+use App\Support\Http\Concerns\ClampsPerPage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ChangePackageController extends Controller
 {
     use AuthorizesRequests;
+    use ClampsPerPage;
 
     public function __construct(
         private ChangeManagementRepositoryInterface $repo,
@@ -240,13 +242,5 @@ class ChangePackageController extends Controller
             AttachmentResource::collection($attachments),
             'Lampiran berhasil diunggah.',
         );
-    }
-
-    /**
-     * Uniform list clamp: per_page is bounded to 1..100 (SPEC-envelope item 3).
-     */
-    private static function perPage(Request $request): int
-    {
-        return min(max($request->integer('per_page', 15), 1), 100);
     }
 }

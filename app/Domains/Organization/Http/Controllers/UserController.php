@@ -11,6 +11,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
+use App\Support\Http\Concerns\ClampsPerPage;
 use App\Support\Import\UserImport;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ use Symfony\Component\HttpFoundation\Response;
 class UserController extends Controller
 {
     use AuthorizesRequests;
+    use ClampsPerPage;
 
     public function __construct(
         private UserRepositoryInterface $userRepository,
@@ -35,7 +37,7 @@ class UserController extends Controller
         $this->authorize('user.manage');
 
         $users = $this->userRepository->paginateWithRelations(
-            perPage: min(max($request->integer('per_page', 15), 1), 100),
+            perPage: self::perPage($request),
             relations: ['team.field', 'roles'],
         );
 
