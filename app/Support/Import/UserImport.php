@@ -2,10 +2,9 @@
 
 namespace App\Support\Import;
 
-use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
-use App\Support\Constants\Roles;
+use App\Support\Users\DefaultPassword;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -70,10 +69,7 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         $this->results['imported']++;
 
         // Determine default password from Setting based on role
-        $hasAdmin = $roleName === Roles::ADMIN;
-        $defaultPassword = $hasAdmin
-            ? Setting::get('password_default_admin', 'admin123')
-            : Setting::get('password_default_user', 'user1234');
+        $defaultPassword = DefaultPassword::forRoles([$roleName]);
 
         $this->roleAssignments[$email] = $roleName;
 
@@ -96,10 +92,14 @@ class UserImport implements ToModel, WithHeadingRow, WithValidation
         $roleNames = Role::pluck('name')->toArray();
 
         return [
-            'nama' => 'required|string',
-            'nip' => 'required|string',
-            'email' => 'required|email',
+            'nama' => ['required', 'string', 'max:255'],
+            'nip' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
             'role' => ['required', 'string', Rule::in($roleNames)],
+            'tim' => ['nullable', 'string', 'max:255'],
+            'telepon' => ['nullable', 'string', 'max:20'],
+            'pangkat_golongan' => ['nullable', 'string', 'max:255'],
+            'jabatan' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

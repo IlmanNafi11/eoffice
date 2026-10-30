@@ -7,12 +7,11 @@ use App\Domains\Organization\Http\Requests\UpdateUserRequest;
 use App\Domains\Organization\Http\Resources\UserResource;
 use App\Domains\Organization\Repositories\UserRepositoryInterface;
 use App\Exceptions\ApiException;
-use App\Models\Setting;
 use App\Models\User;
-use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
 use App\Support\Import\UserImport;
+use App\Support\Users\DefaultPassword;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,9 +27,7 @@ class UserController extends Controller
     use AuthorizesRequests;
     use ClampsPerPage;
 
-    public function __construct(
-        private UserRepositoryInterface $userRepository,
-    ) {}
+    public function __construct(private UserRepositoryInterface $userRepository) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -56,12 +53,7 @@ class UserController extends Controller
         if ($password = $request->input('password')) {
             $data['password'] = $password;
         } else {
-            $roles = $request->input('roles', []);
-            $hasAdmin = in_array(Roles::ADMIN, $roles);
-
-            $data['password'] = $hasAdmin
-                ? Setting::get('password_default_admin', 'admin123')
-                : Setting::get('password_default_user', 'user1234');
+            $data['password'] = DefaultPassword::forRoles($request->input('roles', []));
         }
 
         $user = $this->userRepository->create($data);
