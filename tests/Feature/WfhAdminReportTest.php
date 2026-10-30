@@ -212,4 +212,29 @@ class WfhAdminReportTest extends TestCase
         $this->getJson("/api/wfh/reports/{$report->id}/pdf")
             ->assertStatus(422);
     }
+
+    public function test_admin_report_list_excludes_verification_token(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $admin = User::factory()->create(['team_id' => $team->id]);
+        $admin->assignRole('admin');
+
+        $staf = User::factory()->create(['team_id' => $team->id]);
+        $staf->assignRole('staf');
+
+        WfhReport::factory()->create([
+            'user_id' => $staf->id,
+            'status' => 'approved',
+            'verification_token' => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/admin/wfh/reports')->assertStatus(200);
+
+        $response->assertJsonPath('meta.total', 1);
+        $response->assertJsonMissingPath('data.0.verification_token');
+    }
 }

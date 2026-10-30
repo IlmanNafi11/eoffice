@@ -104,7 +104,7 @@ class ReportResourceTest extends TestCase
             ]);
     }
 
-    public function test_approved_report_response_includes_verification_token(): void
+    public function test_approved_report_response_excludes_verification_token(): void
     {
         $user = User::factory()->create();
         $user->assignRole('staf');
@@ -118,6 +118,6 @@ class ReportResourceTest extends TestCase
 
         $this->getJson("/api/wfh/reports/{$report->id}")
             ->assertStatus(200)
-            ->assertJsonPath('data.verification_token', $report->verification_token);
+            ->assertJsonMissingPath('data.verification_token');
     }
 }
