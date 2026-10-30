@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Resources;
 
+use App\Support\Media\PrivateMediaPath;
 use App\Support\Signature\SignaturePath;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,7 +33,11 @@ class WfhReportResource extends JsonResource
             $data['attendances'] = $this->attendances->map(fn ($att) => [
                 'session' => $att->session,
                 'checked_in' => ! is_null($att->check_in_at),
-                'photo_url' => $att->photo_path ? asset('storage/'.$att->photo_path) : null,
+                'photo_url' => PrivateMediaPath::attendanceUrl(
+                    $this->id,
+                    $att->id,
+                    $att->photo_path,
+                ),
             ]);
         }
 

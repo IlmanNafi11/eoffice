@@ -29,10 +29,17 @@ class Handler extends ExceptionHandler
 
     public function register(): void
     {
-        // Full trace into the log for 500-class exceptions; the internal
-        // default logger is suppressed (return false) to avoid duplicates.
-        // internalDontReport already keeps 4xx exceptions out of this closure.
+        // Full trace into the log for 5xx only. internalDontReport covers the
+        // framework's own client errors, but ApiException carries its own
+        // status and is not in that list — without this check every domain 422
+        // (a normal answer such as "only pending packages can be approved")
+        // was logged as "Unhandled exception", training operators to ignore the
+        // alert that matters.
         $this->reportable(function (Throwable $e) {
+            if ($this->statusFor($e) < 500) {
+                return false;
+            }
+
             Log::error('Unhandled exception', ['exception' => $e]);
 
             return false;

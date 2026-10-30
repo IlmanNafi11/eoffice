@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -93,12 +94,24 @@ class TeamReportController extends Controller
         }
 
         // status is server-owned (SEC-07): forceFill, not mass assignment.
-        $report = new WfhTeamReport([
-            'team_id' => $validated['team_id'],
-            'report_date' => $validated['report_date'],
-            'created_by' => $user->id,
-        ]);
-        $report->forceFill(['status' => 'pending'])->save();
+        try {
+            $report = new WfhTeamReport([
+                'team_id' => $validated['team_id'],
+                'report_date' => $validated['report_date'],
+                'created_by' => $user->id,
+            ]);
+            $report->forceFill(['status' => 'pending'])->save();
+        } catch (QueryException $e) {
+            // The exists() check above is a read-then-write race: two concurrent
+            // requests both see nothing and both insert. The unique index on
+            // (team_id, report_date) is the real guard, so recover here rather
+            // than turning the loser into a 500.
+            if ($e->getCode() === '23505') {
+                return ApiResponse::fail('Laporan untuk tim dan tanggal ini sudah ada.');
+            }
+
+            throw $e;
+        }
 
         return ApiResponse::created(
             new TeamReportResource($report->load(['team', 'creator', 'supervisor'])),

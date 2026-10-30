@@ -15,7 +15,7 @@ use App\Domains\ChangeManagement\Services\ChangePackageDecision;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
-use App\Support\Media\PublicMediaPath;
+use App\Support\Media\PrivateMediaPath;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -125,7 +125,9 @@ class ChangePackageController extends Controller
 
     public function destroy(Request $request, int $id): Response
     {
-        $this->authorize('change.initiation.update');
+        // Must match the route's permission (change.initiation.delete): checking
+        // update here denied holders of delete and admitted holders of update.
+        $this->authorize('change.initiation.delete');
 
         $package = $this->repo->findPackage($id);
 
@@ -239,7 +241,8 @@ class ChangePackageController extends Controller
 
         $paths = [];
         foreach ($request->file('files', []) as $file) {
-            $paths[] = $file->store('change-attachments', 'public');
+            // Private disk: evidence must not be reachable as /storage/... (S2).
+            $paths[] = $file->store('change-attachments', 'local');
         }
 
         $this->repo->addAttachments($package->implementation->id, $paths);
@@ -262,6 +265,10 @@ class ChangePackageController extends Controller
      */
     public function downloadAttachment(Request $request, int $id, int $attachmentId): Response|JsonResponse
     {
+        // Matches the route permission; packageVisibleTo() then narrows to the
+        // actor's own field/ownership.
+        $this->authorize('change.initiation.view');
+
         $package = $this->repo->packageVisibleTo($id, $request->user());
 
         if (! $package) {
@@ -276,7 +283,7 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Lampiran tidak ditemukan.', 404);
         }
 
-        $full = PublicMediaPath::resolve($attachment->path);
+        $full = PrivateMediaPath::resolveAny($attachment->path);
 
         if (! is_file($full)) {
             return ApiResponse::fail('Berkas lampiran tidak ditemukan.', 404);

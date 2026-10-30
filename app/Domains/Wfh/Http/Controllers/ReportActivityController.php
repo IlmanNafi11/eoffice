@@ -26,6 +26,10 @@ class ReportActivityController extends Controller
 
     public function store(WfhReport $report, StoreActivityRequest $request): JsonResponse
     {
+        // Same permission the route requires; authorizeEdit() then narrows to
+        // ownership + editability (SPEC-authorization-consistency).
+        $this->authorize('wfh.report.create');
+
         if ($block = $this->authorizeEdit($report, $request)) {
             return $block;
         }
@@ -40,6 +44,8 @@ class ReportActivityController extends Controller
 
     public function update(WfhReport $report, WfhReportActivity $activity, StoreActivityRequest $request): JsonResponse
     {
+        $this->authorize('wfh.report.update');
+
         if ($activity->wfh_report_id !== $report->id) {
             return $this->notFound('Kegiatan tidak ditemukan.');
         }
@@ -58,6 +64,8 @@ class ReportActivityController extends Controller
 
     public function destroy(WfhReport $report, WfhReportActivity $activity, Request $request): Response
     {
+        $this->authorize('wfh.report.activity.delete');
+
         if ($activity->wfh_report_id !== $report->id) {
             return $this->notFound('Kegiatan tidak ditemukan.');
         }
@@ -73,6 +81,8 @@ class ReportActivityController extends Controller
 
     public function reorder(WfhReport $report, Request $request): JsonResponse
     {
+        $this->authorize('wfh.report.update');
+
         if ($block = $this->authorizeEdit($report, $request)) {
             return $block;
         }

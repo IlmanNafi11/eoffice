@@ -30,6 +30,10 @@ class ReportPdfController extends Controller
 
     public function export(Request $request, WfhReport $report): Response|JsonResponse
     {
+        // Explicit permission plus the ownership/shared-field check below: a
+        // staf without wfh.report.export_pdf must not export even their own.
+        $this->authorize('wfh.report.export_pdf');
+
         $report = $this->wfhRepository->loadReportWithRelations($report);
 
         // Same visibility rule as ReportController::show: the maker sees their

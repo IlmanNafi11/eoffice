@@ -100,25 +100,55 @@ php artisan test
 - QR codes as inline SVG (bacon/bacon-qr-code)
 - Templates: `resources/views/pdf/{wfh-report,change-initiation,change-implementation}.blade.php`
 
-## E-Signature Storage
+## Private Evidence Storage
 
-Tanda tangan disimpan di disk privat (`storage/app/signatures`, disk `local`) dan **tidak** pernah
-di-serve sebagai file statis — `/storage/signatures/*.png` tidak boleh dapat diakses. Pembacaan
-hanya lewat `GET /api/signatures/{user}` yang memeriksa hak akses per request.
+Semua bukti disimpan di disk privat (disk `local`) dan **tidak** pernah di-serve sebagai file
+statis — `/storage/*` tidak boleh dapat diakses:
 
-Saat upgrade dari versi lama (tanda tangan masih di disk publik), jalankan sekali:
+| Jenis bukti | Lokasi privat | Cara baca |
+|---|---|---|
+| Tanda tangan | `storage/app/signatures` | `GET /api/signatures/{user}` |
+| Foto absensi WFH | `storage/app/attendances/{user}/{tanggal}` | `GET /api/wfh/reports/{report}/attendances/{attendance}/photo` |
+| Lampiran paket perubahan | `storage/app/change-attachments` | `GET /api/changes/{id}/attachments/{attachment}` |
+
+Setiap endpoint memeriksa ulang hak akses per request; melihat URL tidak cukup untuk membaca
+berkas. Saat upgrade dari versi lama (bukti masih di disk publik), jalankan sekali:
 
 ```bash
-php artisan signatures:migrate-private --dry-run   # lihat rencana
-php artisan signatures:migrate-private             # pindahkan + hapus salinan publik
+php artisan media:migrate-private --dry-run   # lihat rencana
+php artisan media:migrate-private             # pindahkan + hapus salinan publik
 ```
 
-Perintah ini idempoten dan juga membersihkan `public/storage/signatures` pada deployment yang
-menyalin direktori (bukan symlink).
+Perintah ini idempoten, menangani ketiga jenis bukti sekaligus, dan juga membersihkan
+`public/storage/{signatures,attendances,change-attachments}` pada deployment yang menyalin
+direktori (bukan symlink). Perintah lama `signatures:migrate-private` sudah dihapus.
+
+## Kebijakan Kata Sandi Default
+
+`SettingsSeeder` hanya menyemai `password_default_admin`/`password_default_user` di environment
+`local`/`testing`. Di produksi tidak ada kata sandi default: `DefaultPassword` membuat kata sandi
+acak per akun (dicetak sekali di log) sampai operator menyetel nilainya lewat
+`PUT /api/admin/settings`, dan setiap akun yang dibuat lewat API/impor ditandai
+`must_change_password`. Untuk akun admin bootstrap, set `APP_ADMIN_PASSWORD` (lihat
+`AdminUserSeeder`) atau catat kata sandi acak yang dicetak sekali saat seeding.
 
 ## Config
 - `config/wfh.php` — Allowed WFH days (default: Friday)
 - Document number prefix: `CHANGE_DOC_PREFIX` env var (default `9/1.1/114`)
+
+## Health Check
+
+`GET /up` adalah probe untuk orchestrator/load balancer. Tanpa autentikasi, dan
+memeriksa koneksi database:
+
+| Kondisi | Status | Body |
+|---|---|---|
+| Database terjangkau | `200` | `{"status":"ok"}` |
+| Database tidak terjangkau | `503` | `{"status":"unavailable"}` |
+
+Probe ini sengaja **tidak** berada di bawah `/api/*` dan tidak memakai envelope
+error API: ia milik infrastruktur, bukan klien. Jangan arahkan traffic ke instance
+yang menjawab `503`.
 
 ## APP_DEBUG
 

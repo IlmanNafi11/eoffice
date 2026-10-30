@@ -44,7 +44,9 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request): JsonResponse
     {
-        $this->authorize('user.manage');
+        // Must match the route permission (user.create), not the broader
+        // user.manage: a route-table edit must not silently widen the guard.
+        $this->authorize('user.create');
 
         $data = $request->only(['name', 'nip', 'email', 'team_id', 'rank', 'position', 'phone']);
         $data['is_active'] = true;
@@ -82,7 +84,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
-        $this->authorize('user.manage');
+        $this->authorize('user.update');
 
         $data = $request->only(['name', 'nip', 'email', 'team_id', 'rank', 'position', 'phone', 'is_active']);
         $this->userRepository->update($user->id, $data);
@@ -109,7 +111,7 @@ class UserController extends Controller
 
     public function destroy(User $user): Response
     {
-        $this->authorize('user.manage');
+        $this->authorize('user.delete');
 
         $user->tokens()->delete();
         $user->delete();

@@ -7,7 +7,7 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
-use App\Support\Media\PublicMediaPath;
+use App\Support\Media\PrivateMediaPath;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 use Illuminate\Support\Carbon;
@@ -101,8 +101,10 @@ class WfhReportPdfData
                 $entries[] = [
                     'no' => $i + 1,
                     'name' => $member['name'],
-                    'photo' => PublicMediaPath::exists($photoPath)
-                        ? PublicMediaPath::resolve($photoPath)
+                    // Private disk first; the public disk is only a fallback for
+                    // rows written before the media:migrate-private cutover.
+                    'photo' => PrivateMediaPath::existsAny($photoPath)
+                        ? PrivateMediaPath::resolveAny($photoPath)
                         : null,
                 ];
             }

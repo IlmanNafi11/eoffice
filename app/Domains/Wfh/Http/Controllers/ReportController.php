@@ -137,7 +137,8 @@ class ReportController extends Controller
         $attendances = [];
         foreach (['pagi', 'siang', 'sore'] as $session) {
             if ($photo = $request->file("attendances.{$session}.photo")) {
-                $path = $photo->store("attendances/{$user->id}/{$date}", 'public');
+                // Private disk: attendance photos are evidence, never web-served.
+                $path = $photo->store("attendances/{$user->id}/{$date}", 'local');
                 $attendances[$session] = ['photo_path' => $path];
             }
         }
@@ -192,6 +193,11 @@ class ReportController extends Controller
 
     public function update(StoreReportRequest $request, WfhReport $report): JsonResponse
     {
+        // Same permission the route requires (SPEC-authorization-consistency):
+        // the controller re-checks so a route-table edit cannot silently open
+        // the action.
+        $this->authorize('wfh.report.update');
+
         if ($report->user_id !== $request->user()->id) {
             return ApiResponse::fail('Tidak dapat mengubah laporan orang lain.', 403);
         }
@@ -214,6 +220,8 @@ class ReportController extends Controller
 
     public function destroy(Request $request, WfhReport $report): Response
     {
+        $this->authorize('wfh.report.delete');
+
         if ($report->user_id !== $request->user()->id && ! $request->user()->hasRole(Roles::ADMIN)) {
             return ApiResponse::fail('Tidak dapat menghapus laporan orang lain.', 403);
         }

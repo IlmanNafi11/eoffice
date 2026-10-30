@@ -30,7 +30,10 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])-
 Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:auth');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth');
 
-Route::get('/verify/{token}', [QrVerificationController::class, 'verify']);
+// Public by design (QR on a printed document), but still throttled: the token
+// is 256-bit and unguessable, and a limiter keeps the endpoint from being used
+// as a free token-oracle/amplifier if a QR ever leaks.
+Route::get('/verify/{token}', [QrVerificationController::class, 'verify'])->middleware('throttle:60,1');
 
 Route::middleware('auth:sanctum')->post('/auth/change-password', [AuthController::class, 'changePassword']);
 
@@ -112,6 +115,14 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
         ->middleware('permission:wfh.attendance.create');
     Route::delete('/wfh/reports/{report}/attendances/{attendance}', [ReportAttendanceController::class, 'destroy'])
         ->middleware('permission:wfh.report.attendance.delete');
+    /*
+     * Evidence photo: no permission middleware, because the maker of the report
+     * must see their own photo while a supervisor needs wfh.monitoring.view.
+     * The controller applies that split; a route-level permission would deny
+     * the maker.
+     */
+    Route::get('/wfh/reports/{report}/attendances/{attendance}/photo', [ReportAttendanceController::class, 'photo'])
+        ->name('attendances.photo');
 
     Route::post('/wfh/reports/{report}/submit', [ReportApprovalController::class, 'submit'])
         ->middleware('permission:wfh.report.submit');

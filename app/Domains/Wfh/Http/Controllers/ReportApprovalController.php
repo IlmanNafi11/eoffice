@@ -23,6 +23,8 @@ class ReportApprovalController extends Controller
 
     public function submit(Request $request, WfhReport $report): JsonResponse
     {
+        $this->authorize('wfh.report.submit');
+
         if ($report->user_id !== $request->user()->id) {
             return ApiResponse::fail('Hanya pembuat laporan yang dapat mensubmit.', 403);
         }
@@ -89,6 +91,7 @@ class ReportApprovalController extends Controller
 
     public function revise(Request $request, WfhReport $report): JsonResponse
     {
+        $this->authorize('wfh.report.update');
 
         if ($report->user_id !== $request->user()->id) {
             return ApiResponse::fail('Hanya pembuat laporan yang dapat merevisi.', 403);

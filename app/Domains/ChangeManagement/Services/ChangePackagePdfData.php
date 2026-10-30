@@ -4,7 +4,7 @@ namespace App\Domains\ChangeManagement\Services;
 
 use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
-use App\Support\Media\PublicMediaPath;
+use App\Support\Media\PrivateMediaPath;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 
@@ -141,15 +141,14 @@ class ChangePackagePdfData
     }
 
     /**
-     * Attachments are stored on the `public` disk — resolving them through
-     * SignaturePath (the private `local` disk) made is_file() fail for every
-     * row, so exported PDFs silently lost all evidence images. Try the disk
-     * the file actually lives on, then fall back to the legacy private path
-     * so pre-migration rows still render (ship review SEC-03).
+     * Attachments live on the private `local` disk. resolveAny() consults that
+     * first and falls back to the legacy `public` copy only for rows written
+     * before `media:migrate-private` ran, so exported PDFs keep rendering
+     * across the cutover.
      */
     private function fileDataUri(string $path, string $mime): string
     {
-        $full = PublicMediaPath::resolve($path);
+        $full = PrivateMediaPath::resolveAny($path);
 
         if (! is_file($full)) {
             return '';
