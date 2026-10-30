@@ -22,11 +22,7 @@ class Setting extends Model
             return $default;
         }
 
-        $value = $setting->value;
-        $decoded = is_string($value) ? json_decode($value, true) : $value;
-        self::$cache[$key] = $decoded !== null ? $decoded : $value;
-
-        return self::$cache[$key];
+        return self::$cache[$key] = self::decode($setting->value);
     }
 
     public static function set(string $key, mixed $value): void
@@ -41,5 +37,32 @@ class Setting extends Model
         );
 
         self::$cache[$key] = $value;
+    }
+
+    /**
+     * Warm the static cache with a single query and return the key/value map.
+     *
+     * Callers that need the whole table (e.g. the settings index) must use the
+     * returned map: reading `static::all()` afterwards would be a second query,
+     * and reading `self::$cache` would leak keys that no longer exist.
+     *
+     * @return array<string, mixed>
+     */
+    public static function prime(): array
+    {
+        $values = [];
+
+        foreach (static::all() as $setting) {
+            $values[$setting->key] = self::$cache[$setting->key] = self::decode($setting->value);
+        }
+
+        return $values;
+    }
+
+    private static function decode(mixed $value): mixed
+    {
+        $decoded = is_string($value) ? json_decode($value, true) : $value;
+
+        return $decoded !== null ? $decoded : $value;
     }
 }

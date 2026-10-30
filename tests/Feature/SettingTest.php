@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -135,5 +136,37 @@ class SettingTest extends TestCase
                     'wfh_sessions' => ['pagi', 'siang', 'sore'],
                 ],
             ]);
+    }
+
+    public function test_index_reads_settings_table_once(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        // Simulate a cold process: the seeder warms the static cache, so without
+        // this reset the assertion would pass vacuously on cached values.
+        $cache = new \ReflectionProperty(Setting::class, 'cache');
+        $cache->setAccessible(true);
+        $cache->setValue(null, []);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $this->getJson('/api/admin/settings')
+            ->assertStatus(200)
+            ->assertJsonPath('data.password_default_admin', 'admin123')
+            ->assertJsonPath('data.wfh_allowed_days', [1, 2, 3, 4, 5]);
+
+        $selects = 0;
+        foreach (DB::getQueryLog() as $entry) {
+            $query = strtolower(ltrim($entry['query']));
+            if (str_starts_with($query, 'select') && str_contains($query, '"settings"')) {
+                $selects++;
+            }
+        }
+        DB::flushQueryLog();
+
+        $this->assertSame(1, $selects, 'Settings table must be read exactly once.');
     }
 }

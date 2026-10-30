@@ -13,9 +13,7 @@ class SettingController extends Controller
 {
     public function index(): JsonResponse
     {
-        $settings = Setting::all()->mapWithKeys(fn ($s) => [
-            $s->key => Setting::get($s->key),
-        ]);
+        $settings = Setting::prime();
 
         return ApiResponse::ok($settings);
     }
