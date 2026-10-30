@@ -5,19 +5,16 @@ namespace App\Domains\Wfh\Http\Controllers;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
-use App\Models\Setting;
+use App\Domains\Wfh\Services\WfhReportPdfData;
 use App\Models\Team;
 use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
-use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignatureGuard;
-use App\Support\Signature\SignaturePath;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Carbon;
 
 class ReportPdfController extends Controller
 {
@@ -26,7 +23,7 @@ class ReportPdfController extends Controller
     public function __construct(
         private WfhRepositoryInterface $wfhRepository,
         private PdfRendererService $pdfRenderer,
-        private QrCodeService $qrCodeService,
+        private WfhReportPdfData $pdfData,
     ) {}
 
     public function export(WfhReport $report): Response|JsonResponse
@@ -46,56 +43,7 @@ class ReportPdfController extends Controller
             return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message'], 422);
         }
 
-        $isApproved = $report->status === 'approved';
-
-        $user = $report->user;
-        $supervisor = $report->supervisor;
-        $team = $user->team;
-        $field = $team?->field;
-
-        // Build activity data with links
-        $kegiatan = $report->activities->map(function ($activity) {
-            return [
-                'waktu' => $activity->start_time.' – '.$activity->end_time,
-                'kegiatan' => $activity->activity,
-                'links' => $activity->links->pluck('url')->toArray(),
-            ];
-        })->toArray();
-
-        // QR code only available when approved (verification_token set at approve)
-        $qrSvg = null;
-        if ($isApproved && $report->verification_token) {
-            $verifyUrl = $this->qrCodeService->generateVerificationUrl($report->verification_token);
-            $qrSvg = $this->qrCodeService->generate($verifyUrl);
-        }
-        // Signature paths (absolute for dompdf)
-        $makerSig = SignaturePath::resolve($user->signature_path) ?: null;
-
-        // Supervisor signature only shown when approved
-        $supervisorSig = null;
-        if ($isApproved && $supervisor?->signature_path) {
-            $supervisorSig = SignaturePath::resolve($supervisor->signature_path);
-        }
-
-        $data = [
-            'nama' => $user->name,
-            'nip' => $user->nip,
-            'pangkat' => $user->rank ?? '-',
-            'jabatan' => $user->position ?? '-',
-            'unitKerja' => $field?->name ?? '-',
-            'tanggalPelaksanaan' => $report->report_date->isoFormat('D MMMM Y'),
-            'kegiatan' => $kegiatan,
-            'isApproved' => $isApproved,
-            'signatureMakerPath' => $makerSig,
-            'signatureSupervisorPath' => $supervisorSig,
-            'makerName' => strtoupper($user->name),
-            'makerNip' => $user->nip,
-            'supervisorName' => $supervisor ? strtoupper($supervisor->name) : '-',
-            'supervisorNip' => $supervisor?->nip ?? '-',
-            'qrSvg' => $qrSvg,
-        ];
-
-        $pdf = $this->pdfRenderer->render('pdf.wfh-report', $data);
+        $pdf = $this->pdfRenderer->render('pdf.wfh-report', $this->pdfData->forReport($report));
 
         $filename = "WFH-{$report->id}-{$report->report_date->format('Y-m-d')}.pdf";
 
@@ -118,37 +66,9 @@ class ReportPdfController extends Controller
         }
 
         $date = $request->input('date', now()->format('Y-m-d'));
-        $teamData = $this->wfhRepository->getTeamReportData($team->id, $date);
 
         $team->load(['field.head']);
-        $field = $team->field;
-        $head = $field?->head;
-
-        // Build staff data: name, nip, links (all members, '-' for missing data)
-        $staff = array_map(fn ($member) => [
-            'name' => $member['name'],
-            'nip' => $member['nip'],
-            'links' => $member['links'],
-        ], $teamData);
-
-        // Build sessions documentation data
-        $sessions = [];
-        $sessionNames = Setting::get('wfh_sessions', ['pagi', 'siang', 'sore']);
-        foreach ($sessionNames as $sessionName) {
-            $entries = [];
-            foreach ($teamData as $i => $member) {
-                $memberPhotos = collect($member['photos'])->keyBy('session');
-                $photoPath = $memberPhotos->get($sessionName)['photo_path'] ?? null;
-                $entries[] = [
-                    'no' => $i + 1,
-                    'name' => $member['name'],
-                    'photo' => SignaturePath::exists($photoPath)
-                        ? SignaturePath::resolve($photoPath)
-                        : null,
-                ];
-            }
-            $sessions[$sessionName] = $entries;
-        }
+        $head = $team->field?->head;
 
         // Check team report status if team_report_id provided
         $isApproved = false;
@@ -166,31 +86,7 @@ class ReportPdfController extends Controller
             return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message'], 422);
         }
 
-        // Admin (maker) signature — always shown
-        $makerSig = SignaturePath::resolve($admin->signature_path) ?: null;
-
-        // KB (atasan langsung) signature — only when team report is approved
-        $supervisorSig = null;
-        if ($isApproved && $head?->signature_path) {
-            $supervisorSig = SignaturePath::resolve($head->signature_path);
-        }
-
-        $tanggal = Carbon::parse($date)->isoFormat('D MMMM Y');
-
-        $data = [
-            'namaTim' => $team->name,
-            'unitKerja' => $field?->name ?? '-',
-            'tanggalPelaksanaan' => $tanggal,
-            'staff' => $staff,
-            'sessions' => $sessions,
-            'isApproved' => $isApproved,
-            'signatureMakerPath' => $makerSig,
-            'signatureSupervisorPath' => $supervisorSig,
-            'makerName' => strtoupper($admin->name),
-            'makerNip' => $admin->nip,
-            'supervisorName' => $head ? strtoupper($head->name) : '-',
-            'supervisorNip' => $head?->nip ?? '-',
-        ];
+        $data = $this->pdfData->forTeam($team, $admin, $head, $date, $isApproved);
 
         $pdf = $this->pdfRenderer->render('pdf.wfh-report-admin', $data);
 
