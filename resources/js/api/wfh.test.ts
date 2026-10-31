@@ -111,6 +111,14 @@ describe("api/wfh — list & read", () => {
     expect(result.meta).toEqual({ current_page: 1, last_page: 3, per_page: 15, total: 40 });
   });
 
+  it("listWfhReports meneruskan page (paginator Laravel) dan omits-undefined tetap berlaku", async () => {
+    ok({ success: true, data: [], message: null, meta: { current_page: 2, last_page: 3, per_page: 15, total: 40 } });
+
+    await listWfhReports({ page: 2 });
+
+    expect(requests[0]?.params).toEqual({ page: 2 });
+  });
+
   it("listWfhReports tanpa filter → filter tidak ikut dikirim sebagai param kosong", async () => {
     ok({ success: true, data: [], message: null, meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 } });
 

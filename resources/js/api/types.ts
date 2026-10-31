@@ -194,6 +194,11 @@ export interface ListWfhReportsQuery {
   per_page?: number;
   date?: string;
   month?: string;
+  /**
+   * Halaman paginator — dibaca Laravel `paginate()` dari query `page` walau
+   * tidak dideklarasikan di openapi.yaml (meta `current_page` membuktikannya).
+   */
+  page?: number;
 }
 
 /** `#/components/schemas/ReportActivityInput` — aktivitas pada create (link = URI string[]). */
