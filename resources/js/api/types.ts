@@ -114,3 +114,138 @@ export interface ResetPasswordRequest {
   new_password_confirmation: string;
 }
 
+
+// ── WFH Reports (Phase 2) ────────────────────────────────────────────
+
+/** Status laporan WFH — union literal, BUKAN `string` bebas. */
+export type WfhReportStatus = "draft" | "pending" | "approved" | "rejected";
+
+/** Nama sesi absensi WFH — default Setting `wfh_sessions`. */
+export type WfhSession = "pagi" | "siang" | "sore";
+
+/** `#/components/schemas/ReportUserNested` — pembuat/atasan pada laporan. */
+export interface WfhReportUser {
+  id: number;
+  name: string;
+  nip: string;
+  position?: string | null;
+  rank?: string | null;
+  signature_path?: string | null;
+}
+
+/**
+ * `#/components/schemas/WfhReportActivity.links[]` — `sort_order` hadir saat
+ * dipancarkan lewat `WfhReportResource` (index/show), tapi DIHILANGKAN pada
+ * respons sub-resource POST/PUT activity (asimetri kontrak v6.0.0).
+ */
+export interface WfhReportLink {
+  id?: number;
+  url: string;
+  sort_order?: number;
+}
+
+/** `#/components/schemas/WfhReportActivity` — satu baris kegiatan. */
+export interface WfhReportActivity {
+  id?: number;
+  activity: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  sort_order?: number;
+  links?: WfhReportLink[];
+}
+
+/**
+ * Baris absensi dalam `WfhReportResource.attendances[]` — hanya dipancarkan
+ * saat relasi `attendances` di-load (endpoint show), tidak ada di list.
+ */
+export interface WfhAttendance {
+  id?: number;
+  session: WfhSession;
+  checked_in?: boolean;
+  photo_url?: string | null;
+}
+
+/** `#/components/schemas/WfhReportResource` — resource laporan WFH personal. */
+export interface WfhReport {
+  id: number;
+  user_id: number;
+  report_date: string;
+  status: WfhReportStatus;
+  maker_signed_at?: string | null;
+  supervisor_signed_at?: string | null;
+  reject_reason?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  user?: WfhReportUser | null;
+  supervisor?: WfhReportUser | null;
+  activities?: WfhReportActivity[];
+  activity_count?: number;
+  attendances?: WfhAttendance[];
+}
+
+/** `#/components/schemas/WfhSessionConfigResponse.data` — sesi + hari boleh WFH. */
+export interface WfhSessionConfig {
+  sessions: WfhSession[];
+  allowed_days: number[];
+}
+
+/** Query `GET /wfh/reports` — filter opsional; `date` menang atas `month`. */
+export interface ListWfhReportsQuery {
+  per_page?: number;
+  date?: string;
+  month?: string;
+}
+
+/** `#/components/schemas/ReportActivityInput` — aktivitas pada create (link = URI string[]). */
+export interface ReportActivityInput {
+  activity: string;
+  start_time?: string;
+  end_time?: string;
+  links?: string[] | null;
+}
+
+/**
+ * `#/components/schemas/StoreReportRequest` — payload POST /wfh/reports
+ * (multipart). `status` hanya "draft" (default) atau "submit".
+ */
+export interface CreateWfhReportInput {
+  report_date: string;
+  status?: "draft" | "submit";
+  activities?: ReportActivityInput[] | null;
+  attendances?: Partial<Record<WfhSession, { photo: Blob }>> | null;
+}
+
+/** Link id-diff pada `StoreActivityRequest.links[]`. */
+export interface ActivityLinkInput {
+  id?: number | null;
+  url: string;
+}
+
+/** `#/components/schemas/StoreActivityRequest` — POST activity sub-resource. */
+export interface ActivityInput {
+  activity: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  links?: ActivityLinkInput[] | null;
+}
+
+/** PUT activity — sama seperti POST, plus `id` (id-diff link, skema tunggal). */
+export interface ActivityUpdateInput extends ActivityInput {
+  id?: number | null;
+}
+
+/** `PATCH /wfh/reports/{report}/activities/reorder` — urutan id persis. */
+export interface ReorderInput {
+  ids: number[];
+}
+
+/** `#/components/schemas/RejectReportRequest` — alasan penolakan wajib. */
+export interface RejectReportRequest {
+  reason: string;
+}
+
+/** `#/components/schemas/AppendAttendanceRequest` — POST attendance sub-resource. */
+export interface AttendanceUploadInput {
+  session: WfhSession;
+  photo: Blob;
+}
