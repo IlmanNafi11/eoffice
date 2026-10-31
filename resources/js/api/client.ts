@@ -172,8 +172,8 @@ httpClient.interceptors.response.use(
  * reject `ApiError`.
  */
 export const api = {
-  async get<T>(url: string): Promise<Unwrapped<T>> {
-    const res = await httpClient.get<unknown, AxiosResponse<unknown>>(url);
+  async get<T>(url: string, options: { params?: Record<string, unknown> } = {}): Promise<Unwrapped<T>> {
+    const res = await httpClient.get<unknown, AxiosResponse<unknown>>(url, { params: options.params });
     return unwrap<T>(res.data);
   },
   async post<T>(url: string, body?: unknown): Promise<Unwrapped<T>> {
@@ -184,8 +184,20 @@ export const api = {
     const res = await httpClient.put<unknown, AxiosResponse<unknown>>(url, body);
     return unwrap<T>(res.data);
   },
+  async patch<T>(url: string, body?: unknown): Promise<Unwrapped<T>> {
+    const res = await httpClient.patch<unknown, AxiosResponse<unknown>>(url, body);
+    return unwrap<T>(res.data);
+  },
+  async del<T>(url: string): Promise<Unwrapped<T>> {
+    const res = await httpClient.delete<unknown, AxiosResponse<unknown>>(url);
+    return unwrap<T>(res.data);
+  },
   async postForm<T>(url: string, form: FormData): Promise<Unwrapped<T>> {
     const res = await httpClient.postForm<unknown, AxiosResponse<unknown>>(url, form);
+    return unwrap<T>(res.data);
+  },
+  async putForm<T>(url: string, form: FormData): Promise<Unwrapped<T>> {
+    const res = await httpClient.putForm<unknown, AxiosResponse<unknown>>(url, form);
     return unwrap<T>(res.data);
   },
 };

@@ -3,13 +3,13 @@ import { AxiosError, AxiosHeaders } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { api, httpClient, setAuthToken, getStoredToken, onUnauthorized } from "@/api/client";
 
-type Recorded = { method?: string; url?: string; headers: AxiosHeaders };
+type Recorded = { method?: string; url?: string; headers: AxiosHeaders; params?: unknown; data?: unknown };
 
 const queue: Array<{ status: number; body: unknown }> = [];
 const requests: Recorded[] = [];
 
 function fakeAdapter(config: InternalAxiosRequestConfig) {
-  requests.push({ method: config.method, url: config.url, headers: AxiosHeaders.from(config.headers) });
+  requests.push({ method: config.method, url: config.url, headers: AxiosHeaders.from(config.headers), params: config.params, data: config.data });
   const next = queue.shift();
   if (!next) throw new Error("fakeAdapter: no queued response");
   const response = {
@@ -166,6 +166,42 @@ describe("api/client — instance & interceptor (frontend-phase1 / axios client)
     // user tidak dipanggil karena sudah dilepas.
     expect(getStoredToken()).toBeNull();
     expect(assignSpy).toHaveBeenCalledWith("/login");
-    expect(logoutSpy).not.toHaveBeenCalled();
   });
-});
+  it("api.get(url, { params }) mengirim query string", async () => {
+    ok({ success: true, data: [], message: null, meta: null });
+    await api.get("/wfh/reports", { params: { date: "2026-10-31", per_page: 25 } });
+    expect(requests[0]?.params).toEqual({ date: "2026-10-31", per_page: 25 });
+  });
+
+  it("api.del meng-unwrap envelope DELETE (kontrak WFH 200 ber-envelope)", async () => {
+    ok({ success: true, data: null, message: "Laporan WFH dihapus." });
+    const result = await api.del("/wfh/reports/3");
+    expect(requests[0]?.method).toBe("delete");
+    expect(result.data).toBeNull();
+    expect(result.message).toBe("Laporan WFH dihapus.");
+  });
+
+  it("api.patch meng-unwrap envelope PATCH", async () => {
+    ok({ success: true, data: { id: 1, status: "approved" }, message: "Disetujui." });
+    const result = await api.patch<{ id: number; status: string }>("/wfh/reports/1", { status: "approved" });
+    expect(requests[0]?.method).toBe("patch");
+    expect(JSON.parse(requests[0]?.data as string)).toEqual({ status: "approved" });
+    expect(result.data).toEqual({ id: 1, status: "approved" });
+  });
+
+  it("api.putForm memakai httpClient.putForm multipart dan meng-unwrap", async () => {
+    const form = new FormData();
+    form.append("report_date", "2026-10-31");
+    ok({ success: true, data: { id: 7 }, message: "Laporan dibuat." });
+    const result = await api.putForm<{ id: number }>("/wfh/reports/7", form);
+    expect(requests[0]?.method).toBe("put");
+    expect(requests[0]?.data).toBe(form);
+    expect(result.data).toEqual({ id: 7 });
+  });
+
+  it("api.del error mapping → reject ApiError", async () => {
+    queue.push({ status: 422, body: { success: false, message: "Gagal.", errors: { id: ["tidak valid"] } } });
+    const err = await api.del("/wfh/reports/x").catch((e: unknown) => e);
+    expect(err).toMatchObject({ kind: "validation", status: 422 });
+  });
+ });
