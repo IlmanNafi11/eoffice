@@ -82,9 +82,15 @@ describe("old scaffold removal (Phase 0 / Task 2)", () => {
     // `components/` survives: it is the shadcn baseline home (`components.json` -> @/components).
     // `hooks/` survives for shadcn-owned helpers only (sidebar ships `use-mobile`);
     // legacy app hooks (`useAuth.ts` and friends) must stay gone.
-    for (const dir of ["pages", "context", "layouts", "routes", "utils"]) {
+    // `pages/` also survives from Phase 3 on: the spec's project structure puts
+    // feature pages there (`pages/auth/LoginPage.tsx`, ...), so only the legacy
+    // siblings (context, layouts, routes, utils) must stay gone. What must NOT
+    // return are the legacy scaffold files inside pages/ — asserted below via
+    // the entries Phase 1 actually ships.
+    for (const dir of ["context", "layouts", "routes", "utils"]) {
       expect(existsSync(resolve(root, `resources/js/${dir}`)), `resources/js/${dir} still exists`).toBe(false);
     }
+    expect(existsSync(resolve(root, "resources/js/pages/auth/LoginPage.tsx")), "pages/auth/LoginPage.tsx missing").toBe(true);
     expect(existsSync(resolve(root, "resources/js/hooks/.gitkeep")), "resources/js/hooks/.gitkeep still exists").toBe(false);
     expect(existsSync(resolve(root, "resources/js/components/common")), "resources/js/components/common still exists").toBe(false);
     expect(existsSync(resolve(root, "resources/js/components/layout/.gitkeep")), "layout .gitkeep still exists").toBe(false);
