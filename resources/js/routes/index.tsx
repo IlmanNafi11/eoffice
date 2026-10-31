@@ -16,10 +16,10 @@
  */
 import { createBrowserRouter } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
-
+import { ChangePasswordPage } from "@/pages/auth/ChangePasswordPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
-import { ChangePasswordPage } from "@/pages/auth/ChangePasswordPage";
+import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { OtpVerificationPage } from "@/pages/auth/OtpVerificationPage";
@@ -49,6 +49,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: "/", element: <HomePage /> },
+          { path: "/profile", element: <ProfilePage /> },
           { path: "/change-password", element: <ChangePasswordPage /> },
         ],
       },
