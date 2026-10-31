@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -56,5 +56,28 @@ describe("tooling wiring (Phase 0 / Task 1)", () => {
     const pkg = JSON.parse(read("package.json"));
     expect(pkg.scripts.test).toBe("vitest run");
     expect(pkg.scripts.typecheck).toBe("tsc -p tsconfig.json --noEmit");
+  });
+});
+
+describe("old scaffold removal (Phase 0 / Task 2)", () => {
+  it("deletes the legacy jsx entry, bootstrap, and Root component", () => {
+    for (const p of ["resources/js/app.jsx", "resources/js/bootstrap.js", "resources/js/Root.jsx"]) {
+      expect(existsSync(resolve(root, p)), `${p} still exists`).toBe(false);
+    }
+  });
+
+  it("removes the legacy scaffold directories and their .gitkeep placeholders", () => {
+    // `components/` survives: it is the shadcn baseline home (`components.json` -> @/components).
+    for (const dir of ["pages", "context", "hooks", "layouts", "routes", "utils"]) {
+      expect(existsSync(resolve(root, `resources/js/${dir}`)), `resources/js/${dir} still exists`).toBe(false);
+    }
+    expect(existsSync(resolve(root, "resources/js/components/common")), "resources/js/components/common still exists").toBe(false);
+    expect(existsSync(resolve(root, "resources/js/components/layout/.gitkeep")), "layout .gitkeep still exists").toBe(false);
+  });
+
+  it("mounts app.tsx from the blade shell with no reference to app.jsx", () => {
+    const blade = read("resources/views/app.blade.php");
+    expect(blade).toContain("resources/js/app.tsx");
+    expect(blade).not.toContain("app.jsx");
   });
 });
