@@ -121,7 +121,14 @@ php artisan media:migrate-private             # pindahkan + hapus salinan publik
 
 Perintah ini idempoten, menangani ketiga jenis bukti sekaligus, dan juga membersihkan
 `public/storage/{signatures,attendances,change-attachments}` pada deployment yang menyalin
-direktori (bukan symlink). Perintah lama `signatures:migrate-private` sudah dihapus.
+direktori (bukan symlink) — pembersihan itu rekursif, karena bukti tersimpan bersarang
+(`attendances/{user}/{tanggal}/x.jpg`). Perintah lama `signatures:migrate-private` sudah dihapus.
+Jalankan sebagai user yang punya izin tulis pada `public/storage/*` (`exit 1` dengan pesan
+"sisa di disk publik" berarti ada berkas yang tidak bisa dihapus), lalu verifikasi:
+
+```bash
+curl -sI https://<host>/storage/attendances/<user>/<tanggal>/<file>.jpg | head -1   # harus 404
+```
 
 ## Kebijakan Kata Sandi Default
 
@@ -163,6 +170,29 @@ APP_DEBUG=true docker compose up -d
 
 atau set `APP_DEBUG=true` di `.env` (host) — `docker-compose.yml` membaca variabel tersebut dengan
 fallback `false`. Jangan pernah commit `.env` dengan `APP_DEBUG=true` untuk environment produksi.
+
+## Proses Runtime Wajib (Queue & Scheduler)
+
+`QUEUE_CONNECTION=database` adalah default, dan dua notifikasi bersifat queued:
+`ResetPasswordOtpNotification` (kode OTP reset kata sandi) dan
+`WfhReminderNotification`. Tanpa worker, OTP tidak pernah terkirim dan pengguna
+terkunci dari alur reset kata sandi.
+
+Jadwal juga harus dipicu, karena `SendWfhReminders` didaftarkan `->everyMinute()`:
+
+```bash
+# 1) worker notifikasi
+php artisan queue:work --tries=3 --timeout=60
+
+# 2) pemicu jadwal (pilih salah satu)
+php artisan schedule:work
+* * * * * cd /path/app && php artisan schedule:run >> /dev/null 2>&1   # cron
+```
+
+Keduanya harus hidup berdampingan dengan web server. `docker-compose.yml` di repo
+ini hanya menjalankan `app` + `postgres` untuk pengembangan, bukan topologi
+produksi. Jika `MAIL_MAILER=resend` tanpa API key, OTP gagal terkirim — periksa
+`MAIL_*` sebelum go-live.
 
 ## CI/CD Pipeline
 

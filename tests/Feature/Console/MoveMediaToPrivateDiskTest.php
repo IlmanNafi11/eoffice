@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Console;
 
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -12,11 +13,52 @@ use Tests\TestCase;
  */
 class MoveMediaToPrivateDiskTest extends TestCase
 {
+    private string $publicRoot = '';
+
     protected function setUp(): void
     {
         parent::setUp();
         Storage::fake('public');
         Storage::fake('local');
+
+        // The web copy lives at public_path('storage'), outside the faked disks.
+        // Sandbox it under storage/ so the test never touches the real public/.
+        $this->publicRoot = storage_path('framework/testing/web-'.uniqid());
+        (new Filesystem)->ensureDirectoryExists($this->publicRoot);
+        $this->app->usePublicPath($this->publicRoot);
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->publicRoot !== '') {
+            (new Filesystem)->deleteDirectory($this->publicRoot);
+        }
+
+        parent::tearDown();
+    }
+
+    public function test_removes_nested_files_from_a_copied_public_storage_directory(): void
+    {
+        // Regression: a deployment where public/storage is a real copy keeps a
+        // web-served second copy of every evidence file. Evidence paths are
+        // nested, so a flat purge deleted nothing and still reported success.
+        $web = $this->publicRoot.'/storage';
+        (new Filesystem)->ensureDirectoryExists($web.'/attendances/42/2026-10-30');
+        (new Filesystem)->ensureDirectoryExists($web.'/signatures/deep/nested');
+        (new Filesystem)->ensureDirectoryExists($web.'/change-attachments/pkg');
+        file_put_contents($web.'/attendances/42/2026-10-30/pagi.jpg', 'photo');
+        file_put_contents($web.'/signatures/deep/nested/1.png', 'sig');
+        file_put_contents($web.'/change-attachments/pkg/evidence.pdf', 'evidence');
+        file_put_contents($web.'/.hidden', 'dotfile');
+
+        Storage::disk('local')->put('attendances/42/2026-10-30/pagi.jpg', 'photo');
+
+        $this->artisan('media:migrate-private')->assertSuccessful();
+
+        $this->assertFalse(is_dir($web.'/attendances'), 'nested attendance web copy survived');
+        $this->assertFalse(is_dir($web.'/signatures'), 'nested signature web copy survived');
+        $this->assertFalse(is_dir($web.'/change-attachments'), 'nested evidence web copy survived');
+        $this->assertSame([], (new Filesystem)->files($web), 'a dotfile stayed web-served');
     }
 
     public function test_dry_run_moves_nothing(): void

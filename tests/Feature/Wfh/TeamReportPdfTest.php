@@ -201,8 +201,9 @@ class TeamReportPdfTest extends TestCase
             'check_in_at' => now(),
         ]);
 
-        // Photos are stored on the `public` disk in production, so the fixture
-        // must land where Storage::disk('public') resolves.
+        // Fake the public disk: photos are private in production now, and the
+        // fixture must never leak bytes into a real storage/app during a run.
+        Storage::fake('public');
         Storage::disk('public')->put('attendances/test/pagi.jpg', 'dummy');
 
         $captured = $this->capturePdfViewData($team, null);
@@ -299,7 +300,9 @@ class TeamReportPdfTest extends TestCase
             ]);
         }
 
-        // Create dummy photos for both sessions on the public disk.
+        // Fake the public disk: photos are private in production now, and the
+        // fixture must never leak bytes into a real storage/app during a run.
+        Storage::fake('public');
         foreach (['pagi', 'siang'] as $session) {
             Storage::disk('public')->put("attendances/test/{$session}.jpg", 'dummy');
         }

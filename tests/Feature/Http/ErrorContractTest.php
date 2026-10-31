@@ -233,11 +233,16 @@ class ErrorContractTest extends TestCase
     {
         // No Accept: application/json and not an /api/* path → HTML rendering,
         // so the envelope must not be forced onto the SPA surface.
-        Route::get('probe-web', fn () => throw new RuntimeException('boom'));
+        //
+        // POST on purpose: the SPA catch-all is `Route::get('/{any}')`, so a GET
+        // probe is shadowed by it and the test would only assert that the SPA
+        // view renders — and would flip red as soon as `public/build` exists.
+        Route::post('probe-web', fn () => throw new RuntimeException('boom'));
 
-        $response = $this->get('/probe-web');
+        $response = $this->post('/probe-web');
 
         $this->assertSame(500, $response->getStatusCode());
+        $this->assertStringContainsString('text/html', (string) $response->headers->get('content-type'));
         $this->assertStringNotContainsString('"success"', (string) $response->getContent());
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Unit\Support\Signature;
 
 use App\Support\Signature\SignaturePath;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SignaturePathTest extends TestCase
@@ -12,16 +13,14 @@ class SignaturePathTest extends TestCase
         $this->assertSame('', SignaturePath::resolve(null));
     }
 
-    public function test_resolve_returns_absolute_private_storage_path(): void
+    public function test_resolve_returns_the_private_disk_root(): void
     {
-        $this->assertSame(storage_path('app/signatures/a.png'), SignaturePath::resolve('signatures/a.png'));
-    }
+        // Resolved through the `local` disk (faked in tests), never a
+        // hardcoded storage_path, so a config change cannot drift silently.
+        $expected = Storage::disk('local')->path('signatures/a.png');
 
-    public function test_resolve_never_points_at_the_public_disk(): void
-    {
-        $resolved = SignaturePath::resolve('signatures/1.png');
-
-        $this->assertStringNotContainsString('public', $resolved);
+        $this->assertSame($expected, SignaturePath::resolve('signatures/a.png'));
+        $this->assertStringNotContainsString('public', $expected);
     }
 
     public function test_exists_returns_false_for_null(): void
@@ -37,13 +36,8 @@ class SignaturePathTest extends TestCase
     public function test_exists_returns_true_for_present_file(): void
     {
         $relative = 'signatures/'.uniqid('probe-', true).'.png';
-        @mkdir(storage_path('app/signatures'), 0755, true);
-        file_put_contents(storage_path('app/'.$relative), 'x');
+        Storage::disk('local')->put($relative, 'x');
 
-        try {
-            $this->assertTrue(SignaturePath::exists($relative));
-        } finally {
-            unlink(storage_path('app/'.$relative));
-        }
+        $this->assertTrue(SignaturePath::exists($relative));
     }
 }

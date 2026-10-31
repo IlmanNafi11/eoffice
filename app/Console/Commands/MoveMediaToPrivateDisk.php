@@ -2,8 +2,11 @@
 
 namespace App\Console\Commands;
 
+use FilesystemIterator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 /**
  * One-shot migration for the evidence-privacy change.
@@ -108,6 +111,10 @@ class MoveMediaToPrivateDisk extends Command
      * Deployments where public/storage is a real directory (copied, not
      * symlinked) keep a second, web-served copy. Purge it too, otherwise every
      * file stays downloadable at /storage/<tree>/....
+     *
+     * Walked recursively: evidence paths are nested
+     * (`attendances/{user}/{date}/x.jpg`), so a flat listing would leave every
+     * real file web-served while still reporting success.
      */
     private function purgeWebCopy(string $tree, bool $dryRun): void
     {
@@ -117,9 +124,13 @@ class MoveMediaToPrivateDisk extends Command
             return;
         }
 
-        // Glob every entry, not just known extensions: a stray file must never
-        // stay web-served.
-        $files = array_filter(glob($webCopy.'/*') ?: [], 'is_file');
+        $files = [];
+
+        foreach ($this->walk($webCopy) as $path => $isDir) {
+            if (! $isDir) {
+                $files[] = $path;
+            }
+        }
 
         $this->line(($dryRun ? '[dry-run] ' : '').count($files)." berkas di public/storage/{$tree} dihapus.");
 
@@ -128,6 +139,36 @@ class MoveMediaToPrivateDisk extends Command
         }
 
         array_map('unlink', $files);
+
+        // Depth-first, deepest first: a directory can only be removed once empty.
+        foreach ($this->walk($webCopy) as $path => $isDir) {
+            if ($isDir) {
+                @rmdir($path);
+            }
+        }
+
         @rmdir($webCopy);
+    }
+
+    /**
+     * Every entry under $root, deepest first, as path => isDirectory.
+     * Dot files are included: a stray dotfile must not stay web-served.
+     *
+     * @return \Generator<string, bool>
+     */
+    private function walk(string $root): \Generator
+    {
+        if (! is_dir($root)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $entry) {
+            yield $entry->getPathname() => $entry->isDir();
+        }
     }
 }

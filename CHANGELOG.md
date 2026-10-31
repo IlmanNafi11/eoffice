@@ -53,6 +53,8 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 - `ImplementationResource` memakai URL endpoint berotorisasi, menyamai
   `AttachmentResource` (keduanya sebelumnya tidak konsisten dan salah satunya
   masih mempublikasikan `/storage/...`).
+- `react-router-dom` 7.18.1 → 7.18.5 (menutup GHSA-qwww-vcr4-c8h2, RSC-mode
+  CSRF bypass). `composer audit` dan `npm audit --omit=dev` kini bersih.
 - `DocNumberGenerator`: `CHANGE_DOC_PREFIX=""` kini jatuh ke default, tidak lagi
   menghasilkan nomor rusak seperti `001//2026`.
 
@@ -74,8 +76,28 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   bukan 500.
 - Token verifikasi tidak lagi dibuat ulang saat approval ulang: QR pada PDF yang
   sudah dicetak tetap bisa diverifikasi.
+- **`media:migrate-private`** kini membersihkan salinan web secara rekursif.
+  Sebelumnya `public/storage/{signatures,attendances,change-attachments}` disapu
+  dengan `glob()` satu level, sedangkan bukti tersimpan bersarang
+  (`attendances/{user}/{tanggal}/x.jpg`). Pada deployment yang menyalin direktori
+  (bukan symlink) setiap berkas tetap terunduh di `/storage/<tree>/...` sementara
+  perintah melaporkan sukses; sekarang direktori salinan dihapus seluruhnya dan
+  hasilnya dilaporkan per-tree.
 
 ### Tests
+- Regression test pembersihan salinan web bersarang pada
+  `public/storage/{attendances,signatures,change-attachments}` (RED bila
+  penyapuan dikembalikan ke `glob()` satu level).
+- Rate limit `/verify/{token}` dikunci test (RED bila `ThrottleRequests:api`
+  dilepas dari grup `api`) — sebelumnya tak ada test yang gagal tanpanya.
+- Test fallback render non-JSON memakai probe `POST`: probe `GET` tertutup
+  catch-all SPA, sehingga ia hanya menguji view SPA dan menjadi merah palsu
+  begitu `public/build` ada.
+- Otorisasi baca foto absensi (`/wfh/reports/{report}/attendances/{attendance}/photo`):
+  pemilik boleh, `kepala_*` hanya bila bidangnya sama, kolega lain 403. Rute ini
+  sengaja tanpa `permission:` (tidak bisa menyatakan "pemilik ATAU atasan"), jadi
+  sebelumnya seluruh jalur baca tak teruji — mencopot guard-nya membuat suite
+  tetap hijau.
 - Matriks 403 untuk seluruh rute ber-permission (38 kasus) — menghapus satu
   `permission:` middleware sekarang menggagalkan suite.
 - Pemulihan duplikat `23505` via HTTP dengan double repository yang menjaga

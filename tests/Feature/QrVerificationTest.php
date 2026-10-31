@@ -131,4 +131,23 @@ class QrVerificationTest extends TestCase
 
         $this->getJson("/api/verify/{$token}")->assertStatus(404);
     }
+
+    /**
+     * The public verify endpoint must stay rate limited: without it a leaked QR
+     * (or a guessed token) can be used as an unthrottled oracle.
+     *
+     * The effective limiter is the `api` middleware group (`ThrottleRequests:api`,
+     * 60/min by user-or-IP); the route-level `throttle:60,1` is a second bucket on
+     * the same budget. Removing the group's limiter makes this test RED (verified).
+     */
+    public function test_verify_endpoint_is_rate_limited(): void
+    {
+        $token = bin2hex(random_bytes(32));
+
+        for ($i = 0; $i < 60; $i++) {
+            $this->getJson("/api/verify/{$token}")->assertStatus(404);
+        }
+
+        $this->getJson("/api/verify/{$token}")->assertStatus(429);
+    }
 }
