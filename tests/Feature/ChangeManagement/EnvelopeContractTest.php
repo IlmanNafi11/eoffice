@@ -129,7 +129,7 @@ class EnvelopeContractTest extends TestCase
         $this->assertSame('Lampiran berhasil diunggah.', $body['message']);
         $this->assertCount(1, $body['data']);
         $this->assertSame(
-            ['id', 'path', 'sort_order', 'url'],
+            ['id', 'sort_order', 'url'],
             $this->sortedKeys($body['data'][0]),
         );
         $this->assertStringStartsWith('http', $body['data'][0]['url']);
