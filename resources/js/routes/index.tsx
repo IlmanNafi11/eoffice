@@ -1,23 +1,29 @@
 /**
- * Router map aplikasi (frontend-phase1, Phase 3).
+ * Router map aplikasi (frontend-phase1, Phase 3-4).
  *
  * Kontrak (spec §Project Structure: "routes/index.tsx → peta route, semua di
  * dalam AppShell"; catatan T10 di plan: leaf-nya dibuat bersama task halaman
  * pertama):
- * - `/login` publik (di luar guard) — satu-satunya route otentikasi yang ada
- * - Route terlindungi dibungkus `ProtectedRoute` (guard sesi +
- *   `must_change_password`) dan `SessionBootstrap` (rehidrasi user via
- *   `GET /auth/me` setelah refresh). Halaman Beranda sengaja belum ada sebagai
- *   file (task "Beranda" tidak ada di plan); outletnya placeholder minimal yang
- *   akan diganti modul WFH/Change di fase berikutnya.
+ * - `/login` publik (di luar guard)
+ * - Alur reset password publik (openapi: security[]): `/forgot-password` →
+ *   `/verify-otp` → `/reset-password`
+ * - Route terlindungi dibungkus `ProtectedRoute` (guard sesi + must_change)
+ *   dan `SessionBootstrap` (rehidrasi user via GET /auth/me). `/change-password`
+ *   berada di dalam guard karena endpoint bearer; ia lolos guard via path.
+ * - `/change-password` juga satunya-satunya tujuan saat guard must_change aktif.
+ * - Halaman Beranda (placeholder) menunggu modul WFH/Change/fase berikutnya;
+ *   outletnya tetap minimal.
  */
-
 import { createBrowserRouter } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { ChangePasswordPage } from "@/pages/auth/ChangePasswordPage";
+import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
+import { OtpVerificationPage } from "@/pages/auth/OtpVerificationPage";
+import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
 
 /** Placeholder outlet `/` sampai modul WFH/Change (fase berikutnya). */
@@ -41,8 +47,14 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppShell />,
-        children: [{ path: "/", element: <HomePage /> }],
+        children: [
+          { path: "/", element: <HomePage /> },
+          { path: "/change-password", element: <ChangePasswordPage /> },
+        ],
       },
     ],
   },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/verify-otp", element: <OtpVerificationPage /> },
+  { path: "/reset-password", element: <ResetPasswordPage /> },
 ]);
