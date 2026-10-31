@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Domains\Auth\Http\Controllers\AuthController;

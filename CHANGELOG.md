@@ -68,6 +68,12 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 - Endpoint foto absensi memakai `resolveAny()`/`existsAny()` sehingga baris
   lama (publik, pra-`media:migrate-private`) tetap terlayani — sama seperti jalur
   PDF yang sudah toleran.
+- Baris kosong sebelum `<?php` di `routes/api.php` memberi prefiks byte `\n`
+  pada setiap respons API. JSON tetap ter-parse dan menyembunyikan cacat ini,
+  tetapi respons biner (`GET /api/signatures/{user}`) rusak — browser menolak
+  PNG-nya sehingga preview tanda tangan tampil kosong. Baris kosong dihapus;
+  `SignatureAccessTest::test_application_bootstrap_emits_no_stray_output`
+  mengunci invarian: bootstrap Laravel tidak boleh menulis byte apa pun ke stdout.
 - Parity guard route↔controller dikunci oleh test: setiap route mutating yang
   mendeklarasikan `permission:<name>` wajib memanggil `$this->authorize('<name>')`
   di controllernya (drift inilah yang membuat `destroy` memakai `update`).

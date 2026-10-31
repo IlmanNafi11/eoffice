@@ -90,6 +90,32 @@ class SignatureAccessTest extends TestCase
         $this->getJson("/api/signatures/{$owner->id}")->assertOk();
     }
 
+    public function test_application_bootstrap_emits_no_stray_output(): void
+    {
+        // Binary responses (signature, attachments) stream the file straight
+        // into the response body. Under php-fpm the same applies to the first
+        // bytes of every response. Any output produced while the framework
+        // boots — a blank line before `<?php` in a route file, a BOM, a stray
+        // echo — is prepended to that body and corrupts the payload; JSON
+        // endpoints hide it, PNG/PDF do not.
+        //
+        // A fresh process is required: in-process bootstrap has already run
+        // (and PHPUnit itself buffers), so only an isolated boot can observe it.
+        $command = escapeshellarg(PHP_BINARY)
+            .' -d display_errors=0 -r '
+            .escapeshellarg(
+                'require "vendor/autoload.php";'
+                .'$app = require "bootstrap/app.php";'
+                .'$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();'
+            )
+            .' 2>/dev/null';
+
+        // shell_exec returns null when the process prints nothing.
+        $output = (string) shell_exec('cd '.escapeshellarg(base_path()).' && '.$command);
+
+        $this->assertSame('', $output, 'Bootstrap Laravel tidak boleh menulis byte apa pun ke stdout; prefiks itu akan merusak respons biner.');
+    }
+
     public function test_user_manage_can_read_any_signature(): void
     {
         $owner = $this->withSignature($this->user($this->teamA, Roles::STAF));
