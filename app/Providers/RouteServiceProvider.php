@@ -30,6 +30,10 @@ class RouteServiceProvider extends ServiceProvider
         Route::pattern('report', '[0-9]+');
         Route::pattern('role', '[0-9]+');
         Route::pattern('id', '[0-9]+');
+        Route::pattern('team', '[0-9]+');
+        Route::pattern('activity', '[0-9]+');
+        Route::pattern('attendance', '[0-9]+');
+        Route::pattern('attachment', '[0-9]+');
 
         $this->routes(function () {
             Route::middleware('api')

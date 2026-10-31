@@ -112,6 +112,40 @@ class RouteModelBindingContractTest extends TestCase
         ])->assertNotFound();
     }
 
+    // Ship review #3: team/activity/attendance/attachment params were
+    // unconstrained, so a non-numeric segment reached the database and raised
+    // a Postgres 22P02 QueryException (500) instead of missing the route.
+
+    public function test_team_pdf_export_by_non_numeric_segment_returns_404(): void
+    {
+        $this->admin();
+
+        $this->getJson('/api/admin/wfh/teams/not-a-number/pdf')->assertNotFound();
+    }
+
+    public function test_activity_update_by_non_numeric_segment_returns_404(): void
+    {
+        $this->staf();
+
+        $this->putJson('/api/wfh/reports/1/activities/not-a-number', [
+            'name' => 'X',
+        ])->assertNotFound();
+    }
+
+    public function test_attendance_destroy_by_non_numeric_segment_returns_404(): void
+    {
+        $this->staf();
+
+        $this->deleteJson('/api/wfh/reports/1/attendances/not-a-number')->assertNotFound();
+    }
+
+    public function test_attachment_download_by_non_numeric_segment_returns_404(): void
+    {
+        $this->admin();
+
+        $this->getJson('/api/changes/1/attachments/not-a-number')->assertNotFound();
+    }
+
     public function test_revise_missing_report_by_non_numeric_segment_returns_404(): void
     {
         $this->staf();
