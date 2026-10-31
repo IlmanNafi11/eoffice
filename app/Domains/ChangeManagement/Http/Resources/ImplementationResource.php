@@ -43,11 +43,11 @@ class ImplementationResource extends JsonResource
              * streamed through the authorized download endpoint, never as a
              * static /storage URL. The two resources must not disagree, or a
              * client picking the other field would publish an unauthenticated
-             * link.
+             * link. Internal storage-relative paths are never exposed
+             * (ship review #3).
              */
             $data['attachments'] = $this->attachments->map(fn ($a) => [
                 'id' => $a->id,
-                'path' => $a->path,
                 'url' => route('attachments.download', [
                     'id' => $this->change_initiation_id,
                     'attachment' => $a->id,

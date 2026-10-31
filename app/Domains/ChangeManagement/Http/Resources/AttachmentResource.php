@@ -10,11 +10,11 @@ class AttachmentResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'path' => $this->path,
             /*
              * Evidence files are private: they stream through the authorized
              * download endpoint (same package-visibility check as the read
-             * APIs), never as static /storage URLs (ship review S2).
+             * APIs), never as static /storage URLs (ship review S2). The
+             * internal storage-relative path is never exposed (ship review #3).
              */
             'url' => route('attachments.download', [
                 'id' => $this->implementation->change_initiation_id,

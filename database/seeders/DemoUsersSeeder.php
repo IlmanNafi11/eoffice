@@ -21,9 +21,13 @@ class DemoUsersSeeder extends Seeder
      * credentials (formerly the literal "password123" for three accounts,
      * including two privileged roles) turns every environment that runs a full
      * db:seed into a publicly documented login — the exact threat the hardened
-     * AdminUserSeeder now fails closed against. Two guards:
+     * AdminUserSeeder now fails closed against. Guards:
      *   1. Refuse to run outside local/testing.
      *   2. Never commit a password: generate one and print it once.
+     *   3. Rotate stale rows: firstOrCreate cannot fix an account that an
+     *      older seeder already created with the legacy literal password, so
+     *      whenever APP_DEMO_PASSWORD is explicitly configured the stored
+     *      password is overwritten (and flagged for rotation) on every run.
      */
     public function run(): void
     {
@@ -47,49 +51,40 @@ class DemoUsersSeeder extends Seeder
         $password = (string) config('app.demo_password', '');
         $generated = $password === '';
         $password = $generated ? Str::random(24) : $password;
+        $rotate = ! $generated;
 
-        $staf = User::firstOrCreate(
-            ['email' => 'staf@kominfo.go.id'],
-            [
-                'team_id' => $team->id,
-                'name' => 'Siti Staf',
-                'nip' => '1111111111',
-                'password' => $password,
-                'is_active' => true,
-                'must_change_password' => true,
-            ],
-        );
-        $staf->assignRole(Roles::STAF);
+        $accounts = [
+            ['email' => 'staf@kominfo.go.id', 'name' => 'Siti Staf', 'nip' => '1111111111', 'role' => Roles::STAF],
+            ['email' => 'kepala.tim@kominfo.go.id', 'name' => 'Koko Kepala Tim', 'nip' => '2222222222', 'role' => Roles::KEPALA_TIM],
+            ['email' => 'kepala.bidang@kominfo.go.id', 'name' => 'Budi Kepala Bidang', 'nip' => '3333333333', 'role' => Roles::KEPALA_BIDANG],
+        ];
 
-        $kepalaTim = User::firstOrCreate(
-            ['email' => 'kepala.tim@kominfo.go.id'],
-            [
-                'team_id' => $team->id,
-                'name' => 'Koko Kepala Tim',
-                'nip' => '2222222222',
-                'password' => $password,
-                'is_active' => true,
-                'must_change_password' => true,
-            ],
-        );
-        $kepalaTim->assignRole(Roles::KEPALA_TIM);
+        foreach ($accounts as $account) {
+            $user = User::firstOrCreate(
+                ['email' => $account['email']],
+                [
+                    'team_id' => $team->id,
+                    'name' => $account['name'],
+                    'nip' => $account['nip'],
+                    'password' => $password,
+                    'is_active' => true,
+                    'must_change_password' => true,
+                ],
+            );
 
-        $kepalaBidang = User::firstOrCreate(
-            ['email' => 'kepala.bidang@kominfo.go.id'],
-            [
-                'team_id' => $team->id,
-                'name' => 'Budi Kepala Bidang',
-                'nip' => '3333333333',
-                'password' => $password,
-                'is_active' => true,
-                'must_change_password' => true,
-            ],
-        );
-        $kepalaBidang->assignRole(Roles::KEPALA_BIDANG);
+            if ($rotate) {
+                $user->forceFill([
+                    'password' => $password,
+                    'must_change_password' => true,
+                ])->save();
+            }
+
+            $user->assignRole($account['role']);
+        }
 
         // Circular references — KT is team leader, KB is field head.
-        $team->update(['leader_id' => $kepalaTim->id]);
-        $field->update(['head_id' => $kepalaBidang->id]);
+        $team->update(['leader_id' => User::where('email', 'kepala.tim@kominfo.go.id')->value('id')]);
+        $field->update(['head_id' => User::where('email', 'kepala.bidang@kominfo.go.id')->value('id')]);
 
         if ($generated) {
             $this->command?->warn(

@@ -16,11 +16,13 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Validators\ValidationException;
 use PhpOffice\PhpSpreadsheet\Reader\Exception as PhpSpreadsheetException;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
@@ -145,7 +147,8 @@ class UserController extends Controller
         }
         // Anything else (DB, IO, ...) escapes to the Handler → 500 generic.
 
-        // Assign roles from imported role column (batched user + role lookup).
+        // Assign roles from imported role column (batched user + role lookup,
+        // one pivot INSERT per role group instead of per user — ship review #3).
         if ($import->roleAssignments !== []) {
             $users = User::whereIn('email', array_keys($import->roleAssignments))
                 ->get(['id', 'email'])
@@ -156,12 +159,28 @@ class UserController extends Controller
                 ->get(['id', 'name', 'guard_name'])
                 ->keyBy('name');
 
+            $morphType = (new User)->getMorphClass();
+            $pivot = config('permission.column_names.model_morph_key');
+
+            $rows = [];
             foreach ($import->roleAssignments as $email => $roleName) {
                 $user = $users->get($email);
                 $role = $rolesByName->get($roleName);
                 if ($user && $role) {
-                    $user->assignRole($role);
+                    $rows[] = [
+                        'role_id' => $role->id,
+                        'model_type' => $morphType,
+                        $pivot => $user->getKey(),
+                    ];
                 }
+            }
+
+            if ($rows !== []) {
+                DB::table('model_has_roles')->insertOrIgnore($rows);
+
+                // Direct pivot writes bypass spatie's cache invalidation, so
+                // drop the cached roles/permissions map explicitly.
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
             }
         }
 

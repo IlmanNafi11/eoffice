@@ -89,7 +89,7 @@ class ReportActivityController extends Controller
 
         $validated = $request->validate([
             'ids' => ['required', 'array'],
-            'ids.*' => ['integer'],
+            'ids.*' => ['integer', 'distinct'],
         ]);
 
         $this->wfhRepository->reorderActivities($report, $validated['ids']);

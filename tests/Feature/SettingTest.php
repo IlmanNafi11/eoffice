@@ -59,6 +59,41 @@ class SettingTest extends TestCase
         $this->assertEquals([1, 2, 3, 4, 5, 6], Setting::get('wfh_allowed_days'));
     }
 
+    public function test_password_default_rejects_a_value_over_255_characters(): void
+    {
+        // A default is applied verbatim to every bulk-created account, so an
+        // unbounded value is a mass credential-stuffing vector (ship review #3).
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/admin/settings/password_default_user', [
+            'value' => str_repeat('a', 256),
+        ])->assertStatus(422);
+    }
+
+    public function test_password_default_rejects_a_value_under_8_characters(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/admin/settings/password_default_user', [
+            'value' => 'short',
+        ])->assertStatus(422);
+    }
+
+    public function test_non_password_settings_are_not_length_limited(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/admin/settings/wfh_notify_start_time', [
+            'value' => str_repeat('x', 300),
+        ])->assertStatus(200);
+    }
+
     public function test_update_nonexistent_setting_returns_404(): void
     {
         $admin = User::factory()->create();

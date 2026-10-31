@@ -251,6 +251,12 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
     {
         $reportActivityIds = $report->activities()->pluck('id')->toArray();
 
+        // Reject duplicates up front: a repeated id produces duplicate WHEN
+        // clauses (first wins) and silently drops the intended ordering.
+        if (count($ids) !== count(array_unique($ids))) {
+            throw new ApiException('Activity ids must be unique.', 422);
+        }
+
         // Validate all ids belong to this report
         $invalid = array_diff($ids, $reportActivityIds);
         if (! empty($invalid)) {
@@ -264,15 +270,19 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
         // One statement instead of one UPDATE per id. Values come from the
         // validated $ids, so they are integers; the ids are inlined because a
         // CASE expression cannot be parameterised per-row portably.
-        $cases = [];
-        foreach ($ids as $index => $id) {
-            $cases[] = 'WHEN '.(int) $id.' THEN '.(int) $index;
-        }
+        // Wrapped in a transaction so a concurrent reorder of the same report
+        // cannot interleave (ship review #3).
+        DB::transaction(function () use ($ids): void {
+            $cases = [];
+            foreach ($ids as $index => $id) {
+                $cases[] = 'WHEN '.(int) $id.' THEN '.(int) $index;
+            }
 
-        WfhReportActivity::whereIn('id', $ids)
-            ->update([
-                'sort_order' => DB::raw('CASE id '.implode(' ', $cases).' END'),
-            ]);
+            WfhReportActivity::whereIn('id', $ids)
+                ->update([
+                    'sort_order' => DB::raw('CASE id '.implode(' ', $cases).' END'),
+                ]);
+        });
     }
 
     public function addAttendanceToReport(WfhReport $report, array $data): WfhAttendance

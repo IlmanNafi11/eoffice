@@ -293,6 +293,26 @@ class ReportActivitySubResourceTest extends TestCase
         $this->assertDatabaseHas('wfh_report_activities', ['id' => $a2->id, 'sort_order' => 2]);
     }
 
+    public function test_reorder_with_duplicate_ids_returns_422(): void
+    {
+        // A repeated id produces duplicate CASE WHEN clauses (first wins) and
+        // silently drops the intended ordering (ship review #3).
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user);
+        $a1 = $report->activities()->create(['activity' => 'A', 'sort_order' => 0]);
+        $a2 = $report->activities()->create(['activity' => 'B', 'sort_order' => 1]);
+
+        $this->patchJson("/api/wfh/reports/{$report->id}/activities/reorder", [
+            'ids' => [$a2->id, $a1->id, $a2->id],
+        ])->assertStatus(422);
+
+        $this->assertDatabaseHas('wfh_report_activities', ['id' => $a1->id, 'sort_order' => 0]);
+        $this->assertDatabaseHas('wfh_report_activities', ['id' => $a2->id, 'sort_order' => 1]);
+    }
+
     public function test_reorder_with_invalid_ids_returns_422(): void
     {
         $user = User::factory()->create();

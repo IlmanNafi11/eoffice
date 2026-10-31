@@ -17,16 +17,22 @@ use Illuminate\Support\Facades\Storage;
  * drift is silent public exposure (ship review: both were previously stored on
  * the `public` disk, so `/storage/attendances/...` and
  * `/storage/change-attachments/...` were downloadable without authentication).
+ *
+ * Every path that reaches {@see Storage::path()} is checked for containment
+ * ({@see SignaturePath::contained()}): the value stored in the database is
+ * treated as untrusted even though the normal write paths never accept it
+ * from a request.
  */
 class PrivateMediaPath
 {
     /**
-     * Absolute path on the private disk, or '' when no path is given.
-     * Callers decide whether the file must actually exist.
+     * Absolute path on the private disk, or '' when the path is missing or
+     * escapes the disk root. Callers decide whether the file must actually
+     * exist; '' is already their "no file" signal.
      */
     public static function resolve(?string $relative): string
     {
-        if ($relative === null || $relative === '') {
+        if (! SignaturePath::contained($relative)) {
             return '';
         }
 
@@ -43,7 +49,7 @@ class PrivateMediaPath
      */
     public static function resolveAny(?string $relative): string
     {
-        if ($relative === null || $relative === '') {
+        if (! SignaturePath::contained($relative)) {
             return '';
         }
 
@@ -63,7 +69,7 @@ class PrivateMediaPath
      */
     public static function existsAny(?string $relative): bool
     {
-        if ($relative === null || $relative === '') {
+        if (! SignaturePath::contained($relative)) {
             return false;
         }
 
@@ -72,11 +78,11 @@ class PrivateMediaPath
     }
 
     /**
-     * True when a storage-relative path is set and the file exists on disk.
+     * True when a contained, storage-relative path exists on the private disk.
      */
     public static function exists(?string $relative): bool
     {
-        return $relative !== null && $relative !== '' && Storage::disk('local')->exists($relative);
+        return SignaturePath::contained($relative) && Storage::disk('local')->exists($relative);
     }
 
     /**

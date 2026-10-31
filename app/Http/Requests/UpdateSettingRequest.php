@@ -35,6 +35,13 @@ class UpdateSettingRequest extends FormRequest
             if (! is_string($value) || mb_strlen($value) < 8) {
                 $fail('Kata sandi default minimal 8 karakter.');
             }
+
+            // Upper bound: a default is applied verbatim to bulk-created
+            // accounts, so an unbounded value could be a 1MB password that
+            // fails hashing or storage limits. (ship review #3)
+            if (is_string($value) && mb_strlen($value) > 255) {
+                $fail('Kata sandi default maksimal 255 karakter.');
+            }
         };
     }
 

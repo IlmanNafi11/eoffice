@@ -11,9 +11,11 @@ use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -36,6 +38,37 @@ class ShipReviewRegressionsTest extends TestCase
         parent::setUp();
         $this->artisan('db:seed', ['--class' => 'RolePermissionSeeder']);
         $this->artisan('db:seed', ['--class' => 'SettingsSeeder']);
+    }
+
+    public function test_attachment_resource_never_exposes_storage_path(): void
+    {
+        // Ship review #3 (Low): the storage-relative path leaked internal
+        // layout; only the authorized URL belongs in the payload.
+        $field = Field::factory()->create();
+        $team = Team::factory()->create(['field_id' => $field->id]);
+        $staf = User::factory()->create(['team_id' => $team->id]);
+        $staf->assignRole('staf');
+        Sanctum::actingAs($staf);
+
+        Storage::fake('local');
+
+        $package = $this->postJson('/api/changes', [
+            'initiation' => [
+                'field_id' => $field->id,
+                'description' => 'Test description',
+                'reason' => 'Test reason',
+            ],
+            'implementation' => ['priority' => 'normal', 'impact' => 'Minor'],
+        ])->assertStatus(201)->json('data.initiation');
+
+        $body = $this->postJson("/api/changes/{$package['id']}/attachments", [
+            'files' => [UploadedFile::fake()->image('doc.jpg')],
+        ])->assertOk()->json();
+
+        foreach ($body['data'] as $attachment) {
+            $this->assertArrayNotHasKey('path', $attachment);
+            $this->assertStringStartsWith('http', $attachment['url']);
+        }
     }
 
     public function test_domain_422_is_not_logged_as_unhandled(): void

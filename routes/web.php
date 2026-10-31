@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\Route;
  */
 Route::get('/up', function () {
     try {
+        // Bound the DB round-trip so a hung connection cannot hold the probe
+        // open (ship review #3): connect timeout + statement timeout cover
+        // both a stalled handshake and an already-open but blocked session.
+        DB::connection()->getPdo()->setAttribute(PDO::ATTR_TIMEOUT, 3);
         DB::connection()->select('select 1');
     } catch (Throwable $e) {
         return response()->json(['status' => 'unavailable'], 503);
