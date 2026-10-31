@@ -5,10 +5,10 @@
  * dalam AppShell"; catatan T10 di plan: leaf-nya dibuat bersama task halaman
  * pertama):
  * - `/login` publik (di luar guard) — satu-satunya route otentikasi yang ada
- *   sejak Slice 1.
  * - Route terlindungi dibungkus `ProtectedRoute` (guard sesi +
- *   `must_change_password`). Halaman Beranda sengaja belum ada sebagai file
- *   (task "Beranda" tidak ada di plan); outletnya placeholder minimal yang
+ *   `must_change_password`) dan `SessionBootstrap` (rehidrasi user via
+ *   `GET /auth/me` setelah refresh). Halaman Beranda sengaja belum ada sebagai
+ *   file (task "Beranda" tidak ada di plan); outletnya placeholder minimal yang
  *   akan diganti modul WFH/Change di fase berikutnya.
  */
 
@@ -18,6 +18,7 @@ import { LayoutDashboard } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { LoginPage } from "@/pages/auth/LoginPage";
+import { SessionBootstrap } from "@/routes/SessionBootstrap";
 
 /** Placeholder outlet `/` sampai modul WFH/Change (fase berikutnya). */
 function HomePage() {
@@ -32,7 +33,11 @@ function HomePage() {
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   {
-    element: <ProtectedRoute />,
+    element: (
+      <SessionBootstrap>
+        <ProtectedRoute />
+      </SessionBootstrap>
+    ),
     children: [
       {
         element: <AppShell />,
