@@ -91,9 +91,16 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   hasilnya dilaporkan per-tree.
 
 ### Tests
-- Regression test pembersihan salinan web bersarang pada
-  `public/storage/{attendances,signatures,change-attachments}` (RED bila
-  penyapuan dikembalikan ke `glob()` satu level).
+- Bootstrap tanpa output liar (`test_application_bootstrap_emits_no_stray_output`):
+  bootstrap Laravel dalam proses terisolasi wajib menulis 0 byte ke stdout —
+  RED bila ada baris kosong/BOM/"echo" sebelum `<?php` pada file yang dimuat
+  (menutup kelas bug prefiks-byte pada respons biner).
+- Preview tanda tangan FE teruji unit: request preview wajib membawa header
+  `Authorization: Bearer ...` (RED bila helper kembali memakai URL polos).
+- E2E manual 3 role `DemoUsersSeeder` di browser (staf vs kepala_tim vs
+  kepala_bidang: sidebar berbeda sesuai permission, must_change_password
+  memaksa /change-password, profil + upload signature persist setelah refresh,
+  logout menghapus token, 401 memicu auto-logout + redirect /login).
 - Rate limit `/verify/{token}` dikunci test (RED bila `ThrottleRequests:api`
   dilepas dari grup `api`) — sebelumnya tak ada test yang gagal tanpanya.
 - Test fallback render non-JSON memakai probe `POST`: probe `GET` tertutup
