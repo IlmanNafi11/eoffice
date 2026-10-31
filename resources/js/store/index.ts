@@ -1,7 +1,7 @@
 /**
  * Store tingkat aplikasi (frontend-phase1).
  *
- * - Reducer tunggal `auth` untuk fase ini; bertambah seiring fitur.
+ * - Reducer `auth` + `wfh` (frontend-phase2); bertambah seiring fitur.
  * - Token awal dibaca dari localStorage agar refresh tidak memaksa login ulang.
  * - Interceptor 401 (`@/api/client`) sudah menghapus token dari localStorage
  *   dan redirect ke `/login`; yang kurang hanya state Redux, jadi
@@ -14,11 +14,12 @@ import type { Store, UnknownAction } from "redux";
 import { onUnauthorized, AUTH_TOKEN_KEY } from "@/api/client";
 import type { AuthState } from "@/store/authSlice";
 import { authReducer, clearToken, initialAuthState } from "@/store/authSlice";
+import type { WfhState } from "@/store/wfhSlice";
+import { wfhReducer } from "@/store/wfhSlice";
 
 // ── Tipe store (named — bukan ReturnType) ───────────────────────────
 
-/** Bentuk state root — bertambah saat reducer baru dipasang. */
-export type RootState = { auth: AuthState };
+export type RootState = { auth: AuthState; wfh: WfhState };
 
 /** Dispatch dengan middleware thunk default RTK. */
 export type AppDispatch = ThunkDispatch<RootState, undefined, UnknownAction>;
@@ -38,12 +39,11 @@ export function makeStore(): AppStore {
   const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
 
   const store: AppStore = configureStore({
-    reducer: { auth: authReducer },
+    reducer: { auth: authReducer, wfh: wfhReducer },
     preloadedState: storedToken
       ? { auth: { ...initialAuthState(), token: storedToken } }
       : undefined,
   });
-
   // 401: localStorage & redirect sudah ditangani client; di sini hanya state.
   onUnauthorized(() => store.dispatch(clearToken()));
 
