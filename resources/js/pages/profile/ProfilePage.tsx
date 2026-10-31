@@ -23,7 +23,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/api/client";
-import { uploadSignature, updateProfile } from "@/api/profile";
+import { uploadSignature, updateProfile, fetchSignatureObjectUrl } from "@/api/profile";
 import { setUser } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/authSlice";
@@ -40,7 +40,10 @@ export function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
-  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.signature_url ?? null);
+  // Preview berupa object URL dari bytes yang diambil lewat client
+  // ber-otorisasi (bearer). `<img src="/api/...">` polos tidak membawa token
+  // dan selalu 401 — lihat `fetchSignatureObjectUrl`.
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,7 +53,21 @@ export function ProfilePage() {
     setPhone(user.phone ?? "");
     setPosition(user.position ?? "");
     setRank(user.rank ?? "");
-    setPreviewUrl(user.signature_url ?? null);
+
+    let revoked: string | null = null;
+    if (user.signature_url) {
+      fetchSignatureObjectUrl(user.signature_url)
+        .then((objectUrl) => {
+          revoked = objectUrl;
+          setPreviewUrl(objectUrl);
+        })
+        .catch(() => setPreviewUrl(null));
+    } else {
+      setPreviewUrl(null);
+    }
+    return () => {
+      if (revoked) URL.revokeObjectURL(revoked);
+    };
   }, [user?.id]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -96,7 +113,7 @@ export function ProfilePage() {
 
     try {
       const result = await uploadSignature(form);
-      setPreviewUrl(result.signature_url);
+      setPreviewUrl(await fetchSignatureObjectUrl(result.signature_url));
       dispatch(
         setUser({
           ...user,

@@ -5,7 +5,7 @@
  * jangan set `Content-Type` manual (perlu boundary yang dibuat browser).
  */
 
-import { api } from "@/api/client";
+import { api, httpClient } from "@/api/client";
 import type { ProfileData, UpdateProfileRequest } from "@/api/types";
 
 /** `#/components/schemas/SignatureUploadResponse` */
@@ -38,4 +38,18 @@ export async function updateProfile(input: UpdateProfileRequest): Promise<Profil
 export async function uploadSignature(signature: FormData): Promise<SignatureUploadResponse> {
   const res = await api.postForm<SignatureUploadResponse>("/profile/signature", signature);
   return requireData(res.data, "profile/signature");
+}
+
+/**
+ * Ambil bytes tanda tangan lewat client ber-otorisasi, lalu jadikan object URL.
+ *
+ * `signature_url` menunjuk `/api/signatures/{user}` yang wajib bearer token.
+ * `<img src={signature_url}>` TIDAK membawa header `Authorization`, jadi
+ * permintaan itu dijawab 401 dan preview tampil kosong. Karena itu bytes diambil
+ * lewat axios (interceptor menempelkan token), bukan dengan mengandalkan
+ * elemen gambar.
+ */
+export async function fetchSignatureObjectUrl(url: string): Promise<string> {
+  const res = await httpClient.get<Blob>(url, { responseType: "blob" });
+  return URL.createObjectURL(res.data);
 }

@@ -2,10 +2,10 @@
  * Test unit modul `@/api/profile` (frontend-phase1 — Modul auth & profile).
  * GET/PUT /profile terenvelope; POST /profile/signature multipart FormData.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
-import { getProfile, updateProfile, uploadSignature } from "@/api/profile";
+import { getProfile, updateProfile, uploadSignature, fetchSignatureObjectUrl } from "@/api/profile";
 import { httpClient, setAuthToken } from "@/api/client";
 import type { AuthUser } from "@/api/types";
 
@@ -131,5 +131,25 @@ describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
     form.append("signature", new File(["x"], "ttd.gif", { type: "image/gif" }));
 
     await expect(uploadSignature(form)).rejects.toMatchObject({ kind: "validation", status: 422 });
+  });
+
+  it("fetchSignatureObjectUrl memakai bearer token (bukan <img src> polos)", async () => {
+    // `/api/signatures/{user}` wajib auth. Elemen <img> tidak membawa header
+    // Authorization, jadi preview harus mengambil bytes lewat client ini.
+    setAuthToken("tok-preview");
+    queue.push({ status: 200, body: new Blob([new Uint8Array([0x89, 0x50])], { type: "image/png" }) });
+    const createObjectURL = vi.fn(() => "blob:preview");
+    const originalCreate = URL.createObjectURL;
+    URL.createObjectURL = createObjectURL;
+
+    try {
+      const url = await fetchSignatureObjectUrl("/signatures/1");
+
+      expect(requests[0]?.url).toBe("/signatures/1");
+      expect(requests[0]?.headers.get("authorization")).toBe("Bearer tok-preview");
+      expect(url).toBe("blob:preview");
+    } finally {
+      URL.createObjectURL = originalCreate;
+    }
   });
 });
