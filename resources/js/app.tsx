@@ -1,7 +1,13 @@
+/**
+ * Entry SPA (frontend-phase1).
+ * Provider Redux + RouterProvider (peta route di `@/routes`).
+ */
+
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
+import { RouterProvider } from "react-router-dom";
 import { store } from "@/store";
-import "@/components/ui/button";
+import { router } from "@/routes";
 
 const rootEl = document.getElementById("app");
 if (!rootEl) {
@@ -10,8 +16,6 @@ if (!rootEl) {
 
 createRoot(rootEl).render(
   <Provider store={store}>
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-blue-600">eoffice SPA — fase 1</h1>
-    </div>
+    <RouterProvider router={router} />
   </Provider>,
 );
