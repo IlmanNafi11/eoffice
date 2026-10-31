@@ -114,5 +114,3 @@ export interface ResetPasswordRequest {
   new_password_confirmation: string;
 }
 
-/** `#/components/schemas/VerifyOtpResponse` — envelope penuh, `data.reset_token`. */
-export type VerifyOtpResponse = Envelope<{ reset_token: string }>;

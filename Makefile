@@ -1,4 +1,16 @@
-.PHONY: lint test build ci
+.PHONY: lint test build ci frontend-test frontend-typecheck frontend-build
+
+frontend-test:
+	npm test
+
+frontend-typecheck:
+	npm run typecheck
+
+frontend-build:
+	npm run build
+
+ci: lint test frontend-test frontend-typecheck frontend-build
+	@echo "ci: all targets passed"
 
 lint:
 	vendor/bin/pint --test
@@ -9,5 +21,3 @@ test:
 build:
 	docker build --check .
 
-ci: lint test build
-	@echo "ci: all targets passed"

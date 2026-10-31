@@ -213,13 +213,45 @@ const slice = createSlice({
         state.error =
           (action.payload as string | undefined) ?? action.error.message ?? "Gagal mengubah kata sandi.";
       })
+      // Alur reset publik: pending men-set status loading (men-disable tombol
+      // submit dan mengaktifkan guard double-submit di halaman); pending dan
+      // fulfilled membersihkan error agar pesan langkah sebelumnya tidak bocor
+      // ke halaman berikutnya — keempat halaman publik berbagi satu
+      // `auth.status`/`auth.error`.
+      .addCase(forgotPassword.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state) => {
+        state.status = "succeeded";
+        state.error = null;
+      })
       .addCase(forgotPassword.rejected, (state, action) => {
+        state.status = "failed";
         state.error = (action.payload as string | undefined) ?? action.error.message ?? null;
+      })
+      .addCase(verifyOtp.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(verifyOtp.fulfilled, (state) => {
+        state.status = "succeeded";
+        state.error = null;
       })
       .addCase(verifyOtp.rejected, (state, action) => {
+        state.status = "failed";
         state.error = (action.payload as string | undefined) ?? action.error.message ?? null;
       })
+      .addCase(resetPassword.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state) => {
+        state.status = "succeeded";
+        state.error = null;
+      })
       .addCase(resetPassword.rejected, (state, action) => {
+        state.status = "failed";
         state.error = (action.payload as string | undefined) ?? action.error.message ?? null;
       });
   },
@@ -238,5 +270,3 @@ interface WithAuth {
 export const selectAuth = (state: WithAuth): AuthState => state.auth;
 export const selectToken = (state: WithAuth): string | null => state.auth.token;
 export const selectUser = (state: WithAuth): AuthUser | null => state.auth.user;
-export const selectStatus = (state: WithAuth): AuthStatus => state.auth.status;
-export const selectError = (state: WithAuth): string | null => state.auth.error;

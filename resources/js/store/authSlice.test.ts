@@ -32,18 +32,19 @@ import {
   logout,
   fetchMe,
   changePassword,
-  verifyOtp,
   selectAuth,
+  forgotPassword,
+  resetPassword,
   selectToken,
   selectUser,
 } from "@/store/authSlice";
 import { makeStore } from "@/store";
-
+const mockedForgot = authApi.forgotPassword as unknown as Mock;
+const mockedReset = authApi.resetPassword as unknown as Mock;
 const mockedLogin = authApi.login as unknown as Mock;
 const mockedLogout = authApi.logout as unknown as Mock;
 const mockedMe = authApi.me as unknown as Mock;
 const mockedChange = authApi.changePassword as unknown as Mock;
-const mockedVerify = authApi.verifyOtp as unknown as Mock;
 
 const user: AuthUser = {
   id: 1,
@@ -160,15 +161,41 @@ describe("authSlice — thunks", () => {
     expect(selectUser(store.getState())?.must_change_password).toBe(false);
   });
 
-  it("verifyOtp mengembalikan reset_token ke pemanggil", async () => {
-    mockedVerify.mockResolvedValueOnce({ reset_token: "reset-123" });
+  it("forgotPassword pending→fulfilled menggeser status loading dan membersihkan error lama", async () => {
+    // Seed error lama (mis. 429 dari percobaan sebelumnya).
+    mockedLogin.mockRejectedValueOnce(new Error("stale"));
     const store = makeStore();
+    await store.dispatch(login({ email: "rover@eoffice.test", password: "wrong" }));
+    expect(selectAuth(store.getState()).error).toBe("stale");
 
-    const result = await store.dispatch(
-      verifyOtp({ email: "rover@eoffice.test", code: "123456" }),
+    mockedForgot.mockResolvedValueOnce(undefined);
+    const p = store.dispatch(forgotPassword({ email: "rover@eoffice.test" }));
+    // pending men-set loading + membersihkan error.
+    expect(selectAuth(store.getState()).status).toBe("loading");
+    expect(selectAuth(store.getState()).error).toBeNull();
+
+    await p;
+    expect(selectAuth(store.getState()).status).toBe("succeeded");
+    expect(selectAuth(store.getState()).error).toBeNull();
+  });
+
+  it("resetPassword gagal men-set status failed; error dari langkah forgot tidak bocor", async () => {
+    mockedForgot.mockResolvedValueOnce(undefined);
+    const store = makeStore();
+    await store.dispatch(forgotPassword({ email: "rover@eoffice.test" }));
+
+    mockedReset.mockRejectedValueOnce(new Error("Token kedaluwarsa"));
+    await store.dispatch(
+      resetPassword({
+        reset_token: "x".repeat(60),
+        new_password: "baru12345",
+        new_password_confirmation: "baru12345",
+      }),
     );
 
-    expect(result.payload).toEqual({ reset_token: "reset-123" });
+    const state = selectAuth(store.getState());
+    expect(state.status).toBe("failed");
+    expect(state.error).toBe("Token kedaluwarsa");
   });
 });
 

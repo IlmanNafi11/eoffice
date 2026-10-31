@@ -7,6 +7,10 @@
  * - Menu berbeda antar role murni dari payload permission.
  * - Header menampilkan nama user; tombol keluar men-dispatch `logout`
  *   (POST /auth/logout) dan membersihkan state sesi.
+ * - Logout di dalam ProtectedRoute yang sesungguhnya → token null → guard
+ *   memindahkan route ke /login (komposit guard+header, ship review gap).
+ * - Saat `user` belum termuat, header menampilkan tombol "Keluar" polos
+ *   (bukan dropdown) tanpa crash.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Mock } from "vitest";
@@ -28,6 +32,7 @@ vi.mock("@/api/auth", () => ({
 
 import * as authApi from "@/api/auth";
 import { AppShell } from "@/components/layout/AppShell";
+import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { makeStore } from "@/store";
 import { selectToken, selectUser, setToken, setUser } from "@/store/authSlice";
 import { AUTH_TOKEN_KEY } from "@/api/client";
@@ -158,5 +163,57 @@ describe("AppShell — Header", () => {
     expect(selectToken(store.getState())).toBeNull();
     expect(selectUser(store.getState())).toBeNull();
     expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+  });
+
+  it("logout di dalam guard memindahkan route ke /login (composite)", async () => {
+    mockedLogout.mockResolvedValueOnce(undefined);
+    const store = makeStore();
+    store.dispatch(setToken("tok-shell"));
+    store.dispatch(setUser(userWith(["staf"], STAF_PERMISSIONS)));
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/login" element={<div data-testid="route-login">halaman login</div>} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppShell />}>
+                <Route index element={<div>halaman outlet</div>} />
+              </Route>
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    await userEvent.click(screen.getByTestId("user-menu"));
+    await userEvent.click(screen.getByRole("menuitem", { name: /keluar/i }));
+
+    // Guard membaca token null → redirect ke /login.
+    expect(await screen.findByTestId("route-login")).toBeTruthy();
+  });
+
+  it("header menampilkan tombol keluar placeholder saat user belum termuat (tanpa crash)", async () => {
+    const store = makeStore();
+    store.dispatch(setToken("tok-shell"));
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<div>halaman outlet</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    // Header user-null menampilkan tombol "Keluar" polos (bukan dropdown).
+    const keluar = screen.getByRole("button", { name: /keluar/i });
+    expect(keluar).toBeTruthy();
+    mockedLogout.mockResolvedValueOnce(undefined);
+    await userEvent.click(keluar);
+    expect(mockedLogout).toHaveBeenCalledTimes(1);
   });
 });

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
-import { getProfile, updateProfile, uploadSignature, fetchSignatureObjectUrl } from "@/api/profile";
+import { updateProfile, uploadSignature, fetchSignatureObjectUrl } from "@/api/profile";
 import { httpClient, setAuthToken } from "@/api/client";
 import type { AuthUser } from "@/api/types";
 
@@ -66,16 +66,6 @@ beforeEach(() => {
 const ok = (body: unknown) => queue.push({ status: 200, body });
 
 describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
-  it("getProfile GET /profile mengembalikan ProfileData", async () => {
-    ok({ success: true, data: profile, message: null });
-
-    const result = await getProfile();
-
-    expect(requests[0]?.method).toBe("get");
-    expect(requests[0]?.url).toBe("/profile");
-    expect(result).toEqual(profile);
-  });
-
   it("updateProfile PUT /profile mengirim field yang diberikan", async () => {
     ok({ success: true, data: { ...profile, phone: "081298765432" }, message: "Profil berhasil diperbarui." });
 
@@ -152,4 +142,13 @@ describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
       URL.createObjectURL = originalCreate;
     }
   });
+
+  it("updateProfile dengan envelope tanpa data → gagal-nyata (requireData)", async () => {
+    ok({ success: true, message: "Profil berhasil diperbarui.", data: null });
+
+    await expect(
+      updateProfile({ phone: "081234567890", position: null, rank: null }),
+    ).rejects.toThrow(/tidak berisi data/);
+  });
+
 });

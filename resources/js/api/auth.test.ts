@@ -187,4 +187,22 @@ describe("api/auth — endpoint & unwrap (frontend-phase1)", () => {
       new_password_confirmation: "baru12345",
     });
   });
+
+  it("envelope tanpa data pada endpoint yang menjamin data → gagal-nyata (requireData)", async () => {
+    // Envelope success:true tanpa `data` = bug backend; UI tidak boleh
+    // menerima `null` diam-diam (ship review: guard paling murah).
+    ok({ success: true, message: "Login berhasil.", data: null });
+    await expect(
+      login({ email: "budi@kominfo.go.id", password: "rahasia123" }),
+    ).rejects.toThrow(/tidak berisi data/);
+    expect(getStoredToken()).toBeNull();
+
+    ok({ success: true, message: "OK", data: null });
+    await expect(me()).rejects.toThrow(/tidak berisi data/);
+
+    ok({ success: true, message: "OK", data: null });
+    await expect(
+      verifyOtp({ email: "budi@kominfo.go.id", code: "123456" }),
+    ).rejects.toThrow(/tidak berisi data/);
+  });
 });

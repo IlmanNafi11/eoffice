@@ -146,4 +146,26 @@ describe("api/client — instance & interceptor (frontend-phase1 / axios client)
     const err = await api.get("/auth/me").catch((e: unknown) => e);
     expect(err).toMatchObject({ kind: "network" });
   });
+
+  it("HTTP 500 tanpa body envelope → ApiError kind 'http' dengan status sesuai", async () => {
+    queue.push({ status: 500, body: "Internal Server Error" });
+    const err = await api.get("/auth/me").catch((e: unknown) => e);
+    // 500 → kind 'http' (bukan 'network'), status diteruskan untuk handle UI.
+    expect(err).toMatchObject({ kind: "http", status: 500 });
+    expect(logoutSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
+  });
+
+  it("onUnauthorized(null) melepas handler — 401 tidak lagi memanggil callback", async () => {
+    setAuthToken("tok-detach");
+    onUnauthorized(null); // lepas handler
+    queue.push({ status: 401, body: { success: false, message: "Unauthenticated." } });
+
+    await expect(api.get("/auth/me")).rejects.toMatchObject({ kind: "http", status: 401 });
+    // Token tetap dibersihkan & redirect tetap jalan (safety), tapi callback
+    // user tidak dipanggil karena sudah dilepas.
+    expect(getStoredToken()).toBeNull();
+    expect(assignSpy).toHaveBeenCalledWith("/login");
+    expect(logoutSpy).not.toHaveBeenCalled();
+  });
 });

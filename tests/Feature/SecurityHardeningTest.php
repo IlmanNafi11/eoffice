@@ -71,6 +71,31 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     }
 
+    /**
+     * CSP melindungi token bearer di localStorage dari eskalasi XSS: tanpa
+     * CSP (RED bila header dilepas), script eksfiltrasi lewat connect-src
+     * origin lain lolos. Wajib ada di production.
+     */
+    public function test_content_security_policy_present_in_production(): void
+    {
+        app()['env'] = 'production';
+
+        $this->getJson('/up')->assertHeader('Content-Security-Policy');
+    }
+
+    /**
+     * Guard posisi: CSP digate ke production — local/testing memakai `vite
+     * dev` yang menyuntik script HMR dari dev-server dan tidak lolos CSP
+     * 'self'. RED bila CSP tak sengaja menyala di semua environment dan
+     * mematikan HMR lokal.
+     */
+    public function test_content_security_policy_absent_outside_production(): void
+    {
+        app()['env'] = 'local';
+
+        $this->getJson('/up')->assertHeaderMissing('Content-Security-Policy');
+    }
+
     public function test_login_rate_limited_after_five_attempts(): void
     {
         $this->createAdmin();

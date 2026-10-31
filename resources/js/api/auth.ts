@@ -8,7 +8,7 @@
  * (persist ke localStorage), `logout` membersihkannya.
  */
 
-import { api, setAuthToken } from "@/api/client";
+import { api, requireData, setAuthToken } from "@/api/client";
 import type {
   AuthUser,
   LoginRequest,
@@ -19,15 +19,6 @@ import type {
   ResetPasswordRequest,
 } from "@/api/types";
 
-/** Endpoint yang kontraknya menjamin `data` ada; envelope tanpa data = bug backend. */
-function requireData<T>(value: T | null, endpoint: string): T {
-  if (value === null) {
-    throw new Error(`Respons ${endpoint} tidak berisi data.`);
-  }
-  return value;
-}
-
-/** POST /auth/login — sukses menyimpan token; gagal melempar ApiError tanpa menyimpan apa pun. */
 export async function login(input: LoginRequest): Promise<LoginResponse> {
   const res = await api.post<LoginResponse>("/auth/login", input);
   const payload = requireData(res.data, "login");

@@ -54,6 +54,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Endpoint yang kontraknya menjamin `data` ada; envelope tanpa `data` = bug
+ * backend dan harus gagal-nyata (bukan `null` yang diam-diam dirender UI).
+ * Satu definisi dipakai semua modul API (auth, profile, dst.).
+ */
+export function requireData<T>(value: T | null, endpoint: string): T {
+  if (value === null) {
+    throw new Error(`Respons ${endpoint} tidak berisi data.`);
+  }
+  return value;
+}
+
 export const httpClient: AxiosInstance = axios.create({
   baseURL: "/api",
   headers: { Accept: "application/json" },

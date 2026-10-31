@@ -5,27 +5,13 @@
  * jangan set `Content-Type` manual (perlu boundary yang dibuat browser).
  */
 
-import { api, httpClient } from "@/api/client";
+import { api, httpClient, requireData } from "@/api/client";
 import type { ProfileData, UpdateProfileRequest } from "@/api/types";
 
 /** `#/components/schemas/SignatureUploadResponse` */
 export interface SignatureUploadResponse {
   signature_path: string;
   signature_url: string;
-}
-
-/** Endpoint yang kontraknya menjamin `data` ada; envelope tanpa data = bug backend. */
-function requireData<T>(value: T | null, endpoint: string): T {
-  if (value === null) {
-    throw new Error(`Respons ${endpoint} tidak berisi data.`);
-  }
-  return value;
-}
-
-/** GET /profile — profil user sesi aktif. */
-export async function getProfile(): Promise<ProfileData> {
-  const res = await api.get<ProfileData>("/profile");
-  return requireData(res.data, "profile");
 }
 
 /** PUT /profile — field opsional; `null` untuk mengosongkan. */

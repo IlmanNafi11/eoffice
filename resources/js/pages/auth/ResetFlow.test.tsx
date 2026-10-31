@@ -134,8 +134,11 @@ describe("OtpVerificationPage", () => {
       code: "123456",
     });
     expect(await screen.findByTestId("reset-submit")).toBeTruthy();
-    // Token diteruskan ke halaman reset via sessionStorage.
-    expect(sessionStorage.getItem(RESET_TOKEN_KEY)).toBe("a".repeat(60));
+    // Token sempat ditulis ke sessionStorage oleh OTP, lalu dikonsumsi
+    // (remove-on-read) oleh ResetPasswordPage saat mount — kredensial reset
+    // tidak menetap di storage. Handoff terbukti: halaman reset sudah memuat
+    // token dari state-nya (lihat test ResetPasswordPage di bawah).
+    expect(sessionStorage.getItem(RESET_TOKEN_KEY)).toBeNull();
   });
 
   it("email kosong bisa diisi manual (buka /verify-otp langsung)", async () => {
@@ -208,7 +211,7 @@ describe("ResetPasswordPage", () => {
     expect(await screen.findByTestId("forgot-submit")).toBeTruthy();
   });
 
-  it("menampilkan error envelope token kedaluwarsa (422) dan token tetap disimpan", async () => {
+  it("menampilkan error envelope token kedaluwarsa (422) dan submit tetap memakai token dari state", async () => {
     const user = userEvent.setup();
     sessionStorage.setItem(RESET_TOKEN_KEY, "d".repeat(60));
     vi.mocked(authApi.resetPassword).mockRejectedValueOnce(
@@ -224,7 +227,26 @@ describe("ResetPasswordPage", () => {
       await screen.findByText(/token reset tidak valid/i),
     ).toBeTruthy();
     expect(screen.getByTestId("reset-submit")).toBeTruthy();
-    // Token belum dikonsumsi (gagal = bisa dicoba ulang; hapus hanya saat sukses).
-    expect(sessionStorage.getItem(RESET_TOKEN_KEY)).toBe("d".repeat(60));
+    // Remove-on-read: token dihapus dari sessionStorage saat halaman mount,
+    // tetap hidup di state untuk retry sampai submit sukses pindah ke /login.
+    expect(sessionStorage.getItem(RESET_TOKEN_KEY)).toBeNull();
+
+    // Retry setelah gagal tetap memakai token yang sama dari state.
+    vi.mocked(authApi.resetPassword).mockResolvedValueOnce(undefined);
+    await user.click(screen.getByTestId("reset-submit"));
+    expect(authApi.resetPassword).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reset_token: "d".repeat(60) }),
+    );
+    expect(await screen.findByTestId("route-login")).toBeTruthy();
+  });
+
+  it("abandons flow: token tidak tertinggal di sessionStorage setelah halaman reset dimuat", async () => {
+    sessionStorage.setItem(RESET_TOKEN_KEY, "e".repeat(60));
+
+    renderFlow("/reset-password");
+    expect(await screen.findByTestId("reset-submit")).toBeTruthy();
+    // Kredensial reset yang kuat tidak boleh menetap di storage bila pengguna
+    // meninggalkan alur tanpa menyelesaikan (ship review #4).
+    expect(sessionStorage.getItem(RESET_TOKEN_KEY)).toBeNull();
   });
 });

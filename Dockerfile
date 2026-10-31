@@ -1,3 +1,13 @@
+FROM node:22-alpine AS assets
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY resources resources
+COPY vite.config.js tsconfig.json ./
+RUN npm run build
+
+
 FROM php:8.4-cli
 
 RUN apt-get update && apt-get install -y \
@@ -21,5 +31,7 @@ RUN docker-php-ext-configure gd --with-jpeg --with-freetype \
     zip
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=assets /app/public/build /app/public/build
+
 
 WORKDIR /app

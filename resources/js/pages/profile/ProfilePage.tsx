@@ -8,7 +8,7 @@
  *   preview `signature_url` diperbarui setelah sukses, dan state user disinkron.
  * - Error 422 dari backend ditampilkan per-field (ApiError.errors).
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -24,9 +24,8 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/api/client";
 import { uploadSignature, updateProfile, fetchSignatureObjectUrl } from "@/api/profile";
-import { setUser } from "@/store/authSlice";
+import { setUser, selectUser } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { selectUser } from "@/store/authSlice";
 
 export function ProfilePage() {
   const dispatch = useAppDispatch();
@@ -47,6 +46,26 @@ export function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Object URL preview disimpan di ref agar lifecycle-nya terpusat: setiap
+  // URL baru me-revoke URL sebelumnya, dan cleanup unmount me-revoke URL
+  // terakhir — tanpa race antara promise `.then` dan re-render berikutnya
+  // (ship review: kebocoran object URL pada upload berulang/efek lama).
+  const previewUrlRef = useRef<string | null>(null);
+
+  const setAndTrackPreviewUrl = useCallback((next: string | null) => {
+    if (previewUrlRef.current && previewUrlRef.current !== next) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    previewUrlRef.current = next;
+    setPreviewUrl(next);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    },
+    [],
+  );
   // Sinkronkan form saat user terisi/berubah (mis. setelah rehidrasi).
   useEffect(() => {
     if (!user) return;
@@ -54,21 +73,18 @@ export function ProfilePage() {
     setPosition(user.position ?? "");
     setRank(user.rank ?? "");
 
-    let revoked: string | null = null;
     if (user.signature_url) {
+      // Promise lama yang menyelesaikan setelah URL yang lebih baru sudah
+      // diset tidak boleh menimpa; URL tertinggal akan di-revoke oleh
+      // setAndTrackPreviewUrl saat URL berikutnya masuk, dan cleanup unmount
+      // me-revoke yang tersisa.
       fetchSignatureObjectUrl(user.signature_url)
-        .then((objectUrl) => {
-          revoked = objectUrl;
-          setPreviewUrl(objectUrl);
-        })
-        .catch(() => setPreviewUrl(null));
+        .then(setAndTrackPreviewUrl)
+        .catch(() => setAndTrackPreviewUrl(null));
     } else {
-      setPreviewUrl(null);
+      setAndTrackPreviewUrl(null);
     }
-    return () => {
-      if (revoked) URL.revokeObjectURL(revoked);
-    };
-  }, [user?.id]);
+  }, [user?.id, setAndTrackPreviewUrl]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,7 +129,7 @@ export function ProfilePage() {
 
     try {
       const result = await uploadSignature(form);
-      setPreviewUrl(await fetchSignatureObjectUrl(result.signature_url));
+      setAndTrackPreviewUrl(await fetchSignatureObjectUrl(result.signature_url));
       dispatch(
         setUser({
           ...user,

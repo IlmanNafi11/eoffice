@@ -1,9 +1,8 @@
 /**
- * ResetPasswordPage — set password baru via reset_token (Slice 3).
- *
- * `reset_token` (60-char) dibaca dari sessionStorage (diterbitkan verifikasi
- * OTP, TTL server 5 menit). Token hilang → kembali ke `/forgot-password`.
- * Sukses → token dihapus dari penyimpanan dan dipindah ke `/login`.
+ * `reset_token` (60-char) dibaca sekali dari sessionStorage lewat remove-on-read
+ * (diterbitkan verifikasi OTP, TTL server 5 menit) dan disimpan ke state lokal
+ * selama halaman hidup — kredensial reset tidak menetap di storage bila alur
+ * ditinggalkan. Token hilang → kembali ke `/forgot-password`; sukses → `/login`.
  */
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -28,9 +27,18 @@ export function ResetPasswordPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  // reset_token dibaca sekali ke state lalu langsung dihapus dari
+  // sessionStorage (remove-on-read): kredensial reset yang kuat tidak boleh
+  // menetap di storage bila pengguna meninggalkan alur tanpa menyelesaikan.
+  // Token tetap tersedia untuk retry di state ini sampai submit sukses.
   const status = useAppSelector((s) => s.auth.status);
   const error = useAppSelector((s) => s.auth.error);
 
+  const [resetToken] = useState<string | null>(() => {
+    const token = sessionStorage.getItem(RESET_TOKEN_KEY);
+    sessionStorage.removeItem(RESET_TOKEN_KEY);
+    return token;
+  });
   const [email] = useState(() => searchParams.get("email") ?? "");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -40,7 +48,8 @@ export function ResetPasswordPage() {
     event.preventDefault();
     if (submitting) return;
 
-    const resetToken = sessionStorage.getItem(RESET_TOKEN_KEY);
+    // Token sudah dipindah dari sessionStorage ke state `resetToken` saat
+    // mount; hilang berarti alur dibuka langsung tanpa verify-otp.
     if (!resetToken) {
       void navigate("/forgot-password", { replace: true });
       return;
@@ -54,7 +63,6 @@ export function ResetPasswordPage() {
       }),
     );
     if (resetPassword.fulfilled.match(result)) {
-      sessionStorage.removeItem(RESET_TOKEN_KEY);
       navigate("/login", { replace: true });
     }
   }
