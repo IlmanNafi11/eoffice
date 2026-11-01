@@ -34,6 +34,8 @@ export interface WfhListState {
   query: ListWfhReportsQuery;
   status: WfhFetchStatus;
   error: string | null;
+  /** requestId dispatch list terakhir — untuk membuang respons basi (race). */
+  latestRequestId: string | null;
 }
 
 export interface WfhCurrentState {
@@ -49,7 +51,14 @@ export interface WfhState {
 
 export function initialWfhState(): WfhState {
   return {
-    list: { items: [], meta: null, query: {}, status: "idle", error: null },
+    list: {
+      items: [],
+      meta: null,
+      query: {},
+      status: "idle",
+      error: null,
+      latestRequestId: null,
+    },
     current: { report: null, status: "idle", error: null },
   };
 }
@@ -296,14 +305,20 @@ const slice = createSlice({
         state.list.status = "loading";
         state.list.error = null;
         if (action.meta.arg) state.list.query = { ...state.list.query, ...action.meta.arg };
+        // Catat requestId dispatch TERBARU — respons fetch lama yang balik
+        // belakangan harus dibuang (ship review #4: race out-of-order, hal
+        // 2 lambat menimpa hal 1 yang cepat).
+        state.list.latestRequestId = action.meta.requestId;
       })
       .addCase(fetchWfhReports.fulfilled, (state, action) => {
+        if (state.list.latestRequestId !== action.meta.requestId) return;
         state.list.status = "succeeded";
         state.list.items = action.payload.reports;
         state.list.meta = action.payload.meta;
         state.list.error = null;
       })
       .addCase(fetchWfhReports.rejected, (state, action) => {
+        if (state.list.latestRequestId !== action.meta.requestId) return;
         state.list.status = "failed";
         state.list.error =
           (action.payload as string | undefined) ?? action.error.message ?? "Gagal memuat daftar.";

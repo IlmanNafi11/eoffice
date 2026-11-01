@@ -230,6 +230,64 @@ describe("wfhSlice — thunks", () => {
     expect(current?.status).toBe("draft");
   });
 
+  /** Promise yang settle-nya dikontrol manual — deterministik, tanpa timer. */
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it(
+    "respons fetch list yang basi (out-of-order) TIDAK menimpa hasil terbaru",
+    async () => {
+      // Halaman 2 slow, halaman 1 cepat: fulfilled hal-2 balik belakangan
+      // dan (sebelum guard requestId) menimpa items+meta dengan data lama.
+      const slow = deferred<{ reports: WfhReport[]; meta: PaginationMeta }>();
+      mockedList.mockReturnValueOnce(slow.promise);
+      mockedList.mockResolvedValueOnce({
+        reports: [reportPending],
+        meta: { ...meta, current_page: 1 },
+      });
+      const store = makeStore();
+
+      const first = store.dispatch(fetchWfhReports({ page: 2 }));
+      const second = store.dispatch(fetchWfhReports({ page: 1 }));
+      await second;
+      // Halaman 2 (dispatch pertama) settle TERAKHIR dengan data basi.
+      slow.resolve({
+        reports: [{ ...reportDraft, id: 22 }],
+        meta: { ...meta, current_page: 2 },
+      });
+      await first;
+
+      // Yang menang: dispatch TERAKHIR (halaman 1), bukan resolver terakhir.
+      expect(selectWfhListMeta(store.getState())?.current_page).toBe(1);
+      expect(selectWfhListItems(store.getState())).toEqual([reportPending]);
+    },
+  );
+
+  it("respons fetch list basi yang GAGAL tidak menimpa status succeeded", async () => {
+    const slow = deferred<{ reports: WfhReport[]; meta: PaginationMeta }>();
+    mockedList.mockReturnValueOnce(slow.promise);
+    mockedList.mockResolvedValueOnce({ reports: [reportPending], meta });
+    const store = makeStore();
+
+    const first = store.dispatch(fetchWfhReports({ page: 2 }));
+    const second = store.dispatch(fetchWfhReports({ page: 1 }));
+    await second;
+    slow.reject(new Error("Timeout lama"));
+    await first.catch(() => undefined);
+
+    const list = selectWfhList(store.getState());
+    expect(list.status).toBe("succeeded");
+    expect(list.error).toBeNull();
+    expect(selectWfhListItems(store.getState())).toEqual([reportPending]);
+  });
+
   it("delete sukses menghapus report dari list dan membersihkan current yang cocok", async () => {
     mockedList.mockResolvedValueOnce({ reports: [reportPending, reportDraft], meta });
     const store = makeStore();

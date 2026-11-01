@@ -193,10 +193,23 @@ const slice = createSlice({
         state.error = null;
         setAuthToken(null);
       })
+      .addCase(fetchMe.pending, (state) => {
+        // `status = "loading"` adalah kontrak guard double-dispatch di
+        // `SessionBootstrap` (menahan efek selama request berjalan) — tanpa
+        // reducer ini guard itu false-invariant (ship review #4).
+        state.status = "loading";
+        state.error = null;
+      })
       .addCase(fetchMe.fulfilled, (state, action) => {
+        state.status = "succeeded";
         state.user = action.payload;
       })
       .addCase(fetchMe.rejected, (state, action) => {
+        // Sesi tidak diakhiri di sini: 401 sudah ditangani interceptor
+        // (hapus token + redirect); error non-401 (jaringan mati) tidak boleh
+        // mengakhiri sesi yang masih valid — efek bootstrap menyala ulang dan
+        // mencoba lagi saat jaringan pulih, jadi status kembali ke "idle".
+        state.status = "idle";
         state.error = (action.payload as string | undefined) ?? action.error.message ?? null;
       })
       .addCase(changePassword.pending, (state) => {
