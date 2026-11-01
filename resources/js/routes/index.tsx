@@ -27,6 +27,7 @@ import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { WfhReportsPage } from "@/pages/wfh/WfhReportsPage";
 import { WfhReportDetailPage } from "@/pages/wfh/WfhReportDetailPage";
 import { TeamReportsPage } from "@/pages/wfh/TeamReportsPage";
+import { MonitoringPage } from "@/pages/wfh/MonitoringPage";
 
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
 
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
           { path: "/change-password", element: <ChangePasswordPage /> },
           { path: "/wfh", element: <WfhReportsPage /> },
           { path: "/wfh/:reportId", element: <WfhReportDetailPage /> },
+          { path: "/monitoring", element: <MonitoringPage /> },
           { path: "/team-reports", element: <TeamReportsPage /> },
         ],
       },
