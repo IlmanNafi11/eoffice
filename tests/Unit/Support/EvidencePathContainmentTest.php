@@ -48,4 +48,19 @@ class EvidencePathContainmentTest extends TestCase
         $this->assertSame('', PrivateMediaPath::resolve(null));
         $this->assertSame('', PrivateMediaPath::resolveAny(''));
     }
+
+    /**
+     * Ship review #4 (security Medium): URL-encoded separators/traversal and
+     * null bytes must be rejected even though no current caller forwards a
+     * request string — the guard is the boundary for the next one that does.
+     */
+    public function test_url_encoded_and_null_byte_payloads_are_rejected(): void
+    {
+        $this->assertFalse(SignaturePath::contained('%2e%2e%2f.env'));
+        $this->assertFalse(SignaturePath::contained('signatures/%2f..%2f.env'));
+        $this->assertFalse(SignaturePath::contained('sig%5ctest.png'));
+        $this->assertFalse(SignaturePath::contained('signatures/x%00.php'));
+        $this->assertSame('', SignaturePath::resolve('%2e%2e%2f.env'));
+        $this->assertSame('', PrivateMediaPath::resolveAny('%2e%2e/.env'));
+    }
 }

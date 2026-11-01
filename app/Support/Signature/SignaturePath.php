@@ -20,7 +20,11 @@ class SignaturePath
     /**
      * True when the relative path stays inside the disk root: no `..`
      * segments, no absolute prefix, no backslashes (Windows separators on
-     * a POSIX host would bypass naive prefix checks).
+     * a POSIX host would bypass naive prefix checks), and no URL-encoded or
+     * null-byte payload (ship review #4: a row value like `%2e%2e%2f` or
+     * `..%00.png` currently has no reachable caller that passes it to
+     * Storage::path() un-decoded — this keeps it that way even if a future
+     * endpoint forwards a request string).
      */
     public static function contained(?string $relative): bool
     {
@@ -29,6 +33,10 @@ class SignaturePath
         }
 
         if (str_contains($relative, '\\') || str_starts_with($relative, '/')) {
+            return false;
+        }
+
+        if (str_contains($relative, "\0") || preg_match('/%(?:2e|2f|5c|00)/i', $relative)) {
             return false;
         }
 
