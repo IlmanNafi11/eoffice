@@ -59,6 +59,13 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   menghasilkan nomor rusak seperti `001//2026`.
 
 ### Fixed
+- Pesan error mutasi WFH (422) kini benar-benar terlihat: `WfhReportDetailPage`
+  memanggil refetch detail tanpa syarat setelah setiap mutasi, dan
+  `fetchWfhReport.pending` membersihkan `current.error` sebelum render
+  berikutnya — submit laporan kosong menjawab 422 "Setidaknya satu kegiatan atau
+  satu absensi harus diisi sebelum submit." yang tak pernah tampil ke pengguna.
+  Refetch kini hanya berjalan saat mutasi sukses (`runMutation`,
+  `persistActivities`), dan pesan dari matcher `rejected` dibiarkan di layar.
 - **SEC-01** — filter `status`/`team_id` pada `/api/admin/wfh/reports` divalidasi;
   input sampah sebelumnya diteruskan ke Postgres dan memicu 500 (22P02).
 - **C2** — baris duplikat dalam satu berkas impor kini dilewati dan dilaporkan,
@@ -101,6 +108,21 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   kepala_bidang: sidebar berbeda sesuai permission, must_change_password
   memaksa /change-password, profil + upload signature persist setelah refresh,
   logout menghapus token, 401 memicu auto-logout + redirect /login).
+- E2E manual modul WFH 3 role `DemoUsersSeeder` di browser nyata (wfh-reports
+  Phase 4, CP4): staf — login → must_change_password → daftar/filter
+  `/wfh` → detail → unggah absensi sesi (siang) → Ajukan (draft→pending) →
+  Unduh PDF (blob `WFH-1-2026-11-01.pdf`, valid PDF 1.7, butuh tanda tangan
+  pemilik: tanpa itu endpoint menjawab 422 sesuai `SignatureGuard`); kepala
+  bidang — Setujui (pending→disetujui, tombol aksi hilang) dan Tolak via
+  dialog alasan wajib (alasan tampil ke pemilik); staf — Revisi laporan
+  (rejected→draft) → tambah kegiatan → Ajukan ulang (→pending); kepalatim
+  melihat nav Monitoring/Laporan Tim tanpa Setujui/Tolak (approve/reject =
+  kepala bidang, kontrak `RolePermissionSeeder`). 403 DAN 422 tampil sebagai
+  pesan Indonesia ke pengguna. E2E menemukan + memicu perbaikan bug visibilitas
+  pesan 422 (lihat bagian Fixed) — regresi dikunci test unit halaman detail.
+  Catatan lingkungan: E2E hari Minggu butuh `wfh_allowed_days` [1..7] sementara
+  (dikembalikan ke [1..5] setelahnya); database `kominfo_wfh` dibiarkan berisi
+  data demo E2E — suite PHPUnit memakai `eoffice-pgtest` terpisah.
 - Rate limit `/verify/{token}` dikunci test (RED bila `ThrottleRequests:api`
   dilepas dari grup `api`) — sebelumnya tak ada test yang gagal tanpanya.
 - Test fallback render non-JSON memakai probe `POST`: probe `GET` tertutup
