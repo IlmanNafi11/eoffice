@@ -28,6 +28,9 @@ import { WfhReportsPage } from "@/pages/wfh/WfhReportsPage";
 import { WfhReportDetailPage } from "@/pages/wfh/WfhReportDetailPage";
 import { TeamReportsPage } from "@/pages/wfh/TeamReportsPage";
 import { MonitoringPage } from "@/pages/wfh/MonitoringPage";
+import { ChangesPage } from "@/pages/changes/ChangesPage";
+import { ChangePackageFormPage } from "@/pages/changes/ChangePackageFormPage";
+import { ChangePackageDetailPage } from "@/pages/changes/ChangePackageDetailPage";
 
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
 
@@ -60,6 +63,10 @@ export const router = createBrowserRouter([
           { path: "/wfh/:reportId", element: <WfhReportDetailPage /> },
           { path: "/monitoring", element: <MonitoringPage /> },
           { path: "/team-reports", element: <TeamReportsPage /> },
+          { path: "/changes", element: <ChangesPage /> },
+          { path: "/changes/new", element: <ChangePackageFormPage /> },
+          { path: "/changes/:packageId/edit", element: <ChangePackageFormPage /> },
+          { path: "/changes/:packageId", element: <ChangePackageDetailPage /> },
         ],
       },
     ],
