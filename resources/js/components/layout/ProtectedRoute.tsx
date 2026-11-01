@@ -9,10 +9,12 @@
  * - Sesi valid → render `<Outlet/>` (route anak dari `routes/index.tsx`).
  *
  * Catatan: `user` boleh `null` saat shell baru mount (`fetchMe` berjalan);
- * guard tidak menolak sesi valid hanya karena user belum termuat — flag
- * `must_change_password` baru aktif setelah user ada.
+ * guard menampilkan placeholder sampai sesi terverifikasi — flag
+ * `must_change_password` aktif hanya setelah user ada, tanpa kilat UI
+ * terlindungi sebelum rehidrasi selesai.
  */
 
+import { Loader2 } from "lucide-react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAppSelector } from "@/store/hooks";
 import { selectToken, selectUser } from "@/store/authSlice";
@@ -24,11 +26,28 @@ export function ProtectedRoute() {
   const token = useAppSelector(selectToken);
   const user = useAppSelector(selectUser);
   const location = useLocation();
+
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.must_change_password && location.pathname !== CHANGE_PASSWORD_PATH) {
+  // Token ada tapi user belum termuat (baru refresh, `fetchMe` berjalan):
+  // tahan render sampai sesi terverifikasi — mencegah kilat UI halaman
+  // terlindungi sebelum guard `must_change_password` aktif (ship review #4).
+  if (!user) {
+    return (
+      <div
+        className="flex items-center gap-2 p-6 text-muted-foreground"
+        data-testid="protected-route-loading"
+        role="status"
+      >
+        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+        <span>Memuat…</span>
+      </div>
+    );
+  }
+
+  if (user.must_change_password && location.pathname !== CHANGE_PASSWORD_PATH) {
     return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   }
 

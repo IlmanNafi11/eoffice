@@ -107,12 +107,15 @@ describe("ProtectedRoute — guard sesi", () => {
     expect(screen.queryByText("halaman login")).toBeNull();
   });
 
-  it("me-render konten saat user belum termuat (fetchMe berjalan setelah mount)", () => {
-    // `initialAuthState` sengaja user=null; guard tidak boleh menolak
-    // sesi valid hanya karena `fetchMe` belum selesai.
+  it("menampilkan placeholder memuat saat token ada tapi user belum termuat", () => {
+    // Kontrak baru (ship review #4): sesi TIDAK dianggap valid sampai
+    // `fetchMe` selesai — tanpa gate ini halaman terlindungi sempat
+    // berkilat sebelum guard `must_change_password` aktif.
     renderGuarded("/", { user: null });
 
-    expect(screen.getByText("halaman terlindungi")).toBeTruthy();
+    expect(screen.getByTestId("protected-route-loading")).toBeTruthy();
+    expect(screen.queryByText("halaman terlindungi")).toBeNull();
+    expect(screen.queryByText("halaman login")).toBeNull();
   });
 });
 
