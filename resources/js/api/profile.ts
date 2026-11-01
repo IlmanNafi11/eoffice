@@ -10,7 +10,6 @@ import type { ProfileData, UpdateProfileRequest } from "@/api/types";
 
 /** `#/components/schemas/SignatureUploadResponse` */
 export interface SignatureUploadResponse {
-  signature_path: string;
   signature_url: string;
 }
 

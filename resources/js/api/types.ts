@@ -52,7 +52,6 @@ export interface AuthUser {
   rank?: string | null;
   position?: string | null;
   phone?: string | null;
-  signature_path?: string | null;
   signature_url?: string | null;
   must_change_password: boolean;
   is_active: boolean;
@@ -130,7 +129,6 @@ export interface WfhReportUser {
   nip: string;
   position?: string | null;
   rank?: string | null;
-  signature_path?: string | null;
 }
 
 /**

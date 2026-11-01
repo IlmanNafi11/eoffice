@@ -54,7 +54,6 @@ const user: AuthUser = {
   rank: "III/a",
   position: "Staf",
   phone: "08123",
-  signature_path: null,
   signature_url: null,
   must_change_password: true,
   is_active: true,

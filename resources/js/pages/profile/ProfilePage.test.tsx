@@ -144,7 +144,6 @@ describe("ProfilePage — save profil", () => {
 describe("ProfilePage — upload tanda tangan", () => {
   it("upload memakai FormData lalu preview lewat fetch ber-otorisasi", async () => {
     mockedUpload.mockResolvedValueOnce({
-      signature_path: "signatures/1-signature.png",
       signature_url: "/api/signatures/1",
     });
     mockedFetchUrl.mockResolvedValueOnce("blob:new-signature");
@@ -162,7 +161,6 @@ describe("ProfilePage — upload tanda tangan", () => {
 
   it("preview fetch gagal → placeholder dashed, bukan crash", async () => {
     mockedUpload.mockResolvedValueOnce({
-      signature_path: "signatures/1-signature.png",
       signature_url: "/api/signatures/1",
     });
     mockedFetchUrl.mockRejectedValueOnce(new Error("network"));

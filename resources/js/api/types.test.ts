@@ -31,7 +31,6 @@ const authUser: AuthUser = {
   rank: "Pengatur Muda",
   position: "Staf Pelaksana",
   phone: "081234567890",
-  signature_path: "signatures/budi-signature.png",
   signature_url: "http://localhost/storage/signatures/budi-signature.png",
   must_change_password: true,
   is_active: true,
@@ -77,7 +76,6 @@ describe("api/types — contract dari openapi.yaml (Phase 1 / Tipe API)", () => 
       rank: null,
       position: null,
       phone: null,
-      signature_path: null,
       signature_url: null,
       team: null,
     };
@@ -160,7 +158,6 @@ const reportUser = {
   nip: "199001012023011001",
   position: "Staf Pelaksana",
   rank: "Pengatur Muda",
-  signature_path: "signatures/1-signature.png",
 } as const;
 
 describe("api/types — kontrak domain WFH reports (openapi.yaml)", () => {

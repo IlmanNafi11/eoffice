@@ -46,7 +46,6 @@ const profile: AuthUser = {
   rank: "Pengatur Muda",
   position: "Staf Pelaksana",
   phone: "081234567890",
-  signature_path: "signatures/budi-signature.png",
   signature_url: "http://localhost/storage/signatures/budi-signature.png",
   is_active: true,
   roles: ["staf"],
@@ -85,7 +84,6 @@ describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
     ok({
       success: true,
       data: {
-        signature_path: "signatures/1-signature.png",
         signature_url: "http://localhost/storage/signatures/1-signature.png",
       },
       message: null,
@@ -102,7 +100,6 @@ describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
     expect(requests[0]?.body).toBe(form);
     expect(requests[0]?.headers.get("content-type")).toContain("multipart/form-data");
     expect(result).toEqual({
-      signature_path: "signatures/1-signature.png",
       signature_url: "http://localhost/storage/signatures/1-signature.png",
     });
   });

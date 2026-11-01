@@ -52,7 +52,6 @@ const user: AuthUser = {
   rank: "Pengatur Muda",
   position: "Staf Pelaksana",
   phone: "081234567890",
-  signature_path: null,
   signature_url: null,
   is_active: true,
   roles: ["staf"],

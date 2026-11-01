@@ -210,7 +210,6 @@ components:
             rank: Pengatur Muda
             position: Staf Pelaksana
             phone: "081234567890"
-            signature_path: signatures/budi-signature.png
             must_change_password: true
             is_active: true
             roles: [staf]
@@ -253,10 +252,6 @@ components:
           type: string
           nullable: true
           example: "081234567890"
-        signature_path:
-          type: string
-          nullable: true
-          example: signatures/budi-signature.png
         signature_url:
           type: string
           nullable: true
@@ -316,10 +311,6 @@ components:
           type: string
           nullable: true
           example: "081234567890"
-        signature_path:
-          type: string
-          nullable: true
-          example: signatures/budi-kb-signature.png
         signature_url:
           type: string
           nullable: true
@@ -351,7 +342,6 @@ components:
         rank: Pembina
         position: Kepala Bidang Pengembangan Aplikasi
         phone: "081234567890"
-        signature_path: signatures/budi-kb-signature.png
         signature_url: http://localhost/storage/signatures/budi-kb-signature.png
         must_change_password: false
         is_active: true
@@ -400,11 +390,8 @@ components:
           example: Tanda tangan berhasil diunggah.
         data:
           type: object
-          required: [signature_path, signature_url]
+          required: [signature_url]
           properties:
-            signature_path:
-              type: string
-              example: signatures/1-signature.png
             signature_url:
               type: string
               format: uri
@@ -413,7 +400,6 @@ components:
         success: true
         message: Tanda tangan berhasil diunggah.
         data:
-          signature_path: signatures/1-signature.png
           signature_url: http://localhost/storage/signatures/1-signature.png
     # ── User Management ─────────────────────────────────────────────
     StoreUserRequest:
@@ -573,10 +559,6 @@ components:
         is_active:
           type: boolean
           example: true
-        signature_path:
-          type: string
-          nullable: true
-          example: signatures/12-signature.png
         roles:
           type: array
           items:
@@ -726,7 +708,6 @@ components:
             position: Staf Pelaksana
             phone: "081234567890"
             is_active: true
-            signature_path: signatures/1-signature.png
             roles: [staf]
             created_at: "2025-07-01T08:00:00.000000Z"
             team:
@@ -743,7 +724,6 @@ components:
             position: Staf Pelaksana
             phone: "081345678901"
             is_active: true
-            signature_path: null
             roles: [staf]
             created_at: "2025-07-14T08:30:00.000000Z"
             team:
@@ -1091,14 +1071,12 @@ components:
           nip: "199001012023011001"
           position: Staf Pelaksana
           rank: Pengatur Muda
-          signature_path: signatures/1-signature.png
         supervisor:
           id: 5
           name: Siti Nurhaliza
           nip: "198505202015011001"
           position: Kepala Sub Bagian
           rank: Penata Muda
-          signature_path: signatures/5-signature.png
         activities:
           - id: 67
             start_time: "08:00"
@@ -1144,17 +1122,6 @@ components:
           type: string
           nullable: true
           example: Pengatur Muda
-        signature_path:
-          type: string
-          nullable: true
-          example: signatures/1-signature.png
-      example:
-        id: 1
-        name: Budi Santoso
-        nip: "199001012023011001"
-        position: Staf Pelaksana
-        rank: Pengatur Muda
-        signature_path: signatures/1-signature.png
     WfhReportActivity:
       type: object
       description: |
@@ -1234,7 +1201,6 @@ components:
               nip: "199001012023011001"
               position: Staf Pelaksana
               rank: Pengatur Muda
-              signature_path: signatures/1-signature.png
             activities:
               - id: 67
                 start_time: "08:00"
@@ -1583,7 +1549,6 @@ components:
             nip: "199001012023011001"
             position: "Staf Pelaksana"
             rank: "Penata Muda"
-            signature_path: "signatures/8-signature.png"
         implementation:
           id: 9
           change_initiation_id: 12
@@ -1659,7 +1624,6 @@ components:
             nip: { type: string, example: "199001012023011001" }
             position: { type: string, nullable: true, example: "Staf Pelaksana" }
             rank: { type: string, nullable: true, example: "Penata Muda" }
-            signature_path: { type: string, nullable: true, example: "signatures/8-signature.png" }
     ImplementationResource:
       type: object
       required: [id, change_initiation_id, status]
@@ -1733,7 +1697,6 @@ components:
                 nip: "199001012023011001"
                 position: "Staf Pelaksana"
                 rank: "Penata Muda"
-                signature_path: "signatures/8-signature.png"
             implementation:
               id: 9
               change_initiation_id: 12
@@ -2262,7 +2225,6 @@ paths:
                     rank: Pengatur Muda
                     position: Staf Pelaksana
                     phone: "081234567890"
-                    signature_path: signatures/budi-signature.png
                     is_active: true
                     roles: [staf]
                     permissions: [wfh.attendance.create, wfh.report.create]
@@ -2324,7 +2286,6 @@ paths:
                   rank: Pengatur Muda
                   position: Staf Pelaksana
                   phone: "081234567890"
-                  signature_path: signatures/budi-signature.png
                   is_active: true
                   roles: [staf]
                   permissions: [wfh.attendance.create, wfh.report.create]
@@ -2630,7 +2591,6 @@ paths:
                   rank: Pengatur Muda
                   position: Staf Pelaksana
                   phone: "081234567890"
-                  signature_path: signatures/budi-signature.png
                   signature_url: http://localhost/storage/signatures/budi-signature.png
                   is_active: true
                   roles: [staf]
@@ -2685,7 +2645,6 @@ paths:
                   rank: Penata Muda
                   position: Analis Sistem Informasi
                   phone: "081298765432"
-                  signature_path: signatures/budi-signature.png
                   signature_url: http://localhost/storage/signatures/budi-signature.png
                   is_active: true
                   roles: [staf]
@@ -2827,7 +2786,6 @@ paths:
                   position: Staf Pelaksana
                   phone: "081345678901"
                   is_active: true
-                  signature_path: null
                   roles: [staf]
                   created_at: "2025-07-14T08:30:00.000000Z"
                   team:
@@ -2898,7 +2856,6 @@ paths:
                   position: Staf Pelaksana
                   phone: "081345678901"
                   is_active: true
-                  signature_path: null
                   roles: [staf]
                   created_at: "2025-07-14T08:30:00.000000Z"
                   team:
@@ -2984,7 +2941,6 @@ paths:
                   position: Analis Sistem Informasi
                   phone: "081345678901"
                   is_active: true
-                  signature_path: null
                   roles: [kepala_tim]
                   created_at: "2025-07-14T08:30:00.000000Z"
                   team:
@@ -3620,7 +3576,6 @@ paths:
                     nip: "199001012023011001"
                     position: Staf Pelaksana
                     rank: Pengatur Muda
-                    signature_path: signatures/1-signature.png
                   activities:
                     - id: 67
                       start_time: "08:00"

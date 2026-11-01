@@ -118,8 +118,9 @@ export function ProfilePage() {
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
-
+    // Guard double-select: event `change` kedua yang ter-antre sebelum
+    // re-render tidak boleh memicu upload multipart paralel (ship review #4).
+    if (!file || !user || uploading) return;
     setUploading(true);
     setFieldErrors({});
     setMessage(null);
@@ -133,7 +134,6 @@ export function ProfilePage() {
       dispatch(
         setUser({
           ...user,
-          signature_path: result.signature_path,
           signature_url: result.signature_url,
         }),
       );
