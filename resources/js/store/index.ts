@@ -16,10 +16,12 @@ import type { AuthState } from "@/store/authSlice";
 import { authReducer, clearToken, initialAuthState } from "@/store/authSlice";
 import type { WfhState } from "@/store/wfhSlice";
 import { wfhReducer } from "@/store/wfhSlice";
+import type { WfhTeamState } from "@/store/wfhTeamSlice";
+import { wfhTeamReducer } from "@/store/wfhTeamSlice";
 
 // ── Tipe store (named — bukan ReturnType) ───────────────────────────
 
-export type RootState = { auth: AuthState; wfh: WfhState };
+export type RootState = { auth: AuthState; wfh: WfhState; wfhTeam: WfhTeamState };
 
 /** Dispatch dengan middleware thunk default RTK. */
 export type AppDispatch = ThunkDispatch<RootState, undefined, UnknownAction>;
@@ -39,7 +41,7 @@ export function makeStore(): AppStore {
   const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
 
   const store: AppStore = configureStore({
-    reducer: { auth: authReducer, wfh: wfhReducer },
+    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer },
     preloadedState: storedToken
       ? { auth: { ...initialAuthState(), token: storedToken } }
       : undefined,
