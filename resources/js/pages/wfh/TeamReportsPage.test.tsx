@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { PaginationMeta, WfhTeamReport } from "@/api/types";
@@ -32,6 +32,8 @@ import { setUser } from "@/store/authSlice";
 const mockedList = wfhTeamApi.listWfhTeamReports as unknown as Mock;
 const mockedCreate = wfhTeamApi.createWfhTeamReport as unknown as Mock;
 const mockedListTeams = wfhTeamApi.listTeams as unknown as Mock;
+const mockedApprove = wfhTeamApi.approveWfhTeamReport as unknown as Mock;
+const mockedReject = wfhTeamApi.rejectWfhTeamReport as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 10, total: 12 };
 
@@ -293,5 +295,139 @@ describe("TeamReportsPage — create journey", () => {
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledTimes(2); // initial + refetch
     });
+  });
+});
+
+describe("TeamReportsPage — approve/reject journey", () => {
+  /** User dengan permission approve+reject (kepala bidang). */
+  const approver = {
+    ...user,
+    permissions: [
+      "wfh.team_report.view",
+      "wfh.team_report.approve",
+      "wfh.team_report.reject",
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedList.mockResolvedValue({ reports: [reportA, reportB], meta });
+  });
+
+  it("aksi approve/reject hanya tampil untuk baris pending DAN pemegang permission", async () => {
+    // reportA pending, reportB approved → hanya reportA yang punya tombol.
+    renderPageAs(approver);
+
+    await screen.findByTestId("team-report-row-1");
+    expect(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /setujui/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /tolak/i,
+      }),
+    ).toBeTruthy();
+    // Baris approved (status !== pending) → tanpa aksi.
+    expect(
+      within(screen.getByTestId("team-report-row-2")).queryByRole("button"),
+    ).toBeNull();
+
+    // Tanpa permission approve/reject → tanpa tombol sama sekali.
+    cleanup();
+    renderPage(); // kepala bidang view-only
+    await screen.findByTestId("team-report-row-1");
+    expect(screen.queryByRole("button", { name: /setujui/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /tolak/i })).toBeNull();
+  });
+
+  it("approve → panggil API id baris + daftar di-refetch, baris ter-update", async () => {
+    renderPageAs(approver);
+    await screen.findByTestId("team-report-row-1");
+
+    mockedApprove.mockResolvedValueOnce({ ...reportA, status: "approved" });
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /setujui/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedApprove).toHaveBeenCalledWith(1);
+    });
+    // Refetch pasca-mutasi (sumber kebenaran = server).
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("reject membuka dialog alasan wajib; kosong → tidak mengirim; terisi → payload {reason}", async () => {
+    renderPageAs(approver);
+    await screen.findByTestId("team-report-row-1");
+
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /tolak/i,
+      }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    const input = within(dialog).getByLabelText(/alasan penolakan/i);
+    const submit = within(dialog).getByRole("button", { name: /tolak laporan/i });
+
+    // Alasan kosong → submit disabled, tidak ada panggilan API.
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(submit);
+    expect(mockedReject).not.toHaveBeenCalled();
+
+    // Alasan whitespace saja masih dianggap kosong.
+    await userEvent.type(input, "   ");
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+
+    await userEvent.type(input, "Melebihi kuota WFH bulan ini.");
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
+
+    mockedReject.mockResolvedValueOnce({ ...reportA, status: "rejected" });
+    await userEvent.click(submit);
+    await waitFor(() => {
+      expect(mockedReject).toHaveBeenCalledWith(1, "Melebihi kuota WFH bulan ini.");
+    });
+    // Refetch pasca-mutasi.
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledTimes(2);
+    });
+    // Dialog tertutup setelah sukses.
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  it("403 lintas bidang pada approve → pesan server tersaji dan SELAMAT setelah refetch (regresi a602c46)", async () => {
+    renderPageAs(approver);
+    await screen.findByTestId("team-report-row-1");
+
+    mockedApprove.mockRejectedValueOnce(
+      new Error("Laporan tidak berada dalam bidang Anda."),
+    );
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /setujui/i,
+      }),
+    );
+
+    expect(
+      (await screen.findByTestId("team-action-error")).textContent,
+    ).toContain("Laporan tidak berada dalam bidang Anda.");
+
+    // Mutasi gagal TIDAK memicu refetch (kontrak slice a602c46) — hanya fetch awal.
+    expect(mockedList).toHaveBeenCalledTimes(1);
+
+    // Refetch berikutnya (mis. pengguna paginate) TIDAK boleh menyapu pesan.
+    await userEvent.click(screen.getByRole("button", { name: /berikutnya/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByTestId("team-action-error")).toBeTruthy();
   });
 });
