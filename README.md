@@ -93,6 +93,7 @@ php artisan test
 - Repository pattern with interfaces for testability
 - Cross-cutting services: `app/Support/{Pdf,Signature,QrCode,Import}`
 - Spatie RBAC: roles (admin, kepala_bidang, kepala_tim, staf) + granular permissions
+- SPA: `resources/js` — `api/` (axios client + domain modules), `store/` (Redux Toolkit slices + thunks), `pages/` + `components/` (route-level), `lib/permissions.ts` satu pintu gating; guard rute di `routes/SessionBootstrap.tsx` + `components/layout/ProtectedRoute.tsx`
 
 ## PDF Generation
 - dompdf + Blade templates replicate government form layouts
