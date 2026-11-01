@@ -14,6 +14,7 @@ import {
   CreateTeamReportInput,
   ListTeamReportsQuery,
   PaginationMeta,
+  RejectTeamReportInput,
   TeamResource,
   WfhTeamReport,
 } from "@/api/types";
@@ -60,14 +61,12 @@ export async function approveWfhTeamReport(teamReportId: number): Promise<WfhTea
   return requireData(res.data, "approveWfhTeamReport");
 }
 
-/** POST /admin/wfh/team-reports/{id}/reject — alasan wajib (kontrak `RejectTeamReportRequest`). */
+/** POST …/reject — alasan wajib (kontrak `RejectTeamReportRequest`). */
 export async function rejectWfhTeamReport(
   teamReportId: number,
-  reason: string,
+  input: RejectTeamReportInput,
 ): Promise<WfhTeamReport> {
-  const res = await api.post<WfhTeamReport>(`/admin/wfh/team-reports/${teamReportId}/reject`, {
-    reason,
-  });
+  const res = await api.post<WfhTeamReport>(`/admin/wfh/team-reports/${teamReportId}/reject`, input);
   return requireData(res.data, "rejectWfhTeamReport");
 }
 

@@ -2,7 +2,7 @@
  * Test unit modul `@/api/wfh-team` (modul wfh-team-reports).
  * Mengunci kontrak 5 operasi `openapi.yaml` tag `WFH Team Reports` + 1 op
  * pinjaman `listTeams` (tag Organization): bentuk payload JSON, params query,
- * dan pemetaan paginator raw (non-envelope) → `{ reports, meta }`.
+ * dan pemetaan envelope `ApiResponse::paginated` → `{ reports, meta }`.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
@@ -153,7 +153,7 @@ describe("api/wfh-team — create/approve/reject", () => {
       meta: null,
     });
 
-    const out = await rejectWfhTeamReport(12, "Data tidak lengkap");
+    const out = await rejectWfhTeamReport(12, { reason: "Data tidak lengkap" });
 
     expect(requests[0]?.method).toBe("post");
     expect(requests[0]?.url).toBe("/admin/wfh/team-reports/12/reject");
