@@ -72,28 +72,27 @@ class SecurityHardeningTest extends TestCase
     }
 
     /**
-     * CSP melindungi token bearer di localStorage dari eskalasi XSS: tanpa
-     * CSP (RED bila header dilepas), script eksfiltrasi lewat connect-src
-     * origin lain lolos. Wajib ada di production.
+     * Guard posisi: satu-satunya environment tanpa CSP adalah `local`, karena
+     * hanya di sana `vite dev` menyuntik script HMR inline dari dev-server
+     * yang tidak lolos `script-src 'self'`. Semua environment lain — termasuk
+     * staging/UAT/preview yang menyajikan bundel `vite build` — WAJIB memakai
+     * CSP yang sama dengan production: mekanisme penyimpanan token
+     * (localStorage) identik di sana.
+     *
+     * RED bila gate dikembalikan ke `production`-only: baris `testing` dan
+     * `staging` di bawah gagal (itulah regresi "CSP kosong di staging").
      */
-    public function test_content_security_policy_present_in_production(): void
-    {
-        app()['env'] = 'production';
-
-        $this->getJson('/up')->assertHeader('Content-Security-Policy');
-    }
-
-    /**
-     * Guard posisi: CSP digate ke production — local/testing memakai `vite
-     * dev` yang menyuntik script HMR dari dev-server dan tidak lolos CSP
-     * 'self'. RED bila CSP tak sengaja menyala di semua environment dan
-     * mematikan HMR lokal.
-     */
-    public function test_content_security_policy_absent_outside_production(): void
+    public function test_content_security_policy_absent_only_in_local(): void
     {
         app()['env'] = 'local';
-
         $this->getJson('/up')->assertHeaderMissing('Content-Security-Policy');
+
+        foreach (['testing', 'staging', 'production'] as $env) {
+            app()['env'] = $env;
+            $this->getJson('/up')
+                ->assertHeader('Content-Security-Policy')
+                ->assertHeader('Strict-Transport-Security');
+        }
     }
 
     public function test_login_rate_limited_after_five_attempts(): void

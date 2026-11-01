@@ -28,18 +28,22 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
-        if (app()->environment('production')) {
+        // CSP + HSTS dinyalakan untuk SEMUA environment selain local (bukan
+        // production-only): staging/UAT/preview yang menyajikan bundle `vite
+        // build` tetap mendapat lapisan mitigasi XSS terkuat — mekanisme
+        // simpan token (localStorage) identik di sana. `vite dev` hanya ada
+        // di local (menyuntik script HMR inline dari dev-server), jadi local
+        // dikecualikan agar HMR tidak mati (ship review #4: CSP blank di
+        // staging karena gate production-only).
+        if (! app()->environment('local')) {
             // CSP untuk shell SPA: token bearer disimpan di localStorage;
-            // header ini membatasi dampak XSS (connect-src 'self' memblokir
-            // eksfiltrasi token ke origin lain).
+            // connect-src 'self' memblokir eksfiltrasi token ke origin lain.
             // - script-src 'self': bundel Vite pada `vite build`.
-            // - style-src 'unsafe-inline': tag <style> yang disuntikkan Vite
-            //   HMR dan library UI yang menyuntik style runtime.
-            // - img-src blob:: preview tanda tangan memakai object URL.
+            // - style-src 'unsafe-inline': dibutuhkan oleh `motion` (framer
+            //   motion) yang menyuntik <style> runtime; Vite build sendiri
+            //   mengekstrak CSS ke berkas eksternal.
+            // - img-src blob: preview tanda tangan memakai object URL.
             // - frame-ancestors 'none': padanan modern X-Frame-Options: DENY.
-            // Digate ke production saja: `vite dev` menyajikan script/module
-            // dari dev-server (host berbeda) dan menyuntik script HMR inline,
-            // yang tidak lolos CSP 'self' — jalur itu hanya ada di local.
             $response->headers->set(
                 'Content-Security-Policy',
                 "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
