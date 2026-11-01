@@ -24,10 +24,10 @@ class DemoUsersSeeder extends Seeder
      * AdminUserSeeder now fails closed against. Guards:
      *   1. Refuse to run outside local/testing.
      *   2. Never commit a password: generate one and print it once.
-     *   3. Rotate stale rows: firstOrCreate cannot fix an account that an
-     *      older seeder already created with the legacy literal password, so
-     *      whenever APP_DEMO_PASSWORD is explicitly configured the stored
-     *      password is overwritten (and flagged for rotation) on every run.
+     *   3. Rotate stale rows on EVERY run: firstOrCreate cannot fix an account
+     *      that an older seeder already created with the legacy literal
+     *      password, so the stored password is overwritten unconditionally
+     *      (generated or APP_DEMO_PASSWORD) and flagged for rotation.
      */
     public function run(): void
     {
@@ -51,7 +51,10 @@ class DemoUsersSeeder extends Seeder
         $password = (string) config('app.demo_password', '');
         $generated = $password === '';
         $password = $generated ? Str::random(24) : $password;
-        $rotate = ! $generated;
+        // Rotasi SELALU (ship review #4): `firstOrCreate` mengembalikan baris
+        // lama apa adanya — bila rotasi hanya saat APP_DEMO_PASSWORD diset,
+        // akun legacy ber-password lemah literal tetap hidup dan password acak
+        // yang dicetak tidak cocok dengan yang tersimpan.
 
         $accounts = [
             ['email' => 'staf@kominfo.go.id', 'name' => 'Siti Staf', 'nip' => '1111111111', 'role' => Roles::STAF],
@@ -72,12 +75,12 @@ class DemoUsersSeeder extends Seeder
                 ],
             );
 
-            if ($rotate) {
-                $user->forceFill([
-                    'password' => $password,
-                    'must_change_password' => true,
-                ])->save();
-            }
+            // Rotasi tanpa syarat: baris legacy (mis. dibuat seeder lama dengan
+            // "password123") wajib ikut di-overwrite pada setiap run.
+            $user->forceFill([
+                'password' => $password,
+                'must_change_password' => true,
+            ])->save();
 
             $user->assignRole($account['role']);
         }
