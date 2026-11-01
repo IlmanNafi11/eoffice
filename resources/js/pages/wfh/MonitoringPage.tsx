@@ -59,6 +59,12 @@ import {
   selectWfhMonitoringList,
 } from "@/store/wfhMonitoringSlice";
 
+/** Pesan server (ApiError 422/403 dari PDF tim) — fallback pesan generik. */
+function pdfErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return "Gagal mengunduh PDF. Coba lagi.";
+}
+
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
 const WFH_REPORT_STATUSES = ["draft", "pending", "approved", "rejected"] as const;
 
@@ -324,6 +330,7 @@ export function MonitoringPage() {
                               exportTeamWfhPdf(group.team!.id, { date: board.data!.date })
                             }
                             filename={`rekap-wfh-tim-${group.team!.id}-${board.data!.date}.pdf`}
+                            getError={pdfErrorMessage}
                           >
                             Unduh PDF
                           </PdfDownloadButton>

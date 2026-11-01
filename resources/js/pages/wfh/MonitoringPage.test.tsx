@@ -23,6 +23,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ApiError } from "@/api/client";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -279,6 +280,19 @@ describe("MonitoringPage — ekspor PDF tim", () => {
 
     expect(screen.queryByTestId("monitoring-pdf-team-3")).toBeNull();
   });
+
+  it("regresi H2: exportTeamWfhPdf gagal 422 → pesan server tampil dekat tombol", async () => {
+    mockedPdf.mockRejectedValue(
+      new ApiError("validation", "Penandatangan belum atur tanda tangan.", { status: 422 }),
+    );
+    renderPageAs();
+    await screen.findByTestId("monitoring-group-team-3");
+
+    const pdfWrap = screen.getByTestId("monitoring-pdf-team-3");
+    await userEvent.click(within(pdfWrap).getByRole("button", { name: /unduh pdf/i }));
+
+    expect(await within(pdfWrap).findByText(/penandatangan belum atur tanda tangan/i)).toBeTruthy();
+  });
 });
 
 describe("MonitoringPage — Semua Laporan", () => {
@@ -365,6 +379,32 @@ describe("MonitoringPage — Semua Laporan", () => {
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
+    });
+  });
+
+  it("regresi H1: filter dikosongkan tidak bocor ke pagination berikutnya", async () => {
+    renderPageAs();
+    await openReportsTab();
+
+    // 1. terapkan filter tanggal…
+    fireEvent.change(screen.getByLabelText("Tanggal"), { target: { value: "2026-07-10" } });
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ date: "2026-07-10", page: 1 });
+    });
+
+    // 2. kosongkan tanggal, terapkan bulan…
+    fireEvent.change(screen.getByLabelText("Tanggal"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Bulan"), { target: { value: "2026-07" } });
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 1 });
+    });
+
+    // 3. pagination HARUS memakai query baru (bulan), bukan `date` basi.
+    await userEvent.click(screen.getByRole("button", { name: /berikutnya/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 2 });
     });
   });
 

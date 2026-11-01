@@ -128,9 +128,11 @@ const slice = createSlice({
     setBoardQuery(state, action: PayloadAction<WfhBoardQuery>) {
       state.board.query = { ...state.board.query, ...action.payload };
     },
-    /** Reset/ganti query filter list tanpa menyentuh items/status (dipakai mount). */
+    /** Ganti SELURUH query filter list (bukan merge) — menghapus kunci basi
+     *  saat "Terapkan"/ganti per-halaman. Dipakai sebelum fetch agar filter
+     *  yang sudah dikosongkan tidak diam-diam terbawa ke pagination berikut. */
     setListQuery(state, action: PayloadAction<ListAdminReportsQuery>) {
-      state.list.query = { ...state.list.query, ...action.payload };
+      state.list.query = { ...action.payload };
     },
   },
   extraReducers: (builder) => {
@@ -158,7 +160,10 @@ const slice = createSlice({
       .addCase(fetchAdminReports.pending, (state, action) => {
         state.list.status = "loading";
         state.list.error = null;
-        if (action.meta.arg) state.list.query = { ...state.list.query, ...action.meta.arg };
+        // GANTI (bukan merge): arg dispatch memuat SELURUH filter yang
+        // diinginkan; merge akan meninggalkan kunci filter yang sudah
+        // dikosongkan (regresi H1 ship-review wfh-monitoring).
+        if (action.meta.arg) state.list.query = { ...action.meta.arg };
         state.list.latestRequestId = action.meta.requestId;
       })
       .addCase(fetchAdminReports.fulfilled, (state, action) => {

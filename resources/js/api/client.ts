@@ -40,17 +40,24 @@ export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status: number | null;
   readonly errors: Record<string, string[]> | null;
+  /** Body respons mentah (mis. Blob untuk responseType blob) untuk decode pesan. */
+  readonly responseBody: unknown;
 
   constructor(
     kind: ApiErrorKind,
     message: string,
-    options: { status?: number | null; errors?: Record<string, string[]> | null } = {},
+    options: {
+      status?: number | null;
+      errors?: Record<string, string[]> | null;
+      responseBody?: unknown;
+    } = {},
   ) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = options.status ?? null;
     this.errors = options.errors ?? null;
+    this.responseBody = options.responseBody ?? null;
   }
 }
 
@@ -158,10 +165,10 @@ function toApiError(error: AxiosError): ApiError {
   }
 
   if (status === 422) {
-    return new ApiError("validation", message, { status, errors });
+    return new ApiError("validation", message, { status, errors, responseBody: body });
   }
   if (status !== null) {
-    return new ApiError("http", message, { status });
+    return new ApiError("http", message, { status, responseBody: body });
   }
   return new ApiError("network", message);
 }

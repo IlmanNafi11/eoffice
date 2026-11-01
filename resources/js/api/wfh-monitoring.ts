@@ -12,7 +12,7 @@
  * PDF binary lewat `httpClient` blob — bypass unwrap interceptor (pola
  * `exportWfhReportPdf`).
  */
-import { api, httpClient, requireData } from "@/api/client";
+import { api, ApiError, httpClient, requireData } from "@/api/client";
 import {
   ListAdminReportsQuery,
   PaginationMeta,
@@ -20,7 +20,6 @@ import {
   WfhReport,
 } from "@/api/types";
 
-/** Query `GET /admin/wfh/monitoring` — keduanya opsional. */
 interface WfhMonitoringQuery {
   date?: string;
   team_id?: number;
@@ -82,8 +81,9 @@ export async function adminListWfhReports(
 /**
  * GET /admin/wfh/teams/{team}/pdf — binary `application/pdf` (non-envelope).
  * Tidak melewati unwrap interceptor: ambil Blob langsung dari `httpClient`.
- * `team_report_id` opsional: bila diisi, backend men-toggle flag `isApproved`
- * yang mengontrol render tanda tangan kepala bidang.
+ * Pada 4xx interceptor memberi `ApiError` dengan `responseBody` = Blob; decode
+ * pesan server di sini (422 penandatangan belum atur tanda tangan, 403 lintas
+ * bidang) agar sampai UI, bukan hanya "Request failed with status code…".
  */
 export async function exportTeamWfhPdf(
   teamId: number,
@@ -93,9 +93,38 @@ export async function exportTeamWfhPdf(
   if (query.date !== undefined) params.date = query.date;
   if (query.team_report_id !== undefined) params.team_report_id = query.team_report_id;
 
-  const res = await httpClient.get<Blob>(`/admin/wfh/teams/${teamId}/pdf`, {
-    params: Object.keys(params).length > 0 ? params : undefined,
-    responseType: "blob",
+  try {
+    const res = await httpClient.get<Blob>(`/admin/wfh/teams/${teamId}/pdf`, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+      responseType: "blob",
+    });
+    return res.data;
+  } catch (error) {
+    if (error instanceof ApiError && error.responseBody instanceof Blob) {
+      throw new ApiError(error.kind, await blobMessage(error.responseBody), {
+        status: error.status,
+        errors: error.errors,
+      });
+    }
+    throw error;
+  }
+}
+
+/** Ambil `message` dari body Blob (envelope JSON error), fallback teks mentah.
+ *  `FileReader` (bukan `blob.text()`) agar juga jalan di jsdom (test). */
+async function blobMessage(blob: Blob): Promise<string> {
+  const text = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => resolve("");
+    reader.readAsText(blob);
   });
-  return res.data;
+  try {
+    const parsed = JSON.parse(text) as { message?: unknown };
+    if (typeof parsed.message === "string" && parsed.message) return parsed.message;
+  } catch {
+    // teks non-JSON — jatuh ke raw text di bawah.
+  }
+  const trimmed = text.trim();
+  return trimmed.length > 0 ? trimmed : "Gagal mengunduh PDF.";
 }

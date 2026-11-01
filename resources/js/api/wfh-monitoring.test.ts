@@ -247,4 +247,18 @@ describe("api/wfh-monitoring — exportTeamWfhPdf (blob bypass unwrap)", () => {
     expect(requests[0]?.params).toBeUndefined();
     expect(requests[0]?.url).toBe("/admin/wfh/teams/3/pdf");
   });
+
+  it("4xx body Blob didekode ke pesan server (422 tanda tangan)", async () => {
+    const errBody = new Blob(
+      [JSON.stringify({ success: false, message: "Penandatangan belum atur tanda tangan." })],
+      { type: "application/json" },
+    );
+    queue.push({ status: 422, body: errBody });
+
+    await expect(exportTeamWfhPdf(3, { date: "2026-07-15" })).rejects.toMatchObject({
+      kind: "validation",
+      status: 422,
+      message: "Penandatangan belum atur tanda tangan.",
+    });
+  });
 });

@@ -154,17 +154,33 @@ describe("wfhMonitoringSlice — fetchAdminReports", () => {
     });
   });
 
-  it("pagination mempertahankan filter aktif (setListQuery merge + page)", async () => {
+  it("pending mengganti query penuh (bukan merge) — arg dispatch adalah query final", async () => {
     mockedList.mockResolvedValueOnce({ reports: [reportRow], meta });
     const store = makeStore();
 
-    store.dispatch(setListQuery({ status: "approved", team_id: 3 }));
-    await store.dispatch(fetchAdminReports({ page: 2 }));
+    await store.dispatch(fetchAdminReports({ status: "approved", team_id: 3, page: 2 }));
 
     expect(selectWfhMonitoringListQuery(store.getState())).toEqual({
       status: "approved",
       team_id: 3,
       page: 2,
+    });
+  });
+
+  it("filter yang dikosongkan tidak bocor ke dispatch berikutnya (regresi H1)", async () => {
+    mockedList.mockResolvedValueOnce({ reports: [reportRow], meta });
+    mockedList.mockResolvedValueOnce({ reports: [reportRow], meta });
+    const store = makeStore();
+
+    // 1. filter tanggal dulu…
+    await store.dispatch(fetchAdminReports({ date: "2026-07-10", page: 1 }));
+    // 2. lalu ganti ke filter bulan (tanggal dikosongkan)…
+    await store.dispatch(fetchAdminReports({ month: "2026-07", page: 1 }));
+
+    // `date` yang sudah dikosongkan HARUS hilang, bukan terbawa stale.
+    expect(selectWfhMonitoringListQuery(store.getState())).toEqual({
+      month: "2026-07",
+      page: 1,
     });
   });
 
@@ -212,5 +228,17 @@ describe("wfhMonitoringSlice — filters", () => {
     );
     expect(state.board.query).toEqual({ date: "2025-07-11", team_id: 4 });
     expect(state.board.data).toEqual(boardData);
+  });
+
+  it("setListQuery MENGGANTI seluruh query — kunci lama yang tak dikirim ulang hilang", () => {
+    const state = wfhMonitoringReducer(
+      {
+        ...seeded(),
+        list: { ...seeded().list, query: { status: "approved", team_id: 3, page: 2 } },
+      },
+      setListQuery({ page: 1 }),
+    );
+    // status/team_id basi tidak boleh terbawa.
+    expect(state.list.query).toEqual({ page: 1 });
   });
 });
