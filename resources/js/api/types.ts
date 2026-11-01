@@ -357,3 +357,210 @@ export interface ListAdminReportsQuery {
   month?: string;
   page?: number;
 }
+
+// ── Change Package ─────────────────────────────────────────────────
+
+/** Status paket perubahan — union literal, BUKAN `string` bebas. */
+export type ChangePackageStatus = "draft" | "pending" | "approved" | "rejected";
+
+/**
+ * Status implementasi — union literal penuh tabel `change_implementations`
+ * (migrasi `..._create_change_management_tables.php` + `CHILD_STATUS_MIRROR`
+ * `draft|submitted|completed|rejected`); openapi hanya mencantumkan contoh
+ * `submitted`/`completed`, nilai aktual ditentukan server.
+ */
+export type ChangeImplementationStatus = "draft" | "submitted" | "completed" | "rejected";
+
+/**
+ * `#/components/schemas/ChangeType` — referensi data `GET /change-types`.
+ */
+export interface ChangeType {
+  id: number;
+  name: string;
+}
+
+/**
+ * `#/components/schemas/InitiationResource.field` — nested `{id, name}`.
+ */
+export interface PackageField {
+  id: number;
+  name: string;
+}
+
+/**
+ * `#/components/schemas/InitiationResource.initiator` — nested user ringkas.
+ * `signature_url` dipancarkan resource (`SignaturePath::urlFor`) walau tak
+ * terdokumentasi openapi (drift kontrak v6.x; bagian UI profil & report PDF).
+ */
+export interface PackageInitiator {
+  id: number;
+  name: string;
+  nip: string;
+  position?: string | null;
+  rank?: string | null;
+  signature_url?: string | null;
+}
+
+/**
+ * `#/components/schemas/InitiationResource` — resource inisiasi paket.
+ * `status` kitai ke `ChangePackageStatus`; `review_status` string bebas
+ * (nilai `approved|rejected|diterima|ditolak|revisi` server-side).
+ */
+export interface PackageInitiation {
+  id: number;
+  field_id: number;
+  initiator_id: number;
+  reviewer_id?: number | null;
+  doc_number: string;
+  initiation_date?: string | null;
+  needed_by_date?: string | null;
+  description: string;
+  reason: string;
+  status: ChangePackageStatus;
+  review_status?: string | null;
+  reviewed_at?: string | null;
+  initiator_signed_at?: string | null;
+  created_at?: string | null;
+  field?: PackageField | null;
+  initiator?: PackageInitiator | null;
+}
+
+/**
+ * `#/components/schemas/ImplementationResource.attachments[]` — lampiran
+ * paket perubahan. HANYA `id`/`url`/`sort_order`: `url` menunjuk
+ * `attachments.download` (bearer), `path` internal tidak pernah diekspos
+ * (ship review S2/S3).
+ */
+export interface PackageAttachment {
+  id: number;
+  url: string;
+  sort_order: number;
+}
+
+/**
+ * `#/components/schemas/ImplementationResource` — resource implementasi.
+ * `cost_amount` dan `cost_needed` di-cast model (`boolean` + `decimal:2`);
+ * `change_types`/`attachments` hanya hadir saat relasi di-load (show).
+ */
+export interface PackageImplementation {
+  id: number;
+  change_initiation_id: number;
+  priority?: string | null;
+  impact?: string | null;
+  production_impact?: string | null;
+  required_effort?: string | null;
+  cost_needed?: boolean | null;
+  cost_amount?: string | null;
+  resources?: string | null;
+  test_plan?: string | null;
+  evaluator_id?: number | null;
+  evaluator_signed_at?: string | null;
+  review_status?: string | null;
+  review_response?: string | null;
+  execution_date?: string | null;
+  reviewer_id?: number | null;
+  reviewer_signed_at?: string | null;
+  implementation_result?: string | null;
+  release_date?: string | null;
+  responsible_id?: number | null;
+  responsible_signed_at?: string | null;
+  status: ChangeImplementationStatus;
+  change_types?: ChangeType[];
+  attachments?: PackageAttachment[];
+}
+
+/**
+ * `#/components/schemas/ChangePackageResource` — resource paket perubahan.
+ * `implementation` nullable; relasi belum di-load pada list boleh absen.
+ */
+export interface ChangePackage {
+  initiation: PackageInitiation;
+  implementation?: PackageImplementation | null;
+}
+
+/**
+ * `#/components/schemas/ChangePackageDraftRequest.implementation` — semua prop
+ * nullable (backend `nullable`). `evaluator_id` TIDAK jadi masukan UI
+ * (Resolved #1: diset server, bukan input client).
+ */
+export interface PackageImplementationDraftInput {
+  priority?: "normal" | "emergency" | null;
+  impact?: "Minor" | "Mayor" | null;
+  change_type_ids?: number[] | null;
+  test_plan?: string | null;
+  execution_date?: string | null;
+  release_date?: string | null;
+  implementation_result?: string | null;
+  production_impact?: string | null;
+  required_effort?: string | null;
+  cost_needed?: boolean | null;
+  cost_amount?: string | null;
+  resources?: string | null;
+}
+
+/**
+ * `#/components/schemas/ChangePackageDraftRequest.initiation` — `field_id`
+ * wajib (create), `needed_by_date` nullable; `description`+`reason` wajib.
+ */
+export interface PackageInitiationInput {
+  field_id: number;
+  needed_by_date?: string | null;
+  description: string;
+  reason: string;
+}
+
+/**
+ * `#/components/schemas/ChangePackageDraftRequest` — payload POST/PUT draft.
+ * `implementation` opsional (draft bisa tanpa impl).
+ */
+export interface PackageDraftInput {
+  initiation: PackageInitiationInput;
+  implementation?: PackageImplementationDraftInput;
+}
+
+/**
+ * `#/components/schemas/ChangePackageSubmitRequest.implementation` — semua 7
+ * field required (`priority`, `impact`, `change_type_ids`, `test_plan`,
+ * `execution_date`, `release_date`, `implementation_result`) plus opsional
+ * nullable lain; `change_type_ids` minimal 1 (backend `min:1`).
+ */
+export interface PackageImplementationSubmitInput {
+  priority: "normal" | "emergency";
+  impact: "Minor" | "Mayor";
+  change_type_ids: number[];
+  test_plan: string;
+  execution_date: string;
+  release_date: string;
+  implementation_result: string;
+  production_impact?: string | null;
+  required_effort?: string | null;
+  cost_needed?: boolean | null;
+  cost_amount?: string | null;
+  resources?: string | null;
+}
+
+/**
+ * `#/components/schemas/ChangePackageSubmitRequest` — payload POST /submit
+ * (full-payload; `field_id`, `needed_by_date`, `description`, `reason` wajib).
+ */
+export interface PackageSubmitInput {
+  initiation: {
+    field_id: number;
+    needed_by_date: string;
+    description: string;
+    reason: string;
+  };
+  implementation: PackageImplementationSubmitInput;
+}
+
+/**
+ * Query `GET /changes` — semua opsional; `status` dibatasi skema server
+ * (`draft|pending|approved|rejected`); `field_id` ditambahkan controller
+ * walau tak terdokumentasi (batasan scope tim/bidang).
+ */
+export interface ListPackagesQuery {
+  per_page?: number;
+  page?: number;
+  status?: ChangePackageStatus;
+  field_id?: number;
+}

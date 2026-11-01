@@ -19,8 +19,17 @@ import type {
   ActivityUpdateInput,
   ReorderInput,
   RejectReportRequest,
+  ChangePackageStatus,
+  ChangeImplementationStatus,
+  PackageInitiation,
+  PackageImplementation,
+  PackageAttachment,
+  ChangePackage,
+  ChangeType,
+  PackageDraftInput,
+  PackageSubmitInput,
+  ListPackagesQuery,
 } from "@/api/types";
-
 // Fixtures verbatim dari postman/specs/openapi.yaml (examples).
 
 const authUser: AuthUser = {
@@ -299,5 +308,185 @@ describe("api/types — kontrak domain WFH reports (openapi.yaml)", () => {
     const bad: RejectReportRequest = {};
     expect(reject.reason).toContain("kurang detail");
     expect(bad).toEqual({});
+  });
+});
+
+// Fixtures verbatim dari postman/specs/openapi.yaml (Change Package).
+
+const changeType: ChangeType = { id: 1, name: "Perubahan Infrastruktur" };
+
+const initiation: PackageInitiation = {
+  id: 12,
+  field_id: 3,
+  initiator_id: 8,
+  reviewer_id: 5,
+  doc_number: "001/9/1.1/114/2025",
+  initiation_date: "2025-07-14",
+  needed_by_date: "2025-12-15",
+  description: "Migrasi server aplikasi e-Office dari on-premise ke cloud Kominfo",
+  reason: "Server on-premise saat ini sudah tidak memadai.",
+  status: "approved",
+  review_status: "approved",
+  reviewed_at: "2025-07-18T09:15:00.000000Z",
+  initiator_signed_at: "2025-07-14T10:30:00.000000Z",
+  created_at: "2025-07-14T10:00:00.000000Z",
+  field: { id: 3, name: "Bidang Aplikasi Informatika" },
+  initiator: {
+    id: 8,
+    name: "Budi Santoso",
+    nip: "199001012023011001",
+    position: "Staf Pelaksana",
+    rank: "Penata Muda",
+    signature_url: "/api/signatures/8",
+  },
+};
+
+const implementation: PackageImplementation = {
+  id: 9,
+  change_initiation_id: 12,
+  priority: "normal",
+  impact: "Minor",
+  production_impact: "Aplikasi tidak dapat diakses selama 2 jam.",
+  required_effort: "3 orang x 5 hari kerja",
+  cost_needed: true,
+  cost_amount: "15000000.00",
+  resources: "Cloud server 8 vCPU 16GB RAM",
+  test_plan: "Smoke test semua endpoint API.",
+  evaluator_id: 27,
+  evaluator_signed_at: "2025-07-14T11:00:00.000000Z",
+  review_status: "diterima",
+  review_response: "Rencana implementasi sudah baik.",
+  execution_date: "2025-11-10",
+  reviewer_id: 5,
+  reviewer_signed_at: "2025-07-18T09:15:00.000000Z",
+  implementation_result: "Migrasi berhasil tanpa downtime.",
+  release_date: "2025-11-15",
+  responsible_id: 5,
+  responsible_signed_at: "2025-07-18T09:15:00.000000Z",
+  status: "completed",
+  change_types: [changeType],
+  attachments: [
+    { id: 15, url: "/api/changes/12/attachments/15/download", sort_order: 1 },
+  ],
+};
+
+describe("api/types — kontrak domain change-package (openapi.yaml tag Change Package)", () => {
+  it("union status persis enum skema, bukan string bebas", () => {
+    const pkgStatuses: ChangePackageStatus[] = ["draft", "pending", "approved", "rejected"];
+    const implStatuses: ChangeImplementationStatus[] = ["draft", "submitted", "completed", "rejected"];
+    expect(pkgStatuses).toHaveLength(4);
+    expect(implStatuses).toHaveLength(4);
+  });
+
+  it("PackageInitiation memuat semua prop InitiationResource + nested field/initiator", () => {
+    expect(initiation.doc_number).toContain("114/2025");
+    expect(initiation.initiator?.signature_url).toBe("/api/signatures/8");
+    // nullable persis skema — boleh null
+    const bare: PackageInitiation = {
+      id: 13,
+      field_id: 3,
+      initiator_id: 8,
+      doc_number: "002/9/1.1/114/2025",
+      description: "d",
+      reason: "r",
+      status: "draft",
+      review_status: null,
+      reviewed_at: null,
+      initiator_signed_at: null,
+      created_at: null,
+      initiation_date: null,
+      needed_by_date: null,
+      reviewer_id: null,
+      field: null,
+      initiator: null,
+    };
+    expect(bare.field).toBeNull();
+    expect(bare.initiator).toBeNull();
+  });
+
+  it("PackageImplementation: cost_amount string (decimal:2), Lampiran tanpa path (ship review S2/S3)", () => {
+    expect(typeof implementation.cost_amount).toBe("string");
+    const attach: PackageAttachment = { id: 16, url: "/api/changes/12/attachments/16/download", sort_order: 2 };
+    expect(attach.sort_order).toBe(2);
+    // @ts-expect-error — path internal tidak pernah diekspos resource ( ship review #3)
+    const leak: PackageAttachment = { id: 17, url: "u", sort_order: 3, path: "change-attachments/x.png" };
+    expect(leak.id).toBe(17);
+  });
+
+  it("ChangePackage = {initiation, implementation?} persis ChangePackageResource", () => {
+    const pkg: ChangePackage = { initiation, implementation };
+    const draftOnly: ChangePackage = { initiation };
+    expect(pkg.implementation?.status).toBe("completed");
+    expect(draftOnly.implementation).toBeUndefined();
+  });
+
+  it("PackageDraftInput sesuai ChangePackageDraftRequest — implementation opsional, tanpa evaluator", () => {
+    const draft: PackageDraftInput = {
+      initiation: {
+        field_id: 3,
+        needed_by_date: "2025-12-15",
+        description: "Migrasi server",
+        reason: "Kapasitas kurang",
+      },
+      implementation: {
+        priority: "normal",
+        impact: "Minor",
+        change_type_ids: [1, 3],
+        test_plan: null,
+        execution_date: null,
+        release_date: null,
+        implementation_result: null,
+        production_impact: null,
+        required_effort: null,
+        cost_needed: true,
+        cost_amount: "15000000.00",
+        resources: null,
+      },
+    };
+    expect(draft.implementation?.change_type_ids).toEqual([1, 3]);
+    const withEvaluator: PackageDraftInput = {
+      initiation: { field_id: 3, description: "d", reason: "r" },
+      // @ts-expect-error — evaluator_id tidak jadi masukan UI (Resolved #1, evaluator diset server)
+      implementation: { evaluator_id: 27 },
+    };
+    expect(withEvaluator).toBeDefined();
+  });
+
+  it("PackageSubmitInput sesuai ChangePackageSubmitRequest — semua field wajib required", () => {
+    const submit: PackageSubmitInput = {
+      initiation: {
+        field_id: 3,
+        description: "Migrasi server",
+        reason: "Kapasitas kurang",
+        needed_by_date: "2025-12-15",
+      },
+      implementation: {
+        priority: "emergency",
+        impact: "Mayor",
+        change_type_ids: [1],
+        test_plan: "Smoke test",
+        execution_date: "2025-11-10",
+        release_date: "2025-11-15",
+        implementation_result: "Selesai",
+      },
+    };
+    expect(submit.implementation.change_type_ids.length).toBeGreaterThan(0);
+    const bad: PackageSubmitInput = {
+      initiation: { field_id: 3, description: "d", reason: "r", needed_by_date: "2025-12-15" },
+      // @ts-expect-error — nested object missing `release_date` + `implementation_result`
+      implementation: {
+        priority: "normal",
+        impact: "Minor",
+        change_type_ids: [1],
+        test_plan: "t",
+        execution_date: "a",
+      },
+    };
+    expect(bad).toBeDefined();
+  });
+
+  it("ListPackagesQuery hanya per_page/page/status (+field_id persis openapi)", () => {
+    const q: ListPackagesQuery = { per_page: 15, page: 2, status: "pending" };
+    expect(q.status).toBe("pending");
   });
 });
