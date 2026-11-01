@@ -59,6 +59,15 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   menghasilkan nomor rusak seperti `001//2026`.
 
 ### Fixed
+- **Laporan Tim** (`/team-reports`) menampilkan "Total 0 laporan" padahal baris
+  ada. `GET /api/admin/wfh/team-reports` mengirim envelope
+  `ApiResponse::paginated` (`{success, data[], meta}`), tetapi klien membaca
+  `res.data` sebagai paginator raw (`current_page`, `last_page`, …) sehingga
+  `reports` selalu kosong; skema `TeamReportListResponse` di `openapi.yaml`
+  ikut salah mendokumentasikannya sebagai "raw paginator tanpa success wrapper".
+  `listWfhTeamReports` kini memetakan `res.data` → baris dan `res.meta` →
+  `PaginationMeta`; skema openapi dikoreksi. Ditemukan lewat E2E manual 3 peran
+  di browser, dikunci test pemetaan (RED→GREEN).
 - Pesan error mutasi WFH (422) kini benar-benar terlihat: `WfhReportDetailPage`
   memanggil refetch detail tanpa syarat setelah setiap mutasi, dan
   `fetchWfhReport.pending` membersihkan `current.error` sebelum render
@@ -98,6 +107,20 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   hasilnya dilaporkan per-tree.
 
 ### Tests
+- Test pemetaan list Laporan Tim: `listWfhTeamReports` wajib membaca envelope
+  `ApiResponse::paginated` (`data` → baris, `meta` → `PaginationMeta`) — RED bila
+  klien kembali memperlakukan `res.data` sebagai paginator raw.
+- E2E manual modul `wfh-team-reports` 3 peran di browser nyata: admin — buat
+  laporan (status `pending`, `created_by`=aktor) + duplikat `(team_id,
+  report_date)` menjawab 422 "Laporan untuk tim dan tanggal ini sudah ada." yang
+  tampil dan tetap ada setelah refetch; admin membuat tim di luar bidangnya
+  ditolak 403 "Tim tidak ditemukan dalam bidang Anda."; kepala bidang — Setujui
+  (`supervisor_id` terisi, tombol hilang) dan Tolak via dialog alasan wajib
+  (tombol mati saat alasan kosong, `reject_reason` tersimpan); kepala tim —
+  view-only pada timnya (tanpa form buat, tanpa tombol aksi); staf — menu
+  "Laporan Tim"/"Monitoring WFH" hilang dari sidebar, akses URL langsung
+  menjawab 403 dengan pesan Indonesia "Anda tidak memiliki izin untuk aksi ini."
+  E2E menemukan + memicu perbaikan cacat bentuk list (lihat bagian Fixed).
 - Bootstrap tanpa output liar (`test_application_bootstrap_emits_no_stray_output`):
   bootstrap Laravel dalam proses terisolasi wajib menulis 0 byte ke stdout —
   RED bila ada baris kosong/BOM/"echo" sebelum `<?php` pada file yang dimuat

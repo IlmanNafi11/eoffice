@@ -2054,54 +2054,22 @@ components:
         reason: "Data anggota tim tidak lengkap untuk tanggal ini."
     TeamReportListResponse:
       type: object
-      description: Raw Laravel paginator envelope returned by the controller (no success wrapper).
-      required: [data, current_page, last_page, per_page, total]
+      description: |
+        Paginated team reports, returned by `ApiResponse::paginated` — the same
+        `{success, data, meta}` envelope every other paginated endpoint uses.
+        (Before 2026-11-01 this schema documented a raw Laravel paginator
+        without a `success` wrapper; the controller never returned that shape,
+        and the frontend silently rendered an empty list because of it.)
+      required: [success, data, meta]
       properties:
+        success: { type: boolean, example: true }
         data:
           type: array
           items:
             $ref: "#/components/schemas/WfhTeamReport"
-        current_page:
-          type: integer
-          example: 1
-        last_page:
-          type: integer
-          example: 3
-        per_page:
-          type: integer
-          example: 15
-        total:
-          type: integer
-          example: 32
-        from:
-          type: integer
-          nullable: true
-          example: 1
-        to:
-          type: integer
-          nullable: true
-          example: 15
-        first_page_url:
-          type: string
-          format: uri
-          example: "http://localhost/api/admin/wfh/team-reports?page=1"
-        last_page_url:
-          type: string
-          format: uri
-          example: "http://localhost/api/admin/wfh/team-reports?page=3"
-        next_page_url:
-          type: string
-          format: uri
-          nullable: true
-          example: "http://localhost/api/admin/wfh/team-reports?page=2"
-        prev_page_url:
-          type: string
-          format: uri
-          nullable: true
-          example: null
-        path:
-          type: string
-          example: "http://localhost/api/admin/wfh/team-reports"
+        message: { type: string, nullable: true, example: null }
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
   responses:
     Unauthenticated:
       description: Unauthenticated — bearer token missing or invalid
@@ -4994,7 +4962,7 @@ paths:
                 success: false
                 message: Unauthenticated.
         "403":
-          description: Missing permission (route middleware gates wfh.team_report.approve; controller body additionally requires wfh.team_report.reject), or team report outside actor's field
+          description: Missing the `wfh.team_report.reject` permission, or team report outside actor's field. (Before 2026-11-01 this text wrongly claimed a dual gate with `wfh.team_report.approve`; `routes/api.php` has gated the route with `permission:wfh.team_report.reject` only since v5.0.0.)
           content:
             application/json:
               schema:
