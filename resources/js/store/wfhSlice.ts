@@ -17,9 +17,13 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import * as wfhApi from "@/api/wfh";
 import type {
+  ActivityInput,
+  ActivityUpdateInput,
   ListWfhReportsQuery,
   PaginationMeta,
   WfhReport,
+  WfhReportActivity,
+  WfhSession,
 } from "@/api/types";
 
 export type WfhFetchStatus = "idle" | "loading" | "succeeded" | "failed";
@@ -164,6 +168,98 @@ export const deleteWfhReport = createAsyncThunk<number, number>(
   },
 );
 
+// ── Sub-resource activity/attendance (bukan resource utama → refetch) ──
+
+/** POST /wfh/reports/{report}/activities — tambah satu kegiatan (JSON). */
+export const addReportActivity = createAsyncThunk<
+  WfhReportActivity,
+  { reportId: number; input: ActivityInput }
+>(
+  "wfh/addActivity",
+  async ({ reportId, input }, { rejectWithValue }) => {
+    try {
+      return await wfhApi.addReportActivity(reportId, input);
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
+/** DELETE /wfh/reports/{report}/activities/{activity}. */
+export const deleteReportActivity = createAsyncThunk<
+  void,
+  { reportId: number; activityId: number }
+>(
+  "wfh/deleteActivity",
+  async ({ reportId, activityId }, { rejectWithValue }) => {
+    try {
+      await wfhApi.deleteReportActivity(reportId, activityId);
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
+/** PUT /wfh/reports/{report}/activities/{activity} — links id-diff. */
+export const updateReportActivity = createAsyncThunk<
+  WfhReportActivity,
+  { reportId: number; activityId: number; input: ActivityUpdateInput }
+>(
+  "wfh/updateActivity",
+  async ({ reportId, activityId, input }, { rejectWithValue }) => {
+    try {
+      return await wfhApi.updateReportActivity(reportId, activityId, input);
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
+/** PATCH /wfh/reports/{report}/activities/reorder — {ids} urutan persis. */
+export const reorderReportActivities = createAsyncThunk<
+  void,
+  { reportId: number; ids: number[] }
+>(
+  "wfh/reorderActivities",
+  async ({ reportId, ids }, { rejectWithValue }) => {
+    try {
+      await wfhApi.reorderReportActivities(reportId, { ids });
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
+/** POST /wfh/reports/{report}/attendances — multipart {session, photo}. */
+export const addReportAttendance = createAsyncThunk<
+  void,
+  { reportId: number; session: WfhSession; photo: Blob }
+>(
+  "wfh/addAttendance",
+  async ({ reportId, session, photo }, { rejectWithValue }) => {
+    try {
+      await wfhApi.addReportAttendance(reportId, { session, photo });
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
+/** DELETE /wfh/reports/{report}/attendances/{attendance}. */
+export const deleteReportAttendance = createAsyncThunk<
+  void,
+  { reportId: number; attendanceId: number }
+>(
+  "wfh/deleteAttendance",
+  async ({ reportId, attendanceId }, { rejectWithValue }) => {
+    try {
+      await wfhApi.deleteReportAttendance(reportId, attendanceId);
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
 // ── Slice ───────────────────────────────────────────────────────────
 
 /**
@@ -267,6 +363,41 @@ const slice = createSlice({
             state.current.error =
               (action.payload as string | undefined) ?? action.error?.message ?? "Aksi gagal.";
           }
+        },
+      )
+      // ── Sub-resource activity/absensi: resource utama berubah di backend ──
+      // (attendances hadir di show, activity_count di list) tapi payload-nya
+      // BUKAN WfhReport → jalur tunggal: pending→loading, fulfilled→succeeded
+      // (halaman refetch detail), rejected→error tampil.
+      .addMatcher(
+        (action): action is WfhMutationSettled =>
+          /^wfh\/(add|update|reorder|delete)(Activity|Activities|Attendance)\/pending$/.test(
+            action.type,
+          ),
+        (state) => {
+          state.current.status = "loading";
+          state.current.error = null;
+        },
+      )
+      .addMatcher(
+        (action): action is { type: string } =>
+          /^wfh\/(add|update|reorder|delete)(Activity|Activities|Attendance)\/fulfilled$/.test(
+            action.type,
+          ),
+        (state) => {
+          state.current.status = "succeeded";
+          state.current.error = null;
+        },
+      )
+      .addMatcher(
+        (action): action is WfhMutationSettled =>
+          /^wfh\/(add|update|reorder|delete)(Activity|Activities|Attendance)\/rejected$/.test(
+            action.type,
+          ),
+        (state, action) => {
+          state.current.status = "failed";
+          state.current.error =
+            (action.payload as string | undefined) ?? action.error?.message ?? "Aksi gagal.";
         },
       );
   },

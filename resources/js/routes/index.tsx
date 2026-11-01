@@ -24,6 +24,9 @@ import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { OtpVerificationPage } from "@/pages/auth/OtpVerificationPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
+import { WfhReportsPage } from "@/pages/wfh/WfhReportsPage";
+import { WfhReportDetailPage } from "@/pages/wfh/WfhReportDetailPage";
+
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
 
 /** Placeholder outlet `/` sampai modul WFH/Change (fase berikutnya). */
@@ -51,6 +54,8 @@ export const router = createBrowserRouter([
           { path: "/", element: <HomePage /> },
           { path: "/profile", element: <ProfilePage /> },
           { path: "/change-password", element: <ChangePasswordPage /> },
+          { path: "/wfh", element: <WfhReportsPage /> },
+          { path: "/wfh/:reportId", element: <WfhReportDetailPage /> },
         ],
       },
     ],
