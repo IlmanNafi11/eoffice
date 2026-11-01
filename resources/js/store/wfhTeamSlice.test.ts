@@ -169,7 +169,7 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
 
     await store.dispatch(rejectWfhTeamReport({ teamReportId: 1, reason: "Data tidak lengkap" }));
 
-    expect(mockedReject).toHaveBeenCalledWith(1, "Data tidak lengkap");
+    expect(mockedReject).toHaveBeenCalledWith(1, { reason: "Data tidak lengkap" });
     expect(selectWfhTeamListItems(store.getState())[0]?.status).toBe("rejected");
   });
 
@@ -241,6 +241,28 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     mockedList.mockResolvedValueOnce({ reports: [approved], meta });
     await store.dispatch(approveWfhTeamReport(1));
 
+    expect(selectWfhTeamActionError(store.getState())).toBeNull();
+  });
+
+  it("mutasi sukses + refetch GAGAL → thunk tetap fulfilled (refetch non-fatal), baris ter-update", async () => {
+    mockedList.mockResolvedValueOnce({ reports: [reportPending], meta });
+    const store = makeStore();
+    await store.dispatch(fetchWfhTeamReports({}));
+
+    const approved: WfhTeamReport = { ...reportPending, status: "approved" };
+    mockedApprove.mockResolvedValueOnce(approved);
+    // Refetch pasca-mutasi gagal — tidak boleh mengubah hasil mutasi (sudah sukses).
+    mockedList.mockRejectedValueOnce(new Error("refetch gagal"));
+
+    const result = await store.dispatch(approveWfhTeamReport(1));
+
+    // Thunk terpenuhi (bukan rejected): mutasi sukses, refetch gagal hanya error fetch.
+    expect(result.type).toBe(approveWfhTeamReport.fulfilled.type);
+    // Baris tetap diperbarui in-place dari payload mutasi.
+    expect(selectWfhTeamListItems(store.getState()).find((r) => r.id === 1)?.status).toBe(
+      "approved",
+    );
+    // Tidak ada actionError asing (pesan mutasi). Gagal refetch = error fetch terpisah.
     expect(selectWfhTeamActionError(store.getState())).toBeNull();
   });
 });

@@ -86,16 +86,16 @@ export const fetchWfhTeamReports = createAsyncThunk<
 
 /**
  * Mutasi yang mengembalikan `WfhTeamReport`. Setelah sukses, daftar di-refetch
- * dengan query aktif — refetch dibungkus `.catch` agar kegagalannya TIDAK
- * mengubah hasil mutasi (mutasi sudah sukses; gagal refetch = error fetch,
- * bukan error mutasi).
+ * dengan query aktif. `fetchWfhTeamReports` menangkap error-nya sendiri (`rejectWithValue`),
+ * jadi `dispatch(...)` tidak pernah reject — kegagalan refetch masuk ke `list.error`,
+ * terpisah dari hasil mutasi yang sudah berhasil.
  */
 async function mutateAndRefetch(
   mutate: () => Promise<WfhTeamReport>,
   refetch: () => Promise<unknown>,
 ): Promise<WfhTeamReport> {
   const report = await mutate();
-  await refetch().catch(() => undefined); // refetch deterministik, non-fatal
+  await refetch(); // gagal refetch → list.error, bukan menggagalkan mutasi
   return report;
 }
 
@@ -150,7 +150,7 @@ export const rejectWfhTeamReport = createAsyncThunk<
     try {
       const state = getState();
       return await mutateAndRefetch(
-        () => wfhTeamApi.rejectWfhTeamReport(teamReportId, reason),
+        () => wfhTeamApi.rejectWfhTeamReport(teamReportId, { reason }),
         () => dispatch(fetchWfhTeamReports(state.wfhTeam.list.query)),
       );
     } catch (error) {
@@ -177,9 +177,9 @@ const slice = createSlice({
   name: "wfhTeam",
   initialState: initialWfhTeamState,
   reducers: {
-    /** Ganti query filter list tanpa menyentuh items/status. */
+    /** Reset/ganti query filter list tanpa menyentuh items/status (dipakai mount). */
     setTeamListQuery(state, action: PayloadAction<ListTeamReportsQuery>) {
-      state.list.query = action.payload;
+      state.list.query = { ...state.list.query, ...action.payload };
     },
   },
   extraReducers: (builder) => {
@@ -235,6 +235,7 @@ const slice = createSlice({
 });
 
 export const { setTeamListQuery } = slice.actions;
+
 export const wfhTeamReducer = slice.reducer;
 
 // ── Selectors ───────────────────────────────────────────────────────
