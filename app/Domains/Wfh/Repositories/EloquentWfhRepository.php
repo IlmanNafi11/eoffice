@@ -249,6 +249,12 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
     public function reorderActivities(WfhReport $report, array $ids): void
     {
+        // No-op tanpa query: validasi+pluck untuk daftar kosong mubazir
+        // (ship review #4 — gerakkan early-return ke atas).
+        if (empty($ids)) {
+            return;
+        }
+
         $reportActivityIds = $report->activities()->pluck('id')->toArray();
 
         // Reject duplicates up front: a repeated id produces duplicate WHEN
@@ -261,10 +267,6 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
         $invalid = array_diff($ids, $reportActivityIds);
         if (! empty($invalid)) {
             throw new ApiException('Some activity ids do not belong to this report.', 422);
-        }
-
-        if (empty($ids)) {
-            return;
         }
 
         // One statement instead of one UPDATE per id. Values come from the
