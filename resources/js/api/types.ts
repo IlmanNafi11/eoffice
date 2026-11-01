@@ -306,3 +306,54 @@ export interface ListTeamReportsQuery {
  * paginator raw tanpa `success` seperti deskripsi lama `TeamReportListResponse`.
  * Dipetakan ke `{ reports, meta }` di `api/wfh-team.ts`.
  */
+// ── WFH Monitoring ──────────────────────────────────────────────────
+
+/**
+ * `#/components/schemas/MonitoringUser` — satu baris pada papan monitoring.
+ * Bagian dari allowlist kolom `monitoringUserQuery` di backend: hanya kolom
+ * publik, tanpa PII/timestamp (`select(['id', 'name', 'nip', 'email', 'rank',
+ * 'position', 'phone', 'is_active', 'team_id'])->with('team:id,name')`).
+ */
+export interface MonitoringUser {
+  id: number;
+  name: string;
+  nip: string;
+  email: string;
+  rank?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  is_active: boolean;
+  team_id: number | null;
+  team?: { id: number; name: string } | null;
+}
+
+/**
+ * `#/components/schemas/WfhMonitoringResponse.data` — papan monitoring harian.
+ * `team_id`/`field_id` selalu hadir (required di skema) tapi nullable: scope
+ * murni keputusan server — admin = keduanya null, kepala bidang = `field_id`
+ * terisi (`team_id` null), kepala tim = `team_id` terisi (`field_id` null).
+ */
+export interface WfhMonitoringData {
+  date: string;
+  team_id: number | null;
+  field_id: number | null;
+  not_checked_in: MonitoringUser[];
+  no_report: MonitoringUser[];
+}
+
+/**
+ * Query `GET /admin/wfh/reports` — semua filter opsional; presedensi
+ * `date_from`/`date_to` > `date` > `month` diputuskan backend (jangan
+ * dipaksakan client). `page` dibaca `paginate()` Laravel walau tak
+ * dideklarasikan openapi (meta `current_page` membuktikannya).
+ */
+export interface ListAdminReportsQuery {
+  per_page?: number;
+  status?: WfhReportStatus;
+  team_id?: number;
+  date_from?: string;
+  date_to?: string;
+  date?: string;
+  month?: string;
+  page?: number;
+}
