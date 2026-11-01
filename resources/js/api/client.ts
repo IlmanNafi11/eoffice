@@ -97,6 +97,7 @@ const REDIRECT_LOGIN = "/login";
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getStoredToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
   return config;
 });
 
@@ -139,8 +140,18 @@ function toApiError(error: AxiosError): ApiError {
       ? (body.errors as Record<string, string[]>)
       : null;
 
-  if (status === 401 && getStoredToken()) {
-    // Hanya sesi yang *tadinya* valid yang di-logout — bukan login gagal.
+  if (
+    status === 401 &&
+    getStoredToken() &&
+    // Bandingkan header Authorization yang DIKIRIM dengan token aktif sekarang:
+    // 401 dari request in-flight yang dikirim DENGAN token lama (basi, keluar
+    // sebelum re-login) tidak boleh menghapus token baru (ship review #4:
+    // logout race setelah re-login).
+    error.config?.headers?.Authorization === `Bearer ${getStoredToken()}`
+  ) {
+    // Debounce: banyak request paralel yang sama-sama 401 cukup memicu satu
+    // logout-redirect — `setAuthToken(null)` membuat panggilan berikutnya
+    // gagal guard `getStoredToken()` secara alami.
     setAuthToken(null);
     unauthorizedHandler?.();
     window.location.assign(REDIRECT_LOGIN);

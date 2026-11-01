@@ -129,13 +129,55 @@ describe("api/client — instance & interceptor (frontend-phase1 / axios client)
     expect(assignSpy).toHaveBeenCalledWith("/login");
   });
 
-  it("401 pada request tanpa token (login kredensial salah) TIDAK memicu logout/redirect", async () => {
-    queue.push({ status: 401, body: { success: false, message: "Email atau password salah." } });
-    await expect(api.post("/auth/login", { email: "a@b.c", password: "salah" })).rejects.toMatchObject({
-      kind: "http",
-      status: 401,
-      message: "Email atau password salah.",
+  it("401 konkuren (dua request paralel) → satu redirect + satu kali logout", async () => {
+    setAuthToken("shared-token");
+    queue.push({ status: 401, body: { success: false, message: "Unauthenticated." } });
+    queue.push({ status: 401, body: { success: false, message: "Unauthenticated." } });
+
+    const [a, b] = await Promise.allSettled([api.get("/a"), api.get("/b")]);
+    expect(a.status).toBe("rejected");
+    expect(b.status).toBe("rejected");
+    // Debounce: hanya panggilan 401 pertama yang memicu logout+redirect.
+    expect(logoutSpy).toHaveBeenCalledTimes(1);
+    expect(assignSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("401 basi (dikirim DENGAN token lama) TIDAK menghapus token baru pasca re-login", async () => {
+    setAuthToken("old-token");
+
+    // Adapter deferred: tahan respons sampai test melepaskannya — meniru
+    // request in-flight yang dikirim DENGAN token lama sebelum re-login.
+    let reject401!: (e: unknown) => void;
+    let sentAuthorization: unknown;
+    let sent!: () => void;
+    const sentGate = new Promise<void>((r) => {
+      sent = r;
     });
+    httpClient.defaults.adapter = (config) => {
+      sentAuthorization = config.headers?.Authorization;
+      sent();
+      return new Promise((_resolve, reject) => {
+        reject401 = reject;
+      });
+    };
+
+    const pending = api.get("/auth/me");
+    await sentGate; // event aktual: request sudah terkirim ber-bearer lama.
+    setAuthToken("new-token");
+
+    // Respons 401 untuk request bertoken LAMA baru tiba sekarang.
+    reject401(
+      new AxiosError("Request failed", AxiosError.ERR_BAD_REQUEST, {} as InternalAxiosRequestConfig, {}, {
+        status: 401,
+        data: { success: false, message: "Unauthenticated." },
+        headers: {},
+      } as unknown as AxiosResponse),
+    );
+    await expect(pending).rejects.toMatchObject({ kind: "http", status: 401 });
+
+    // Token baru HARUS bertahan — 401 milik request yang dikirim bertoken lama.
+    expect(sentAuthorization).toBe("Bearer old-token");
+    expect(getStoredToken()).toBe("new-token");
     expect(logoutSpy).not.toHaveBeenCalled();
     expect(assignSpy).not.toHaveBeenCalled();
   });
