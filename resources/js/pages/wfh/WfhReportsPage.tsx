@@ -33,7 +33,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/wfh/pagination";
-import { WfhStatusBadge } from "@/components/wfh/status-badge";
+import { WfhReportRow } from "@/components/wfh/report-row";
 import {
   fetchWfhReports,
   selectWfhList,
@@ -190,20 +190,11 @@ export function WfhReportsPage() {
                   </thead>
                   <tbody>
                     {items.map((r) => (
-                      <tr
+                      <WfhReportRow
                         key={r.id}
-                        data-testid={`wfh-report-row-${r.id}`}
-                        className="cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/50"
-                        onClick={() => navigate(`/wfh/${r.id}`)}
-                      >
-                        <td className="py-2 pr-4 font-medium">{r.report_date}</td>
-                        <td className="py-2 pr-4">
-                          <WfhStatusBadge status={r.status} />
-                        </td>
-                        <td className="py-2 text-right">
-                          {r.activity_count ?? r.activities?.length ?? 0}
-                        </td>
-                      </tr>
+                        report={r}
+                        onOpen={(reportId) => navigate(`/wfh/${reportId}`)}
+                      />
                     ))}
                   </tbody>
                 </table>
