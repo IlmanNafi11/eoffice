@@ -56,7 +56,7 @@ The map, not filename guessing, is the index of what exists.
 | Module id | Status |
 |---|---|
 | `wfh-reports` | **CLOSED 2026-11-01** (Phases 0–4, 9 commit `c0c8cec`…`f32d1bb`; 231/231 test FE, tsc + build bersih, E2E manual 3 role di browser — menemukan + memperbaiki bug visibilitas pesan 422 `a602c46`) |
-| `wfh-team-reports` | OPEN |
+| `wfh-team-reports` | **CLOSED 2026-11-01** (4 ops list/create/approve/reject, 7 commit `9d3d732`…`d43ff91`; 26 file / 270 test FE, tsc + build bersih, E2E manual 3 peran di browser — menemukan + memperbaiki defect bentuk list envelope `a78e547`) |
 | `wfh-monitoring` | OPEN |
 | `change-package` | OPEN |
 | `admin` | OPEN |
@@ -67,3 +67,4 @@ The map, not filename guessing, is the index of what exists.
 | Date | Module | Scope closed | Evidence |
 |---|---|---|---|
 | 2026-11-01 | `wfh-reports` | 17 operations: list/create/get/update/delete, submit/approve/reject/revise, activities add/update/delete/reorder, attendance add/delete, PDF export, session-config | 9 commits (`c0c8cec`…`f32d1bb`); 23 test files / 231 tests green, `tsc --noEmit` clean, `npm run build` exit 0; E2E manual 3 role in a real browser (staf create→submit→PDF, kepala bidang approve and reject-with-reason, staf revise→resubmit, 403/422 surfaced as Indonesian messages). E2E found a real defect: the 422 message never reached the user because the post-mutation refetch cleared `current.error` — fixed in `a602c46` with a page-level regression test. Primitives left reusable for the next five modules: `status-badge`, `pagination`, `pdf-download` (blob + objectURL), `activities-editor` (id-diff links), `attendance-upload` (fetch+bearer preview) |
+| 2026-11-01 | `wfh-team-reports` | 4 operations: list/create/approve/reject — daftar laporan tim (paginate + badge), buat (admin), approve/reject ber-alasan (kepala bidang) | 7 commits (`9d3d732`…`d43ff91`); 26 test files / 270 tests green, `tsc --noEmit` clean, `npm run build` exit 0; E2E manual 3 peran in a real browser (admin create → 422 duplikat tersaji, kepala bidang approve & reject-with-reason, kepala tim view-only, staf menu hilang + 403 tersaji Indonesia). E2E found a real defect: `GET /admin/wfh/team-reports` mengirim envelope `ApiResponse::paginated`, bukan paginator raw yang diasumsikan `TeamReportListResponse`/klien → list selalu kosong — fixed di `a78e547` dengan RED→GREEN test pemetaan envelope (2 test) + koreksi `openapi.yaml` |
