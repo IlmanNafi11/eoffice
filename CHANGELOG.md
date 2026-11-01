@@ -68,6 +68,13 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   `listWfhTeamReports` kini memetakan `res.data` → baris dan `res.meta` →
   `PaginationMeta`; skema openapi dikoreksi. Ditemukan lewat E2E manual 3 peran
   di browser, dikunci test pemetaan (RED→GREEN).
+- **Ship review #5** Laporan Tim: (1) pesan gagal reject kini dirender *di dalam*
+  dialog agar tidak terkurung di belakang overlay `DialogOverlay`; (2) query
+  redux list di-reset saat mount (`setTeamListQuery({})`) supaya fetch ulang
+  benar-benar bersih dari sisa navigasi sebelumnya; (3) `rejectWfhTeamReport`
+  kini memakai `RejectTeamReportInput` (tipe kontrak yang sebelumnya diekspor
+  tak terpakai). Ketiganya dikunci test RED→GREEN (refetch non-fatal, pesan
+  reject dalam dialog).
 - Pesan error mutasi WFH (422) kini benar-benar terlihat: `WfhReportDetailPage`
   memanggil refetch detail tanpa syarat setelah setiap mutasi, dan
   `fetchWfhReport.pending` membersihkan `current.error` sebelum render
