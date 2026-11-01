@@ -119,4 +119,27 @@ describe("AttendanceUploadList", () => {
     expect(screen.queryByRole("button", { name: /hapus/i })).toBeNull();
     expect(screen.queryByLabelText(/unggah foto/i)).toBeNull();
   });
+
+  it("upload gagal → spinner berhenti (uploading reset) dan callback reject tidak membekukan UI", async () => {
+    const onUpload = vi.fn().mockRejectedValueOnce(new Error("Foto terlalu besar"));
+    render(
+      <AttendanceUploadList
+        sessions={["pagi"]}
+        attendances={[]}
+        canEdit
+        onUpload={onUpload}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const file = new File(["x"], "pagi.jpg", { type: "image/jpeg" });
+    await userEvent.upload(screen.getByLabelText(/unggah foto/i), file);
+    await waitFor(() => expect(onUpload).toHaveBeenCalled());
+
+    // finally mengembalikan `uploading` → label "Unggah foto" kembali aktif.
+    await waitFor(() => {
+      expect(screen.getByText(/unggah foto/i)).toBeTruthy();
+    });
+  });
+
 });

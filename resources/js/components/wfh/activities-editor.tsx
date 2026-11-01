@@ -92,8 +92,11 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
                       {row.start_time ?? "—"} – {row.end_time ?? "—"}
                     </p>
                   ) : null}
-                  {row.links?.map((link) => (
-                    <p key={link.url} className="text-xs text-primary underline">
+                  {row.links?.map((link, li) => (
+                    <p
+                      key={link.id ?? `link-${li}`}
+                      className="text-xs text-primary underline"
+                    >
                       {link.url}
                     </p>
                   ))}

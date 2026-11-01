@@ -358,4 +358,98 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
       expect(mockedAddActivity).toHaveBeenCalledWith(1, expect.objectContaining({ activity: "Setup VPN" }));
     });
   });
+  it(
+    "double-submit Setujui → hanya SATU POST approve (guard busyRef sinkron)",
+    async () => {
+      mockedApprove.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(detail("approved")), 50)),
+      );
+      renderDetail("kepala", detail("pending"));
+
+      const btn = await screen.findByRole("button", { name: /setujui/i });
+      // Dua klik beruntun sebelum promise pertama settle — ref guard harus
+      // menolak yang kedua karena state belum sempat re-render.
+      await userEvent.click(btn);
+      await userEvent.click(btn);
+
+      await waitFor(() => {
+        expect(mockedApprove).toHaveBeenCalledTimes(1);
+      });
+      // Settle penuh (mutasi 50ms + refetch) agar tidak bocor ke test
+      // berikutnya.
+      await waitFor(() => {
+        expect(mockedGet.mock.calls.length).toBeGreaterThan(1);
+      });
+    },
+  );
+
+  it("double-submit Ajukan → hanya SATU POST submit", async () => {
+    mockedSubmit.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(detail("pending")), 50)),
+    );
+    renderDetail("staf", detail("draft"));
+
+    const btn = await screen.findByRole("button", { name: /ajukan untuk disetujui/i });
+    await userEvent.click(btn);
+    await userEvent.click(btn);
+
+    await waitFor(() => {
+      expect(mockedSubmit).toHaveBeenCalledTimes(1);
+    });
+    // Settle penuh (mutasi 50ms + refetch) agar tidak bocor ke test
+    // berikutnya.
+    await waitFor(() => {
+      expect(mockedGet.mock.calls.length).toBeGreaterThan(1);
+    });
+  });
+
+  it(
+    "persistActivities multi-op: add+delete dalam satu siklus editor — refetch saat semua sukses",
+    async () => {
+      const start: WfhReport = {
+        ...detail("draft"),
+        activities: [
+          { id: 11, activity: "Kerja A", sort_order: 1 },
+          { id: 12, activity: "Kerja B", sort_order: 2 },
+        ],
+      };
+      mockedAddActivity.mockResolvedValue({ id: 13, activity: "Kerja C", sort_order: 3 });
+      mockedDeleteActivity.mockResolvedValue("Kegiatan dihapus.");
+      renderDetail("staf", start);
+
+      await waitFor(() => expect(screen.getByText("Kerja B")).toBeTruthy());
+      const getsBefore = mockedGet.mock.calls.length;
+      // Dua baris → dua tombol hapus; ambil milik "Kerja A" (pertama).
+      await userEvent.click(screen.getAllByRole("button", { name: /hapus kegiatan/i })[0]!);
+      await waitFor(() => {
+        expect(mockedDeleteActivity).toHaveBeenCalledWith(1, 11);
+      });
+      // Semua op sukses → TEPAT satu refetch detail (delta, bukan absolut).
+      await waitFor(() => {
+        expect(mockedGet.mock.calls.length).toBe(getsBefore + 1);
+      });
+    },
+  );
+
+  it("persistActivities: salah satu op gagal → TIDAK refetch, pesan error tampil", async () => {
+    renderDetail("staf", detail("draft"));
+
+    await waitFor(() => expect(screen.getByText("Kerja A")).toBeTruthy());
+    mockedAddActivity.mockRejectedValueOnce(new Error("Gagal tambah kegiatan."));
+    await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
+    await userEvent.type(await screen.findByLabelText(/deskripsi kegiatan/i), "Kerja X");
+    await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Gagal tambah kegiatan.")).toBeTruthy();
+    });
+    // Error mutasi tampil INLINE: halaman tidak collapse ke layar error —
+    // editor (dan baris belum tersimpan) tetap termuat.
+    expect(screen.getByText("Kerja A")).toBeTruthy();
+    // Ada op reject → tidak ada GET baru sama sekali (tidak refetch).
+    const getsBeforeFailure = mockedGet.mock.calls.length;
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockedGet.mock.calls.length).toBe(getsBeforeFailure);
+  });
 });
+

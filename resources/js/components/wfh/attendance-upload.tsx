@@ -69,6 +69,9 @@ export function AttendanceUploadList({
               setUploading(session);
               try {
                 await onUpload({ session, photo });
+              } catch {
+                // Error di-surfing orang tua (slice `current.error`) — jangan
+                // rethrow, biar tidak jadi unhandled rejection di sini.
               } finally {
                 setUploading(null);
               }
@@ -78,6 +81,8 @@ export function AttendanceUploadList({
               setDeleting(att.id);
               try {
                 await onDelete(att.id);
+              } catch {
+                // idem — error di-surfing orang tua.
               } finally {
                 setDeleting(null);
               }
@@ -146,7 +151,9 @@ function AttendanceRow({
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) return;
+    // Early-return: dua event `change` ter-antre sebelum re-render jangan
+    // memicu upload paralel (ship review #4 double-select guard).
+    if (!file || uploading) return;
     await onUpload(file);
     if (inputRef.current) inputRef.current.value = "";
   }

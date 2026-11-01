@@ -20,7 +20,7 @@
  * - kegiatan: id-diff (tanpa id → POST, teks berubah → PUT id, hilang →
  *   DELETE, urutan berubah → PATCH {ids}).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 
@@ -86,6 +86,11 @@ export function WfhReportDetailPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  // Guard double-submit (ship review #4): ref sinkron menolak dua klik
+  // beruntun sebelum re-render; state men-disable tombol selama in-flight.
+  // DIDEKLARASIKAN SEBELUM early-return — Rules of Hooks.
+  const busyRef = useRef(false);
+  const [pendingMutation, setPendingMutation] = useState(false);
 
   useEffect(() => {
     if (Number.isFinite(id)) dispatch(fetchWfhReport(id));
@@ -127,7 +132,10 @@ export function WfhReportDetailPage() {
     );
   }
 
-  if (error) {
+  // Full-page error HANYA untuk kegagalan fetch awal (report belum ada).
+  // Error mutasi sub-resource (422 upload/hapus/aktivitas) tampil inline di
+  // bawah — halaman (dan editor berisi baris belum tersimpan) tetap termuat.
+  if (error && !report) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-destructive" role="alert">
@@ -160,15 +168,22 @@ export function WfhReportDetailPage() {
     (report.status === "pending" || report.status === "approved") &&
     can(user, "wfh.report.export_pdf");
 
-  /** Satu mutasi: tunggu selesai lalu refetch detail. `dispatch(thunk)`
-   *  mengembalikan thenable ber-`.unwrap()` (RTK). */
+  /** Satu mutasi: tunggu selesai lalu refetch detail. Guard double-submit:
+   *  `busyRef` menolak klik kedua saat in-flight; `pendingMutation` men-disable
+   *  tombol. `dispatch(thunk)` mengembalikan thenable ber-`.unwrap()` (RTK). */
   async function runMutation(action: { unwrap: () => Promise<unknown> }) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setPendingMutation(true);
     try {
       await action.unwrap();
       refetch();
     } catch {
       // Pesan error sudah disimpan slice → tampil di halaman. Jangan refetch:
       // fetchWfhReport.pending membersihkan current.error sebelum terlihat.
+    } finally {
+      busyRef.current = false;
+      setPendingMutation(false);
     }
   }
 
@@ -286,7 +301,7 @@ export function WfhReportDetailPage() {
       {report.status === "pending" && (canApprove || canReject) ? (
         <div className="flex gap-2">
           {canApprove ? (
-            <Button onClick={() => void runMutation(dispatch(approveWfhReport(report.id)))}>
+            <Button disabled={pendingMutation} onClick={() => void runMutation(dispatch(approveWfhReport(report.id)))}>
               Setujui
             </Button>
           ) : null}
@@ -306,7 +321,10 @@ export function WfhReportDetailPage() {
 
       {canSubmit ? (
         <div>
-          <Button onClick={() => void runMutation(dispatch(submitWfhReport(report.id)))}>
+          <Button
+            disabled={pendingMutation}
+            onClick={() => void runMutation(dispatch(submitWfhReport(report.id)))}
+          >
             Ajukan untuk disetujui
           </Button>
         </div>
@@ -314,7 +332,10 @@ export function WfhReportDetailPage() {
 
       {canRevise ? (
         <div>
-          <Button onClick={() => void runMutation(dispatch(reviseWfhReport(report.id)))}>
+          <Button
+            disabled={pendingMutation}
+            onClick={() => void runMutation(dispatch(reviseWfhReport(report.id)))}
+          >
             Revisi laporan
           </Button>
         </div>
