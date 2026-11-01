@@ -1,8 +1,8 @@
 /**
  * Store tingkat aplikasi (frontend-phase1).
  *
- * - Reducer `auth` + `wfh` (frontend-phase2); bertambah seiring fitur.
  * - Token awal dibaca dari localStorage agar refresh tidak memaksa login ulang.
+ * - Reducer `wfhMonitoring` ditambahkan modul wfh-monitoring (Task 3).
  * - Interceptor 401 (`@/api/client`) sudah menghapus token dari localStorage
  *   dan redirect ke `/login`; yang kurang hanya state Redux, jadi
  *   `makeStore` mendaftarkan handler yang memanggil `clearToken`.
@@ -18,10 +18,17 @@ import type { WfhState } from "@/store/wfhSlice";
 import { wfhReducer } from "@/store/wfhSlice";
 import type { WfhTeamState } from "@/store/wfhTeamSlice";
 import { wfhTeamReducer } from "@/store/wfhTeamSlice";
+import type { WfhMonitoringState } from "@/store/wfhMonitoringSlice";
+import { wfhMonitoringReducer } from "@/store/wfhMonitoringSlice";
 
 // ── Tipe store (named — bukan ReturnType) ───────────────────────────
 
-export type RootState = { auth: AuthState; wfh: WfhState; wfhTeam: WfhTeamState };
+export type RootState = {
+  auth: AuthState;
+  wfh: WfhState;
+  wfhTeam: WfhTeamState;
+  wfhMonitoring: WfhMonitoringState;
+};
 
 /** Dispatch dengan middleware thunk default RTK. */
 export type AppDispatch = ThunkDispatch<RootState, undefined, UnknownAction>;
@@ -41,7 +48,7 @@ export function makeStore(): AppStore {
   const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
 
   const store: AppStore = configureStore({
-    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer },
+    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer, wfhMonitoring: wfhMonitoringReducer },
     preloadedState: storedToken
       ? { auth: { ...initialAuthState(), token: storedToken } }
       : undefined,
