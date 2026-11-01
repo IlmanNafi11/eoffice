@@ -300,13 +300,9 @@ export interface ListTeamReportsQuery {
 }
 
 /**
- * `#/components/schemas/TeamReportListResponse` — paginator raw Laravel
- * TANPA envelope `success`; unwrap meneruskannya apa adanya sebagai `data`.
+ * Bentuk list team reports yang benar secara ground truth (E2E 2026-11-01):
+ * backend membungkus paginator dalam `ApiResponse::paginated` —
+ * `{success, data: WfhTeamReport[], meta: PaginationMeta}` (envelope), BUKAN
+ * paginator raw tanpa `success` seperti deskripsi lama `TeamReportListResponse`.
+ * Dipetakan ke `{ reports, meta }` di `api/wfh-team.ts`.
  */
-export interface TeamReportPage {
-  data: WfhTeamReport[];
-  current_page: number;
-  last_page: number;
-  per_page: number;
-  total: number;
-}

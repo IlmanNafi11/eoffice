@@ -83,14 +83,13 @@ function jsonBody(i = 0): unknown {
   return typeof raw === "string" ? (JSON.parse(raw) as unknown) : raw;
 }
 
-describe("api/wfh-team — list (raw paginator)", () => {
-  it("listWfhTeamReports meneruskan per_page/page dan memetakan paginator raw → { reports, meta }", async () => {
+describe("api/wfh-team — list (envelope paginated)", () => {
+  it("listWfhTeamReports meneruskan per_page/page dan memetakan envelope paginated → { reports, meta }", async () => {
     ok({
+      success: true,
       data: [teamReport],
-      current_page: 2,
-      last_page: 3,
-      per_page: 15,
-      total: 32,
+      message: null,
+      meta: { current_page: 2, last_page: 3, per_page: 15, total: 32 },
     });
 
     const out = await listWfhTeamReports({ per_page: 15, page: 2 });
@@ -102,8 +101,13 @@ describe("api/wfh-team — list (raw paginator)", () => {
     expect(out.meta).toEqual({ current_page: 2, last_page: 3, per_page: 15, total: 32 });
   });
 
-  it("listWfhTeamReports tanpa query mengirim tanpa params dan default meta kosong", async () => {
-    ok({ data: [], current_page: 1, last_page: 1, per_page: 15, total: 0 });
+  it("listWfhTeamReports tanpa query mengirim tanpa params dan memetakan meta default", async () => {
+    ok({
+      success: true,
+      data: [],
+      message: null,
+      meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 },
+    });
 
     const out = await listWfhTeamReports();
 

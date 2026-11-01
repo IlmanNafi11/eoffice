@@ -5,21 +5,26 @@
  * pinjaman `listTeams` (tag `Organization`, dipinjam untuk dropdown form
  * create — keputusan user 2026-11-01, lihat `SPEC-wfh-team-reports.md`).
  *
- * Disiplin envelope: list = paginator raw TANPA kunci `success` (unwrap
- * meneruskannya sebagai `data`); create/approve/reject + listTeams = envelope
- * `{data}` lewat `requireData`.
+ * Disiplin envelope: SEMUA 5 op lewat envelope — list = `ApiResponse::paginated`
+ * (`{success, data[], meta}`; meta = paginator), create/approve/reject +
+ * listTeams = envelope `{data}` lewat `requireData`.
  */
 import { api, requireData } from "@/api/client";
 import {
   CreateTeamReportInput,
   ListTeamReportsQuery,
   PaginationMeta,
-  TeamReportPage,
   TeamResource,
   WfhTeamReport,
 } from "@/api/types";
 
-/** GET /admin/wfh/team-reports — paginator raw → `{ reports, meta }`. */
+/**
+ * GET /admin/wfh/team-reports — envelope `ApiResponse::paginated` →
+ * `{ reports, meta }`. Ground truth E2E 2026-11-01: backend membungkus paginator
+ * dalam envelope (`ApiResponse::paginated`), BUKAN paginator raw seperti
+ * deskripsi lama `TeamReportListResponse`; unwrap melepas `success`, jadi
+ * `res.data` = array baris dan `res.meta` = paginator.
+ */
 export async function listWfhTeamReports(
   query: ListTeamReportsQuery = {},
 ): Promise<{ reports: WfhTeamReport[]; meta: PaginationMeta }> {
@@ -27,18 +32,18 @@ export async function listWfhTeamReports(
   if (query.per_page !== undefined) params.per_page = query.per_page;
   if (query.page !== undefined) params.page = query.page;
 
-  const res = await api.get<TeamReportPage>(
+  const res = await api.get<WfhTeamReport[]>(
     "/admin/wfh/team-reports",
     Object.keys(params).length > 0 ? { params } : {},
   );
-  const page = res.data;
+  const meta = res.meta;
   return {
-    reports: page?.data ?? [],
+    reports: res.data ?? [],
     meta: {
-      current_page: page?.current_page ?? 1,
-      last_page: page?.last_page ?? 1,
-      per_page: page?.per_page,
-      total: page?.total ?? 0,
+      current_page: meta?.current_page ?? 1,
+      last_page: meta?.last_page ?? 1,
+      per_page: meta?.per_page,
+      total: meta?.total ?? 0,
     },
   };
 }
