@@ -252,3 +252,61 @@ export interface AttendanceUploadInput {
   session: WfhSession;
   photo: Blob;
 }
+
+// ── WFH Team Reports ────────────────────────────────────────────────
+
+/** `#/components/schemas/WfhTeamReport` — resource laporan WFH tim. */
+export interface WfhTeamReport {
+  id: number;
+  team_id: number;
+  report_date: string;
+  status: WfhReportStatus;
+  created_by: number;
+  supervisor_id?: number | null;
+  maker_signed_at?: string | null;
+  supervisor_signed_at?: string | null;
+  reject_reason?: string | null;
+  verification_token?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  team?: TeamNested | null;
+  creator?: WfhReportUser | null;
+  supervisor?: WfhReportUser | null;
+}
+
+/** `#/components/schemas/TeamResource` — baris flat dropdown `GET /teams`. */
+export interface TeamResource {
+  id: number;
+  name: string;
+  leader_id: number | null;
+  field_id: number | null;
+}
+
+/** `#/components/schemas/CreateTeamReportRequest` — `{team_id, report_date}`. */
+export interface CreateTeamReportInput {
+  team_id: number;
+  report_date: string;
+}
+
+/** `#/components/schemas/RejectTeamReportRequest` — alasan wajib. */
+export interface RejectTeamReportInput {
+  reason: string;
+}
+
+/** Query `GET /admin/wfh/team-reports` — `per_page` (default 15, max 100). */
+export interface ListTeamReportsQuery {
+  per_page?: number;
+  page?: number;
+}
+
+/**
+ * `#/components/schemas/TeamReportListResponse` — paginator raw Laravel
+ * TANPA envelope `success`; unwrap meneruskannya apa adanya sebagai `data`.
+ */
+export interface TeamReportPage {
+  data: WfhTeamReport[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
