@@ -51,6 +51,7 @@ import {
   createWfhTeamReport,
   fetchWfhTeamReports,
   rejectWfhTeamReport,
+  setTeamListQuery,
   selectWfhTeamActionError,
   selectWfhTeamList,
   selectWfhTeamListItems,
@@ -93,6 +94,10 @@ export function TeamReportsPage() {
   const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
+    // Query redux bisa membawa sisa navigasi sebelumnya (page 2, per_page 25)
+    // sementara kontrol lokal halaman reset ke default — reset dulu supaya
+    // fetch ulang mount benar-benar query bersih dan refetch mutasi konsisten.
+    dispatch(setTeamListQuery({}));
     dispatch(fetchWfhTeamReports({}));
   }, [dispatch]);
 
@@ -263,7 +268,7 @@ export function TeamReportsPage() {
         </Card>
       )}
 
-      {actionError && (
+      {actionError && !rejectOpen && (
         <p
           className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           role="alert"
@@ -372,6 +377,15 @@ export function TeamReportsPage() {
               onChange={(e) => setRejectReason(e.target.value)}
             />
           </Field>
+          {actionError && (
+            <p
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+              data-testid="team-reject-error"
+            >
+              {actionError}
+            </p>
+          )}
           <DialogFooter>
             <Button
               type="button"

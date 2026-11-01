@@ -391,7 +391,7 @@ describe("TeamReportsPage — approve/reject journey", () => {
     mockedReject.mockResolvedValueOnce({ ...reportA, status: "rejected" });
     await userEvent.click(submit);
     await waitFor(() => {
-      expect(mockedReject).toHaveBeenCalledWith(1, "Melebihi kuota WFH bulan ini.");
+      expect(mockedReject).toHaveBeenCalledWith(1, { reason: "Melebihi kuota WFH bulan ini." });
     });
     // Refetch pasca-mutasi.
     await waitFor(() => {
@@ -429,5 +429,32 @@ describe("TeamReportsPage — approve/reject journey", () => {
       expect(mockedList).toHaveBeenCalledTimes(2);
     });
     expect(screen.getByTestId("team-action-error")).toBeTruthy();
+  });
+
+  it("reject gagal 403/422 → dialog tetap terbuka dan pesan server tampil DI DALAM dialog", async () => {
+    renderPageAs(approver);
+    await screen.findByTestId("team-report-row-1");
+
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /tolak/i,
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    const input = within(dialog).getByLabelText(/alasan penolakan/i);
+    await userEvent.type(input, "Alasan lintas bidang.");
+
+    mockedReject.mockRejectedValueOnce(
+      new Error("Laporan tidak berada dalam bidang Anda."),
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: /tolak laporan/i }));
+
+    // Pesan mutasi dirender di dalam dialog (bukan di belakang overlay).
+    expect(await within(dialog).findByTestId("team-reject-error")).toBeTruthy();
+    expect(within(dialog).getByTestId("team-reject-error").textContent).toContain(
+      "Laporan tidak berada dalam bidang Anda.",
+    );
+    // Dialog tetap terbuka agar pengguna bisa memperbaiki/membatalkan.
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });
