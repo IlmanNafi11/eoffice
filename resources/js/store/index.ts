@@ -20,7 +20,8 @@ import type { WfhTeamState } from "@/store/wfhTeamSlice";
 import { wfhTeamReducer } from "@/store/wfhTeamSlice";
 import type { WfhMonitoringState } from "@/store/wfhMonitoringSlice";
 import { wfhMonitoringReducer } from "@/store/wfhMonitoringSlice";
-
+import type { ChangePackageState } from "@/store/changePackageSlice";
+import { changePackageReducer } from "@/store/changePackageSlice";
 // ── Tipe store (named — bukan ReturnType) ───────────────────────────
 
 export type RootState = {
@@ -28,6 +29,7 @@ export type RootState = {
   wfh: WfhState;
   wfhTeam: WfhTeamState;
   wfhMonitoring: WfhMonitoringState;
+  changePackage: ChangePackageState;
 };
 
 /** Dispatch dengan middleware thunk default RTK. */
@@ -48,7 +50,7 @@ export function makeStore(): AppStore {
   const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
 
   const store: AppStore = configureStore({
-    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer, wfhMonitoring: wfhMonitoringReducer },
+    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer, wfhMonitoring: wfhMonitoringReducer, changePackage: changePackageReducer },
     preloadedState: storedToken
       ? { auth: { ...initialAuthState(), token: storedToken } }
       : undefined,
