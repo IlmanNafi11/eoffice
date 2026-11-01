@@ -45,12 +45,12 @@ import { setUser } from "@/store/authSlice";
 
 const mockedGet = wfhApi.getWfhReport as unknown as Mock;
 const mockedSessionConfig = wfhApi.getWfhSessionConfig as unknown as Mock;
+const mockedSubmit = wfhApi.submitWfhReport as unknown as Mock;
 const mockedReject = wfhApi.rejectWfhReport as unknown as Mock;
 const mockedApprove = wfhApi.approveWfhReport as unknown as Mock;
 const mockedDeleteActivity = wfhApi.deleteReportActivity as unknown as Mock;
 const mockedAddActivity = wfhApi.addReportActivity as unknown as Mock;
 const mockedUpdateMetadata = wfhApi.updateWfhReportMetadata as unknown as Mock;
-
 const config: WfhSessionConfig = {
   sessions: ["pagi", "siang", "sore"],
   allowed_days: [1, 2, 3, 4, 5],
@@ -302,6 +302,33 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
 
     expect(
       await screen.findByText("Laporan dengan status draft tidak dapat ditolak."),
+    ).toBeTruthy();
+  });
+
+  it("gagal 422 saat submit → pesan kesalahan tampil dan tidak dihapus refetch", async () => {
+    // Kontrak: pesan error mutasi (422) TIDAK boleh terhapus. Sebelum fix,
+    // refetch() pasca-mutasi (fetchWfhReport.pending) membersihkan
+    // current.error sebelum pesan sempat terlihat.
+    mockedSubmit.mockRejectedValue(
+      new Error("Laporan kosong: minimal satu kegiatan atau absensi."),
+    );
+    renderDetail("staf", detail("draft"));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /ajukan untuk disetujui/i }),
+    );
+
+    // Pesan envelope tampil.
+    expect(
+      await screen.findByText(
+        "Laporan kosong: minimal satu kegiatan atau absensi.",
+      ),
+    ).toBeTruthy();
+    // Mutasi gagal ⇒ tidak ada refetch (tetap 1 GET dari mount); pesan
+    // bertahan di layar.
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText("Laporan kosong: minimal satu kegiatan atau absensi."),
     ).toBeTruthy();
   });
 

@@ -165,10 +165,11 @@ export function WfhReportDetailPage() {
   async function runMutation(action: { unwrap: () => Promise<unknown> }) {
     try {
       await action.unwrap();
+      refetch();
     } catch {
-      // Pesan error sudah disimpan slice → tampil di halaman.
+      // Pesan error sudah disimpan slice → tampil di halaman. Jangan refetch:
+      // fetchWfhReport.pending membersihkan current.error sebelum terlihat.
     }
-    refetch();
   }
 
   /** Id-diff kegiatan: tambah → POST, teks berubah → PUT, hilang → DELETE,
@@ -237,7 +238,10 @@ export function WfhReportDetailPage() {
       );
     }
 
-    await Promise.allSettled(ops.map((op) => op.unwrap()));
+    const results = await Promise.allSettled(ops.map((op) => op.unwrap()));
+    // Semua gagal (mis. 422 validasi) → jangan refetch; pesan error di slice
+    // (disimpan matcher rejected) harus tetap tampil.
+    if (results.some((r) => r.status === "rejected")) return;
     refetch();
   }
 
