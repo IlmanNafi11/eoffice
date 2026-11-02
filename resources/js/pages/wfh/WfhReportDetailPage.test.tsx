@@ -12,8 +12,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
+import { userEvent, pickDate } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { AuthUser, WfhReport, WfhSessionConfig } from "@/api/types";
@@ -266,8 +266,7 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     mockedUpdateMetadata.mockResolvedValue(detail("draft"));
     renderDetail("staf", detail("draft"));
 
-    const input = await screen.findByLabelText(/tanggal laporan/i);
-    fireEvent.change(input, { target: { value: "2026-08-12" } });
+    await pickDate(await screen.findByLabelText(/tanggal laporan/i), "2026-08-12");
     await userEvent.click(screen.getByRole("button", { name: /simpan tanggal/i }));
 
     await waitFor(() => {

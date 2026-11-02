@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -368,11 +369,10 @@ export function WfhReportDetailPage() {
             >
               <Field className="w-48" orientation="vertical">
                 <FieldLabel htmlFor="wfh-detail-date">Tanggal laporan</FieldLabel>
-                <Input
+                <DateInput
                   id="wfh-detail-date"
-                  type="date"
                   value={dateDraft ?? report.report_date}
-                  onChange={(e) => setDateDraft(e.target.value)}
+                  onChange={setDateDraft}
                 />
               </Field>
               <Button type="submit" variant="outline" disabled={!dateDraft}>

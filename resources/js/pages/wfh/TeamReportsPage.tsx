@@ -34,6 +34,14 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -206,18 +214,25 @@ export function TeamReportsPage() {
           <form className="flex flex-wrap items-end gap-3">
             <Field className="w-36" orientation="vertical">
               <FieldLabel htmlFor="team-reports-perpage">Per halaman</FieldLabel>
-              <select
-                id="team-reports-perpage"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+              <Select
                 value={perPage?.toString() ?? "15"}
-                onChange={(e) => applyPerPage(e.target.value)}
+                onValueChange={applyPerPage}
               >
-                {PER_PAGE_OPTIONS.map((n) => (
-                  <option key={n} value={String(n)}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="team-reports-perpage"
+                  aria-label="Per halaman"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PER_PAGE_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           </form>
         </CardContent>
@@ -235,29 +250,32 @@ export function TeamReportsPage() {
             <form className="flex flex-wrap items-end gap-3" onSubmit={submitCreate}>
               <Field className="w-56" orientation="vertical">
                 <FieldLabel htmlFor="team-report-team">Tim</FieldLabel>
-                <select
-                  id="team-report-team"
-                  className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                  required
+                <Select
+                  value={teamId === "" ? undefined : teamId}
+                  onValueChange={(v) => setTeamId(v ?? "")}
                 >
-                  <option value="">Pilih tim…</option>
-                  {(teams ?? []).map((t) => (
-                    <option key={t.id} value={String(t.id)}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    id="team-report-team"
+                    aria-label="Tim"
+                    className="w-full"
+                  >
+                    <SelectValue placeholder="Pilih tim…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(teams ?? []).map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field className="w-44" orientation="vertical">
                 <FieldLabel htmlFor="team-report-date">Tanggal laporan</FieldLabel>
-                <Input
+                <DateInput
                   id="team-report-date"
-                  type="date"
                   value={reportDate}
-                  onChange={(e) => setReportDate(e.target.value)}
-                  required
+                  onChange={setReportDate}
                 />
               </Field>
               <Button type="submit" disabled={creating}>

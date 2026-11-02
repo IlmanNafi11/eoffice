@@ -30,7 +30,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
+import { MonthInput } from "@/components/ui/month-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/wfh/pagination";
 import { WfhReportRow } from "@/components/wfh/report-row";
@@ -120,36 +128,41 @@ export function WfhReportsPage() {
           <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
             <Field className="w-48" orientation="vertical">
               <FieldLabel htmlFor="wfh-filter-date">Tanggal</FieldLabel>
-              <Input
+              <DateInput
                 id="wfh-filter-date"
-                type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={setDate}
               />
             </Field>
             <Field className="w-44" orientation="vertical">
               <FieldLabel htmlFor="wfh-filter-month">Bulan</FieldLabel>
-              <Input
+              <MonthInput
                 id="wfh-filter-month"
-                type="month"
                 value={month}
-                onChange={(e) => setMonth(e.target.value)}
+                onChange={setMonth}
               />
             </Field>
             <Field className="w-36" orientation="vertical">
               <FieldLabel htmlFor="wfh-filter-perpage">Per halaman</FieldLabel>
-              <select
-                id="wfh-filter-perpage"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+              <Select
                 value={perPage?.toString() ?? "15"}
-                onChange={(e) => applyPerPage(e.target.value)}
+                onValueChange={applyPerPage}
               >
-                {PER_PAGE_OPTIONS.map((n) => (
-                  <option key={n} value={String(n)}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="wfh-filter-perpage"
+                  aria-label="Per halaman"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PER_PAGE_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Button type="submit">Terapkan</Button>
           </form>

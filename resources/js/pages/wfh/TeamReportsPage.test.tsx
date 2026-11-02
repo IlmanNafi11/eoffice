@@ -10,8 +10,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import userEvent from "@testing-library/user-event";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { userEvent, pickDate, pickSelect } from "@/test/portal";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { PaginationMeta, WfhTeamReport } from "@/api/types";
@@ -176,7 +176,7 @@ describe("TeamReportsPage — paginate", () => {
       reports: [reportA],
       meta: { current_page: 1, last_page: 2, per_page: 25, total: 30 },
     });
-    await userEvent.selectOptions(screen.getByLabelText(/per halaman/i), "25");
+    await pickSelect(/per halaman/i, "25");
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ per_page: 25, page: 1 });
     });
@@ -211,7 +211,7 @@ describe("TeamReportsPage — paginate", () => {
       meta: { current_page: 1, last_page: 2, per_page: 25, total: 30 },
     });
 
-    await userEvent.selectOptions(screen.getByLabelText(/per halaman/i), "25");
+    await pickSelect(/per halaman/i, "25");
 
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ per_page: 25, page: 1 });
@@ -244,15 +244,13 @@ describe("TeamReportsPage — create journey", () => {
     await waitFor(() => {
       expect(mockedListTeams).toHaveBeenCalledTimes(1);
     });
-    const dropdown = await screen.findByLabelText(/tim/i);
-    expect(dropdown.textContent).toContain("Tim Aplikasi");
+    // Trigger Select kosong menampilkan placeholder; opsi hidup di portal.
+    const dropdown = await screen.findByLabelText("Tim");
+    expect(dropdown.textContent).toContain("Pilih tim");
 
-    await userEvent.selectOptions(screen.getByLabelText(/tim/i), "3");
+    await pickSelect(/tim/i, "Tim Aplikasi");
 
-    // Date input: fireEvent (userEvent tidak mengetik di input type=date).
-    fireEvent.change(screen.getByLabelText(/tanggal laporan/i), {
-      target: { value: "2026-08-12" },
-    });
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
     await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
 
     await waitFor(() => {
@@ -264,10 +262,8 @@ describe("TeamReportsPage — create journey", () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await userEvent.selectOptions(screen.getByLabelText(/tim/i), "3");
-    fireEvent.change(screen.getByLabelText(/tanggal laporan/i), {
-      target: { value: "2026-08-10" },
-    });
+    await pickSelect(/tim/i, "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-10");
 
     mockedCreate.mockRejectedValueOnce(
       new Error("Laporan untuk tim dan tanggal ini sudah ada."),
@@ -283,10 +279,8 @@ describe("TeamReportsPage — create journey", () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await userEvent.selectOptions(screen.getByLabelText(/tim/i), "3");
-    fireEvent.change(screen.getByLabelText(/tanggal laporan/i), {
-      target: { value: "2026-08-12" },
-    });
+    await pickSelect(/tim/i, "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
 
     mockedCreate.mockResolvedValueOnce({ ...reportA, id: 9, report_date: "2026-08-12" });
     mockedList.mockResolvedValueOnce({ reports: [reportA, reportB], meta });

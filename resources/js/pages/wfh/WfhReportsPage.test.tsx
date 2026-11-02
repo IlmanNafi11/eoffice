@@ -12,8 +12,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
+import { userEvent, pickDate, pickMonth, pickSelect } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { PaginationMeta, WfhReport } from "@/api/types";
@@ -140,7 +140,7 @@ describe("WfhReportsPage — filter & paginate", () => {
     await screen.findByText("2026-08-10");
     mockedList.mockClear();
 
-    fireEvent.change(screen.getByLabelText(/tanggal/i), { target: { value: "2026-08-10" } });
+    await pickDate(screen.getByLabelText(/tanggal/i), "2026-08-10");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
@@ -153,7 +153,7 @@ describe("WfhReportsPage — filter & paginate", () => {
     await screen.findByText("2026-08-10");
     mockedList.mockClear();
 
-    fireEvent.change(screen.getByLabelText(/bulan/i), { target: { value: "2026-09" } });
+    await pickMonth(screen.getByLabelText(/bulan/i), 2026, "September");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
@@ -182,7 +182,7 @@ describe("WfhReportsPage — filter & paginate", () => {
       meta: { current_page: 1, last_page: 2, per_page: 25, total: 30 },
     });
 
-    await userEvent.selectOptions(screen.getByLabelText(/per halaman/i), "25");
+    await pickSelect(/per halaman/i, "25");
 
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ per_page: 25, page: 1 });
