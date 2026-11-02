@@ -430,7 +430,7 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
     expect(draftOnly.implementation).toBeUndefined();
   });
 
-  it("PackageDraftInput sesuai ChangePackageDraftRequest — implementation opsional, tanpa evaluator", () => {
+  it("PackageDraftInput sesuai ChangePackageDraftRequest — implementation opsional, evaluator_id opsional", () => {
     const draft: PackageDraftInput = {
       initiation: {
         field_id: 3,
@@ -456,13 +456,12 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
     expect(draft.implementation?.change_type_ids).toEqual([1, 3]);
     const withEvaluator: PackageDraftInput = {
       initiation: { field_id: 3, description: "d", reason: "r" },
-      // @ts-expect-error — evaluator_id tidak jadi masukan UI (Resolved #1, evaluator diset server)
       implementation: { evaluator_id: 27 },
     };
-    expect(withEvaluator).toBeDefined();
+    expect(withEvaluator.implementation?.evaluator_id).toBe(27);
   });
 
-  it("PackageSubmitInput sesuai ChangePackageSubmitRequest — semua field wajib required", () => {
+  it("PackageSubmitInput sesuai ChangePackageSubmitRequest — evaluator_id opsional nullable", () => {
     const submit: PackageSubmitInput = {
       initiation: {
         field_id: 3,
@@ -478,9 +477,31 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
         execution_date: "2025-11-10",
         release_date: "2025-11-15",
         implementation_result: "Selesai",
+        evaluator_id: 27,
       },
     };
-    expect(submit.implementation.change_type_ids.length).toBeGreaterThan(0);
+    expect(submit.implementation.evaluator_id).toBe(27);
+    const noEvaluator: PackageSubmitInput = {
+      initiation: {
+        field_id: 3,
+        description: "d",
+        reason: "r",
+        needed_by_date: "2025-12-15",
+      },
+      implementation: {
+        priority: "normal",
+        impact: "Minor",
+        change_type_ids: [1],
+        test_plan: "t",
+        execution_date: "2025-11-10",
+        release_date: "2025-11-11",
+        implementation_result: "r",
+        evaluator_id: null,
+      },
+    };
+    expect(noEvaluator.implementation.evaluator_id).toBeNull();
+  });
+  it("PackageSubmitInput menolak implementation tanpa field wajib (release_date + implementation_result)", () => {
     const bad: PackageSubmitInput = {
       initiation: { field_id: 3, description: "d", reason: "r", needed_by_date: "2025-12-15" },
       // @ts-expect-error — nested object missing `release_date` + `implementation_result`

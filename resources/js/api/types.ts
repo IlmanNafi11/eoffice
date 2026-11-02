@@ -480,10 +480,12 @@ export interface ChangePackage {
 
 /**
  * `#/components/schemas/ChangePackageDraftRequest.implementation` — semua prop
- * nullable (backend `nullable`). `evaluator_id` TIDAK jadi masukan UI
- * (Resolved #1: diset server, bukan input client).
+ * nullable (backend `nullable`). `evaluator_id` kini jadi masukan UI (Resolved
+ * #1 digugurkan): picker di SetChangePackageFormPage memilih evaluator aktif
+ * sebidang; `null` = belum memilih.
  */
 export interface PackageImplementationDraftInput {
+  evaluator_id?: number | null;
   priority?: "normal" | "emergency" | null;
   impact?: "Minor" | "Mayor" | null;
   change_type_ids?: number[] | null;
@@ -522,9 +524,11 @@ export interface PackageDraftInput {
  * `#/components/schemas/ChangePackageSubmitRequest.implementation` — semua 7
  * field required (`priority`, `impact`, `change_type_ids`, `test_plan`,
  * `execution_date`, `release_date`, `implementation_result`) plus opsional
- * nullable lain; `change_type_ids` minimal 1 (backend `min:1`).
+ * nullable lain (`evaluator_id`, `production_impact`, …); `change_type_ids`
+ * minimal 1 (backend `min:1`).
  */
 export interface PackageImplementationSubmitInput {
+  evaluator_id?: number | null;
   priority: "normal" | "emergency";
   impact: "Minor" | "Mayor";
   change_type_ids: number[];
