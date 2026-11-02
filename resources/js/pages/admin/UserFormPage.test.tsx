@@ -3,7 +3,7 @@
  * Kontrak yang dijaga (plan Task 5 + spec):
  * - satu file untuk create `/admin/users/new` + edit `/admin/users/:userId/edit`
  *   (edit prefill via `getUserById`);
- * - field: NIP/nama/email wajib + format email; tim dropdown `listTeams`
+ * - field: NIP/nama/email wajib + format email; tim Select animate-ui `listTeams`
  *   (pinjaman, tanpa `field_id`); role checkbox 4 nama kontrak; password
  *   (create; kosong = default server + hint tersaji); direct permissions
  *   multi-select dari cache `listPermissions` (Resolved #3; prefill gabungan +
@@ -16,8 +16,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
+import { userEvent, settlePortal } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -130,6 +130,19 @@ async function fillRequired(opts?: { nip?: string; email?: string }) {
   await userEvent.click(screen.getByRole("checkbox", { name: "staf" }));
 }
 
+/** Buka Select tim, klik opsi, lalu settle visibilitas portal (helper). */
+async function pickTeam(value: string) {
+  const name = value === "3" ? "Tim Aplikasi" : "Tim Jaringan";
+  await userEvent.click(screen.getByLabelText("Tim"));
+  await userEvent.click(await screen.findByRole("option", { name }));
+  await settlePortal();
+}
+
+/** State Checkbox animate-ui (button role=checkbox) via aria-checked. */
+function checkState(name: string): string {
+  return screen.getByRole("checkbox", { name }).getAttribute("aria-checked") ?? "";
+}
+
 /** Payload create yang diharapkan dari fillRequired() tanpa password. */
 const expectedCreateInput = {
   name: "Budi Santoso",
@@ -176,11 +189,11 @@ describe("UserFormPage — render form (create mode)", () => {
 
   it("dropdown tim terisi dari listTeams pinjaman (semua tim, tanpa field_id)", async () => {
     renderForm("/admin/users/new");
-    const select = screen.getByLabelText("Tim") as HTMLSelectElement;
-    await waitFor(() => expect(select.options.length).toBe(3)); // placeholder + 2 tim
-    expect(mockedListTeams).toHaveBeenCalledWith(); // tanpa argumen — semua tim
-    expect(within(select).getByText("Tim Aplikasi")).toBeTruthy();
-    expect(within(select).getByText("Tim Jaringan")).toBeTruthy();
+    // Trigger Select kosong menampilkan placeholder; opsi hidup di portal.
+    await waitFor(() => expect(mockedListTeams).toHaveBeenCalledWith()); // semua tim
+    await userEvent.click(screen.getByLabelText("Tim"));
+    expect(await screen.findByRole("option", { name: "Tim Aplikasi" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Tim Jaringan" })).toBeTruthy();
   });
 
   it("direct permissions multi-select render dari cache listPermissions (Resolved #3)", async () => {
@@ -210,16 +223,15 @@ describe("UserFormPage — render form (create mode)", () => {
 
 describe("UserFormPage — create submit", () => {
   it("isi form lengkap tanpa password → createUser DIKIRIM dengan field terisi, password DI-OMIT", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
     await fillRequired();
-    await userEvent.selectOptions(screen.getByLabelText("Tim"), "3");
+    await pickTeam("3");
     await userEvent.type(screen.getByLabelText("Pangkat"), "Penata Muda");
     await userEvent.type(screen.getByLabelText("Jabatan"), "Programmer");
     await userEvent.type(screen.getByLabelText("Telepon"), "081234567890");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
 
     const input = mockedCreate.mock.calls[0]?.[0];
@@ -230,31 +242,29 @@ describe("UserFormPage — create submit", () => {
   });
 
   it("isi password → dikirim apa adanya", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
     await fillRequired();
-    await userEvent.selectOptions(screen.getByLabelText("Tim"), "3");
+    await pickTeam("3");
     await userEvent.type(screen.getByLabelText("Password"), "rahasiaBudi123");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
     expect(mockedCreate.mock.calls[0]?.[0].password).toBe("rahasiaBudi123");
   });
 
   it("pilih direct permission → permissions[] terkirim (Resolved #3)", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
     await fillRequired();
-    await userEvent.selectOptions(screen.getByLabelText("Tim"), "3");
+    await pickTeam("3");
     // Tunggu permissions termuat lalu centang satu.
     await waitFor(() =>
       expect(screen.getByRole("checkbox", { name: "wfh.report.create" })).toBeTruthy(),
     );
-    await u.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
     expect(mockedCreate.mock.calls[0]?.[0].permissions).toEqual(["wfh.report.create"]);
   });
@@ -262,10 +272,9 @@ describe("UserFormPage — create submit", () => {
 
 describe("UserFormPage — validasi klien (create)", () => {
   it("kosong → tidak memanggil createUser; pesan required (nama/NIP/email) tampil", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
 
     expect(mockedCreate).not.toHaveBeenCalled();
     expect(screen.getByText("Nama wajib diisi.")).toBeTruthy();
@@ -275,13 +284,12 @@ describe("UserFormPage — validasi klien (create)", () => {
 
 
   it("email format salah → tidak memanggil createUser; pesan format tampil", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
     await fillRequired({ email: "bukan-email" });
-    await userEvent.selectOptions(screen.getByLabelText("Tim"), "3");
+    await pickTeam("3");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
 
     expect(mockedCreate).not.toHaveBeenCalled();
     expect(screen.getByText("Format email tidak valid.")).toBeTruthy();
@@ -299,13 +307,12 @@ describe("UserFormPage — 422 duplikat nip/email dirender per field", () => {
         },
       }),
     );
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
     await fillRequired();
-    await userEvent.selectOptions(screen.getByLabelText("Tim"), "3");
+    await pickTeam("3");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
 
     await waitFor(() =>
       expect(screen.getAllByText("The nip has already been taken.").length).toBeGreaterThan(0),
@@ -331,18 +338,14 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
     expect((screen.getByLabelText("Pangkat") as HTMLInputElement).value).toBe("Pengatur Muda");
     expect((screen.getByLabelText("Jabatan") as HTMLInputElement).value).toBe("Staf Pelaksana");
     expect((screen.getByLabelText("Telepon") as HTMLInputElement).value).toBe("081345678901");
-    // Tim prefill sesuai team nested.
+    // Tim prefill sesuai team nested — trigger menampilkan nama tim.
     await waitFor(() => {
-      expect((screen.getByLabelText("Tim") as HTMLSelectElement).value).toBe("3");
+      expect(screen.getByLabelText("Tim").textContent).toContain("Tim Aplikasi");
     });
-    expect(
-      (screen.getByRole("checkbox", { name: "staf" }) as HTMLInputElement).checked,
-    ).toBe(true);
-    expect(
-      (screen.getByRole("checkbox", { name: "admin" }) as HTMLInputElement).checked,
-    ).toBe(false);
+    expect(checkState("staf")).toBe("true");
+    expect(checkState("admin")).toBe("false");
     // Toggle is_active HANYA di edit.
-    expect((screen.getByLabelText("Status aktif") as HTMLInputElement).checked).toBe(true);
+    expect(checkState("Status aktif")).toBe("true");
   });
 
   it("prefill permissions gabungan role+direct ditandai (Open Question #1) + hint", async () => {
@@ -350,24 +353,13 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
     await waitFor(() =>
       expect((screen.getByLabelText("Nama") as HTMLInputElement).value).toBe("Dewi Lestari"),
     );
-    await waitFor(() =>
-      expect(
-        (screen.getByRole("checkbox", { name: "wfh.report.create" }) as HTMLInputElement)
-          .checked,
-      ).toBe(true),
-    );
-    expect(
-      (screen.getByRole("checkbox", { name: "wfh.report.approve" }) as HTMLInputElement)
-        .checked,
-    ).toBe(true);
-    expect(
-      (screen.getByRole("checkbox", { name: "change.implementation.review" }) as HTMLInputElement)
-        .checked,
-    ).toBe(false);
+    await waitFor(() => expect(checkState("wfh.report.create")).toBe("true"));
+    expect(checkState("wfh.report.approve")).toBe("true");
+    expect(checkState("change.implementation.review")).toBe("false");
   });
 
+
   it("ubah satu field + sentuh permissions → updateUser mengirim field berubah + permissions PENUH", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/12/edit");
 
     await waitFor(() =>
@@ -382,11 +374,11 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
     await userEvent.type(screen.getByLabelText("Nama"), "Dewi Lestari Wijaya");
     await userEvent.clear(screen.getByLabelText("Jabatan"));
     await userEvent.type(screen.getByLabelText("Jabatan"), "Analis Sistem Informasi");
-    await u.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
-    await u.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
     // (checkbox disentuh dua kali → tetap tercentang)
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
 
     const [userId, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
@@ -408,7 +400,6 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
   });
 
   it("edit TANPA menyentuh permissions → permissions TIDAK dikirim", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/12/edit");
 
     await waitFor(() =>
@@ -421,7 +412,7 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
     await userEvent.clear(screen.getByLabelText("Telepon"));
     await userEvent.type(screen.getByLabelText("Telepon"), "081999888777");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
 
     const [, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
@@ -430,7 +421,6 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
   });
 
   it("toggle is_active false → updateUser {is_active: false}", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/12/edit");
 
     await waitFor(() =>
@@ -440,16 +430,15 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
       expect(screen.getByRole("checkbox", { name: "wfh.report.create" })).toBeTruthy(),
     );
 
-    await u.click(screen.getByLabelText("Status aktif"));
+    await userEvent.click(screen.getByLabelText("Status aktif"));
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
 
     const [, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
     expect(input.is_active).toBe(false);
   });
   it("uncheck SEMUA direct permissions → updateUser mengirim permissions: [] (bukan omit)", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/12/edit");
 
     // Prefill gabungan [wfh.report.create, wfh.report.approve].
@@ -460,10 +449,10 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
       expect(screen.getByRole("checkbox", { name: "wfh.report.approve" })).toBeTruthy(),
     );
 
-    await u.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
-    await u.click(screen.getByRole("checkbox", { name: "wfh.report.approve" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "wfh.report.approve" }));
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
 
     const [, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
@@ -472,7 +461,6 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
   });
 
   it("uncheck role lalu centang role lain → roles[] dikirim; permissions TIDAK (tak disentuh)", async () => {
-    const u = userEvent.setup();
     renderForm("/admin/users/12/edit");
 
     await waitFor(() =>
@@ -482,10 +470,10 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
       expect(screen.getByRole("checkbox", { name: "wfh.report.create" })).toBeTruthy(),
     );
 
-    await u.click(screen.getByRole("checkbox", { name: "staf" }));
-    await u.click(screen.getByRole("checkbox", { name: "kepala_tim" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "staf" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "kepala_tim" }));
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
 
     const [, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
@@ -536,13 +524,12 @@ describe("UserFormPage — gate permission (sintetik, bukan role)", () => {
 describe("UserFormPage — navigasi pasca-sukses", () => {
   it("create sukses → navigate ke /admin/users", async () => {
     mockNavigate.mockClear();
-    const u = userEvent.setup();
     renderForm("/admin/users/new");
 
     await fillRequired();
-    await userEvent.selectOptions(screen.getByLabelText("Tim"), "3");
+    await pickTeam("3");
 
-    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
     expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
   });

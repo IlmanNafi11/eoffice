@@ -36,6 +36,14 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchPermissions,
@@ -400,19 +408,25 @@ export function UserFormPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field orientation="vertical">
                   <FieldLabel htmlFor="user-form-team">Tim</FieldLabel>
-                  <select
-                    id="user-form-team"
-                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                    value={form.teamId}
-                    onChange={(e) => set("teamId", e.target.value)}
+                  <Select
+                    value={form.teamId === "" ? undefined : form.teamId}
+                    onValueChange={(v) => set("teamId", v ?? "")}
                   >
-                    <option value="">Pilih tim…</option>
-                    {(teams ?? []).map((t) => (
-                      <option key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="user-form-team"
+                      aria-label="Tim"
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="Pilih tim…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(teams ?? []).map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FieldError errors={fieldErrors.team_id?.map((m) => ({ message: m }))} />
                 </Field>
                 <Field orientation="vertical">
@@ -455,10 +469,10 @@ export function UserFormPage() {
                 <div className="flex flex-wrap gap-3">
                   {ROLE_NAMES.map((role) => (
                     <label key={role} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        aria-label={role}
                         checked={roles.includes(role)}
-                        onChange={() => toggleRole(role)}
+                        onCheckedChange={() => toggleRole(role)}
                       />
                       {role}
                     </label>
@@ -488,10 +502,10 @@ export function UserFormPage() {
                 <div className="flex flex-wrap gap-3">
                   {(permissions ?? []).map((p) => (
                     <label key={p.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        aria-label={p.name}
                         checked={permissionNames.includes(p.name)}
-                        onChange={() => togglePermission(p.name)}
+                        onCheckedChange={() => togglePermission(p.name)}
                       />
                       {p.name}
                     </label>
@@ -507,10 +521,10 @@ export function UserFormPage() {
               {isEdit ? (
                 <Field orientation="vertical">
                   <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      aria-label="Status aktif"
                       checked={isActive}
-                      onChange={(e) => setIsActive(e.target.checked)}
+                      onCheckedChange={(v) => setIsActive(v === true)}
                     />
                     Status aktif
                   </label>

@@ -104,6 +104,11 @@ beforeEach(() => {
   mockedListUsers.mockResolvedValue({ users: [userA, userB], meta });
 });
 
+/** Input file tersembunyi milik `FileInput` (sr-only, id dari halaman). */
+function importInput(): HTMLInputElement {
+  return document.getElementById("admin-import-file") as HTMLInputElement;
+}
+
 describe("UsersPage — list & pagination", () => {
   it("mount → fetchUsers query bersih (tanpa params, page 1)", async () => {
     renderPageAs(["user.manage"]);
@@ -182,7 +187,7 @@ describe("UsersPage — import", () => {
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
 
     const file = new File(["nip,name"], "users.csv", { type: "text/csv" });
-    await u.upload(screen.getByLabelText(/pilih file import/i), file);
+    await u.upload(importInput(), file);
 
     await waitFor(() => expect(mockedImport).toHaveBeenCalledTimes(1));
     expect(mockedImport.mock.calls[0]?.[0]).toBeInstanceOf(File);
@@ -208,7 +213,7 @@ describe("UsersPage — import", () => {
 
     // fireEvent (bukan userEvent.upload): user-event v14 mematuhi `accept`,
     // meng-drop evil.exe sebelum onChange; ini menguji guard ekstensi kita.
-    fireEvent.change(screen.getByTestId("import-input"), {
+    fireEvent.change(importInput(), {
       target: { files: [new File(["x"], "evil.exe", { type: "application/octet-stream" })] },
     });
 
@@ -222,10 +227,7 @@ describe("UsersPage — import", () => {
     renderPageAs(["user.manage", "user.import"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
 
-    await u.upload(
-      screen.getByLabelText(/pilih file import/i),
-      new File(["x"], "bad.csv", { type: "text/csv" }),
-    );
+    await u.upload(importInput(), new File(["x"], "bad.csv", { type: "text/csv" }));
 
     await waitFor(() =>
       expect(screen.getByText("Import gagal. Silakan periksa format file.")).toBeTruthy(),
@@ -280,7 +282,7 @@ describe("UsersPage — hapus user", () => {
     const file = new File(["x".repeat(10 * 1024 * 1024 + 1)], "big.csv", {
       type: "text/csv",
     });
-    await u.upload(screen.getByTestId("import-input"), file);
+    await u.upload(importInput(), file);
 
     expect(screen.getByText("Ukuran file melebihi 10 MB.")).toBeTruthy();
     expect(mockedImport).not.toHaveBeenCalled();

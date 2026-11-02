@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
 import {
   Dialog,
   DialogContent,
@@ -140,24 +141,15 @@ export function UsersPage() {
           <Button onClick={() => navigate("/admin/users/new")}>Buat User</Button>
         )}
         {canImport && (
-          <div>
-            <label htmlFor="admin-import-file" className="sr-only">
-              Pilih file import users
-            </label>
-            <input
-              id="admin-import-file"
-              data-testid="import-input"
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              aria-label="Pilih file import"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void submitImport(f);
-                e.target.value = "";
-              }}
-              className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm hover:file:bg-muted/70"
-            />
-          </div>
+          <FileInput
+            id="admin-import-file"
+            aria-label="Pilih file import"
+            accept=".xlsx,.xls,.csv"
+            placeholder="Pilih file import (xlsx/xls/csv)"
+            onFileChange={(f) => {
+              if (f) void submitImport(f);
+            }}
+          />
         )}
       </div>
 

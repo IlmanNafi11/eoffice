@@ -106,4 +106,8 @@ if (typeof window.SVGGeometryElement === "undefined") {
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  // Radix Select/Popover mengunci `body { pointer-events: none }` selama content
+  // terbuka dan melepasnya lewat animasi exit — animasi itu tidak pernah
+  // selesai di jsdom, jadi kunci bocor antar-test. Reset di sini.
+  document.body.style.pointerEvents = "";
 });
