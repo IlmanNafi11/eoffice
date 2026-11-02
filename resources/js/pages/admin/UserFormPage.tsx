@@ -118,10 +118,13 @@ export function UserFormPage() {
     if (isEdit) dispatch(fetchUser(id));
   }, [dispatch, id, isEdit]);
 
-  /** Referensi direct permissions (cache sekali per sesi di slice). */
+  /** Referensi direct permissions (cache sekali per sesi di slice) — hanya
+   *  pemegang `permission.manage` (endpoint server 403 selebihnya; pola
+   *  RolesPage). Tanpa hak: seksi render kosong + hint. */
+  const canListPermissions = can(user, "permission.manage");
   useEffect(() => {
-    dispatch(fetchPermissions());
-  }, [dispatch]);
+    if (canListPermissions) dispatch(fetchPermissions());
+  }, [dispatch, canListPermissions]);
 
   /** Dropdown tim (listTeams pinjaman) — dimuat sekali saat mount. */
   useEffect(() => {

@@ -16,11 +16,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { AdminUser, PaginationMeta } from "@/api/types";
-
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -127,7 +126,7 @@ describe("UsersPage — list & pagination", () => {
     expect(within(rowB).getByText("Nonaktif")).toBeTruthy();
   });
 
-  it("pagination → fetch halaman 2", async () => {
+  it("pagination → fetch halaman 2 (per_page ikut meta efektif)", async () => {
     const u = userEvent.setup();
     renderPageAs(["user.manage"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
@@ -135,7 +134,7 @@ describe("UsersPage — list & pagination", () => {
     await u.click(screen.getByRole("button", { name: "Berikutnya" }));
 
     await waitFor(() =>
-      expect(mockedListUsers).toHaveBeenLastCalledWith({ page: 2 }),
+      expect(mockedListUsers).toHaveBeenLastCalledWith({ page: 2, per_page: 15 }),
     );
   });
 });
@@ -201,6 +200,20 @@ describe("UsersPage — import", () => {
     await waitFor(() =>
       expect(mockedListUsers).toHaveBeenCalledTimes(2),
     );
+  });
+
+  it("import ekstensi tak diizinkan → pesan format tersaji, importUsersThunk tak dipanggil", async () => {
+    renderPageAs(["user.manage", "user.import"]);
+    await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
+
+    // fireEvent (bukan userEvent.upload): user-event v14 mematuhi `accept`,
+    // meng-drop evil.exe sebelum onChange; ini menguji guard ekstensi kita.
+    fireEvent.change(screen.getByTestId("import-input"), {
+      target: { files: [new File(["x"], "evil.exe", { type: "application/octet-stream" })] },
+    });
+
+    expect(await screen.findByText("Format file harus .xlsx, .xls, atau .csv.")).toBeTruthy();
+    expect(mockedImport).not.toHaveBeenCalled();
   });
 
   it("import gagal (422) → pesan server tersaji; list tidak di-refresh", async () => {
@@ -275,12 +288,11 @@ describe("UsersPage — hapus user", () => {
 });
 
 describe("UsersPage — navigasi edit", () => {
-  it("klik baris → navigate ke /admin/users/{id}/edit", async () => {
-    const u = userEvent.setup();
+  it("nama user adalah Link keyboard-reachable ke /admin/users/{id}/edit", async () => {
     renderPageAs(["user.manage"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
 
-    await u.click(screen.getByTestId("user-row-12"));
-    expect(mockNavigate).toHaveBeenCalledWith("/admin/users/12/edit");
+    const link = screen.getByRole("link", { name: "Dewi Lestari" });
+    expect(link.getAttribute("href")).toBe("/admin/users/12/edit");
   });
 });

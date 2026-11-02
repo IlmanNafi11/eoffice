@@ -145,14 +145,14 @@ describe("adminSlice — fetchUsers (list)", () => {
     expect(mockedListUsers).toHaveBeenCalledWith({ page: 2, per_page: 15 });
   });
 
-  it("query kosong → page 1, perPage null", async () => {
+  it("query kosong → page 1; perPage disinkron dari meta.per_page (server clamp)", async () => {
     mockedListUsers.mockResolvedValueOnce({ users: [], meta });
     const store = makeStore();
 
     await store.dispatch(fetchUsers({}));
 
     expect(selectAdminUsersPage(store.getState())).toBe(1);
-    expect(selectAdminUsersList(store.getState()).perPage).toBeNull();
+    expect(selectAdminUsersList(store.getState()).perPage).toBe(15);
   });
 
   it("gagal → status failed + error siap tampil", async () => {
@@ -189,6 +189,19 @@ describe("adminSlice — fetchUsers (list)", () => {
     expect(selectAdminUsersItems(store.getState())).toEqual([adminUser]);
   });
 
+  it("perPage disinkronkan dari meta.per_page efektif (server clamp)", async () => {
+    mockedListUsers.mockResolvedValueOnce({
+      users: [adminUser],
+      meta: { ...meta, per_page: 100 },
+    });
+    const store = makeStore();
+
+    await store.dispatch(fetchUsers({ per_page: 100 }));
+
+    // Server clamp ke nilai efektif → state mengikuti meta, bukan permintaan.
+    expect(selectAdminUsersList(store.getState()).perPage).toBe(100);
+  });
+
   it("respons basi (out-of-order) tidak menimpa hasil terbaru", async () => {
     let resolveSlow!: (v: { users: AdminUser[]; meta: PaginationMeta }) => void;
     const slow = new Promise<{ users: AdminUser[]; meta: PaginationMeta }>((r) => {
@@ -208,7 +221,6 @@ describe("adminSlice — fetchUsers (list)", () => {
     expect(selectAdminUsersItems(store.getState())).toEqual([adminUser]);
   });
 });
-
 describe("adminSlice — fetchUser (prefill edit)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

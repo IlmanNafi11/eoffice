@@ -12,11 +12,11 @@
  * - aksi hapus per baris gate `user.delete` + confirm dialog →
  *   `deleteUserThunk` → list refresh; gagal → pesan server tampil (error tak
  *   lenyap saat refetch — `a602c46` ditegakkan di slice);
- * - klik baris → navigasi ke `/admin/users/{id}/edit` (Task 5);
+ * - klik nama user (Link) → navigasi ke `/admin/users/{id}/edit` (Task 5);
  * - gate = permission sintetik (`can()` nama persis seeder), BUKAN nama role.
  */
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 
 import {
@@ -80,13 +80,20 @@ export function UsersPage() {
     };
   }
 
-  /** Batas ukuran import kontrak (`UserController::max:10240` KB) — cek klien
-   *  murah sebelum unggah penuh; server tetap otoritas. */
+  /** Batas ukuran + ekstensi import kontrak (`max:10240` KB; `.xlsx/.xls/.csv`)
+   *  — cek klien murah sebelum unggah; `accept` input hanya petunjuk UI,
+   *  BUKAN kontrol (server tetap otoritas format sebenarnya). */
   const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_IMPORT_EXT = [".xlsx", ".xls", ".csv"];
   const [importInvalid, setImportInvalid] = useState<string | null>(null);
 
   /** Import file terpilih — sukses → panel hasil + list refresh page aktif. */
   async function submitImport(file: File) {
+    const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!ALLOWED_IMPORT_EXT.includes(ext)) {
+      setImportInvalid("Format file harus .xlsx, .xls, atau .csv.");
+      return;
+    }
     if (file.size > MAX_IMPORT_BYTES) {
       setImportInvalid("Ukuran file melebihi 10 MB.");
       return;
@@ -164,8 +171,8 @@ export function UsersPage() {
           </p>
           {importResult.errors.length > 0 && (
             <ul className="mt-2 list-disc pl-5 text-muted-foreground">
-              {importResult.errors.map((err) => (
-                <li key={err}>{err}</li>
+              {importResult.errors.map((err, i) => (
+                <li key={`${i}-${err}`}>{err}</li>
               ))}
             </ul>
           )}
@@ -228,10 +235,16 @@ export function UsersPage() {
                       <tr
                         key={u.id}
                         data-testid={`user-row-${u.id}`}
-                        className="cursor-pointer border-b border-border/60 hover:bg-muted/40"
-                        onClick={() => navigate(`/admin/users/${u.id}/edit`)}
+                        className="border-b border-border/60"
                       >
-                        <td className="py-2 pr-4 font-medium">{u.name}</td>
+                        <td className="py-2 pr-4 font-medium">
+                          <Link
+                            to={`/admin/users/${u.id}/edit`}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            {u.name}
+                          </Link>
+                        </td>
                         <td className="py-2 pr-4">{u.nip}</td>
                         <td className="py-2 pr-4">{u.email}</td>
                         <td className="py-2 pr-4">{u.team?.name ?? "-"}</td>

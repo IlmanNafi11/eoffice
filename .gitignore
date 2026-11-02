@@ -27,3 +27,4 @@ tasks/
 .agents
 graphify-out
 docs
+*.tsbuildinfo

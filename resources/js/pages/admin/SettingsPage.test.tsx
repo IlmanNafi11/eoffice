@@ -83,7 +83,10 @@ async function findRow(key: string): Promise<HTMLElement> {
 }
 
 function inputOf(row: HTMLElement): HTMLInputElement {
-  return within(row).getByRole("textbox") as HTMLInputElement;
+  // Query by testid (bukan role): input `password_default_*` bertype
+  // `password` — TIDAK memperoleh role aksesibel `textbox` (jsdom).
+  const testid = row.getAttribute("data-testid") ?? "";
+  return within(row).getByTestId(`setting-input-${testid.replace("setting-row-", "")}`) as HTMLInputElement;
 }
 
 function saveButtonOf(row: HTMLElement): HTMLButtonElement | null {
@@ -156,6 +159,24 @@ describe("SettingsPage — render daftar & bentuk editor", () => {
     expect(sessionsInput.value).toBe('["pagi","siang","sore"]');
     expect(sessionsInput.disabled).toBe(true);
     expect(saveButtonOf(sessionsRow)).toBeNull();
+  });
+
+  it("password_default_* dimask (type=password) + tombol reveal", async () => {
+    const user = userEvent.setup();
+    renderPageAs(["setting.manage"]);
+
+    const row = await findRow("password_default_admin");
+    const input = within(row).getByTestId("setting-input-password_default_admin") as HTMLInputElement;
+    expect(input.type).toBe("password");
+
+    // Nilai tetap ada di value (draft), visual dimask oleh type=password.
+    expect(input.value).toBe("admin123");
+
+    // Reveal → type text; tombol kembali menyembunyikan.
+    await user.click(within(row).getByRole("button", { name: /tampilkan nilai/i }));
+    expect(input.type).toBe("text");
+    await user.click(within(row).getByRole("button", { name: /sembunyikan nilai/i }));
+    expect(input.type).toBe("password");
   });
 
   it("gagal fetch → pesan error tersaji", async () => {

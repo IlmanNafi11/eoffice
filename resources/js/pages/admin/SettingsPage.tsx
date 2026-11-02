@@ -61,6 +61,10 @@ function SettingRow({ settingKey, value, canManage, onSave }: SettingRowProps) {
   const editable = canManage && !structured;
   const [draft, setDraft] = useState(() => toDisplay(value));
   const [dirty, setDirty] = useState(false);
+  // Key berprefix `password_default_*` dimask: nilai tak terekspos di layar
+  // (tetap terbaca via network — redaksi penuh tanggung jawab backend).
+  const masked = settingKey.startsWith("password_default_");
+  const [reveal, setReveal] = useState(false);
 
   return (
     <div
@@ -70,17 +74,30 @@ function SettingRow({ settingKey, value, canManage, onSave }: SettingRowProps) {
       <Label htmlFor={`setting-input-${settingKey}`} className="font-medium">
         {settingKey}
       </Label>
-      <Input
-        id={`setting-input-${settingKey}`}
-        data-testid={`setting-input-${settingKey}`}
-        type="text"
-        value={draft}
-        disabled={!editable}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          setDirty(true);
-        }}
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          id={`setting-input-${settingKey}`}
+          data-testid={`setting-input-${settingKey}`}
+          type={masked && !reveal ? "password" : "text"}
+          value={draft}
+          disabled={!editable}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setDirty(true);
+          }}
+        />
+        {masked ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-label={reveal ? "Sembunyikan nilai" : "Tampilkan nilai"}
+            onClick={() => setReveal((v) => !v)}
+          >
+            {reveal ? "Sembunyikan" : "Tampilkan"}
+          </Button>
+        ) : null}
+      </div>
       {editable ? (
         <div>
           <Button
@@ -97,7 +114,6 @@ function SettingRow({ settingKey, value, canManage, onSave }: SettingRowProps) {
     </div>
   );
 }
-
 export function SettingsPage() {
   const dispatch = useAppDispatch();
 

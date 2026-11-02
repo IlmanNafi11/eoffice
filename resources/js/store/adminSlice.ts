@@ -260,6 +260,11 @@ const slice = createSlice({
         state.users.status = "succeeded";
         state.users.items = action.payload.users;
         state.users.meta = action.payload.meta;
+        // Sinkron `per_page` efektif (server clamp, ClampsPerPage) supaya
+        // refetch pasca-mutasi/pagination tak mengirim nilai yang di-clamp.
+        if (action.payload.meta.per_page != null) {
+          state.users.perPage = action.payload.meta.per_page;
+        }
         state.users.error = null;
       })
       .addCase(fetchUsers.rejected, (state, action) => {

@@ -94,7 +94,7 @@ const adminPersona = {
   must_change_password: false,
   is_active: true,
   roles: ["admin"],
-  permissions: ["user.manage", "user.create", "user.update"],
+  permissions: ["user.manage", "user.create", "user.update", "permission.manage"],
 };
 
 function renderForm(route: string, overrides?: Partial<typeof adminPersona>) {
@@ -511,6 +511,19 @@ describe("UserFormPage — gate permission (sintetik, bukan role)", () => {
     renderForm("/admin/users/new");
     await waitFor(() => expect(mockedListTeams).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: /simpan/i })).toBeTruthy();
+  });
+
+  it("tanpa permission.manage → listPermissions TIDAK dipanggil (pola RolesPage)", async () => {
+    renderForm("/admin/users/new", {
+      permissions: ["user.manage", "user.create", "user.update"],
+    });
+    await waitFor(() => expect(mockedListTeams).toHaveBeenCalled());
+    expect(mockedPermissions).not.toHaveBeenCalled();
+  });
+
+  it("dengan permission.manage → listPermissions dipanggil", async () => {
+    renderForm("/admin/users/new");
+    await waitFor(() => expect(mockedPermissions).toHaveBeenCalled());
   });
 
   it("edit dengan user.update → tombol Simpan tampil", async () => {
