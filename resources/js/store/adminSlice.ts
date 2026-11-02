@@ -16,7 +16,6 @@
  */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import {
-  createUser,
   deleteUser,
   getUserById,
   importUsers,
@@ -26,7 +25,6 @@ import {
   listUsers,
   updateRolePermissions,
   updateSetting,
-  updateUser,
 } from "@/api/admin";
 import type {
   AdminPermission,
@@ -36,8 +34,6 @@ import type {
   ListUsersQuery,
   PaginationMeta,
   SettingsMap,
-  StoreUserInput,
-  UpdateUserInput,
 } from "@/api/types";
 
 export type AdminFetchStatus = "idle" | "loading" | "succeeded" | "failed";
@@ -186,32 +182,8 @@ export const fetchSettings = createAsyncThunk<SettingsMap, void, { state: WithAd
 
 // ── Mutasi ──────────────────────────────────────────────────────────
 
-/** POST /admin/users — buat user. */
-export const createUserThunk = createAsyncThunk<AdminUser, StoreUserInput>(
-  "admin/createUser",
-  async (input, { rejectWithValue }) => {
-    try {
-      return await createUser(input);
-    } catch (error) {
-      return rejectWithValue(messageOf(error));
-    }
-  },
-);
-
-/** PUT /admin/users/{id} — perbarui user. */
-export const updateUserThunk = createAsyncThunk<
-  AdminUser,
-  { userId: number; input: UpdateUserInput }
->(
-  "admin/updateUser",
-  async ({ userId, input }, { rejectWithValue }) => {
-    try {
-      return await updateUser(userId, input);
-    } catch (error) {
-      return rejectWithValue(messageOf(error));
-    }
-  },
-);
+// (create/update user dipanggil langsung dari UserFormPage via api/admin.ts —
+// tanpa thunk; state `current` untuk prefill edit diisi fetchUser saja.)
 
 /** DELETE /admin/users/{id} — kembalikan pesan sukses. */
 export const deleteUserThunk = createAsyncThunk<string, number>(
@@ -266,17 +238,6 @@ export const updateSettingThunk = createAsyncThunk<
     }
   },
 );
-
-/** Matcher mutasi create/update — fulfilled membawa `AdminUser`. */
-const USER_MUTATION_FULFILLED = /^admin\/(createUser|updateUser)\/fulfilled$/;
-/** Matcher mutasi create/update — settled (pending|rejected). */
-const USER_MUTATION_SETTLED = /^admin\/(createUser|updateUser)\/(pending|rejected)$/;
-
-interface AdminMutationSettled {
-  type: string;
-  payload?: unknown;
-  error?: { message?: string };
-}
 
 const slice = createSlice({
   name: "admin",
@@ -433,30 +394,7 @@ const slice = createSlice({
         state.current.status = "failed";
         state.current.error =
           (action.payload as string | undefined) ?? action.error.message ?? "Gagal menyimpan setting.";
-      })
-      // ── Mutasi create/update: current + error ─────────────────
-      .addMatcher(
-        (action): action is { type: string; payload: AdminUser } =>
-          USER_MUTATION_FULFILLED.test(action.type),
-        (state, action) => {
-          state.current.status = "succeeded";
-          state.current.data = action.payload;
-          state.current.error = null;
-        },
-      )
-      .addMatcher(
-        (action): action is AdminMutationSettled => USER_MUTATION_SETTLED.test(action.type),
-        (state, action) => {
-          if (action.type.endsWith("/pending")) {
-            state.current.status = "loading";
-            state.current.error = null;
-          } else {
-            state.current.status = "failed";
-            state.current.error =
-              (action.payload as string | undefined) ?? action.error?.message ?? "Aksi gagal.";
-          }
-        },
-      );
+      });
   },
 });
 

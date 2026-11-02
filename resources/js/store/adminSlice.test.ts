@@ -47,8 +47,6 @@ import {
   fetchRoles,
   fetchPermissions,
   fetchSettings,
-  createUserThunk,
-  updateUserThunk,
   deleteUserThunk,
   importUsersThunk,
   syncRolePermissionsThunk,
@@ -67,9 +65,7 @@ import {
 import { makeStore } from "@/store";
 
 const mockedListUsers = adminApi.listUsers as unknown as Mock;
-const mockedCreate = adminApi.createUser as unknown as Mock;
 const mockedUser = adminApi.getUserById as unknown as Mock;
-const mockedUpdate = adminApi.updateUser as unknown as Mock;
 const mockedDelete = adminApi.deleteUser as unknown as Mock;
 const mockedImport = adminApi.importUsers as unknown as Mock;
 const mockedListRoles = adminApi.listRoles as unknown as Mock;
@@ -90,6 +86,14 @@ const adminUser: AdminUser = {
   is_active: true,
   roles: ["staf"],
   permissions: ["wfh.attendance.create", "wfh.report.create"],
+};
+
+const userB: AdminUser = {
+  ...adminUser,
+  id: 13,
+  name: "Budi Santoso",
+  nip: "199001012023011001",
+  email: "budi@kominfo.go.id",
 };
 
 const role: AdminRole = {
@@ -242,6 +246,45 @@ describe("adminSlice — fetchUser (prefill edit)", () => {
     expect(selectAdminCurrentUser(store.getState()).error).toBeNull();
     expect(selectAdminCurrentUserData(store.getState())).toEqual(adminUser);
   });
+  it("respons basi fetchUser (out-of-order) tidak menimpa detail terbaru", async () => {
+    let resolveSlow!: (u: AdminUser) => void;
+    const slow = new Promise<AdminUser>((r) => {
+      resolveSlow = r;
+    });
+    mockedUser.mockReturnValueOnce(slow);
+    mockedUser.mockResolvedValueOnce(userB);
+    const store = makeStore();
+
+    // Detail 12 lambat; detail 13 cepat → 13 harus menang.
+    const first = store.dispatch(fetchUser(12));
+    const second = store.dispatch(fetchUser(13));
+    await second;
+    resolveSlow(adminUser);
+    await first;
+
+    expect(selectAdminCurrentUserData(store.getState())?.id).toBe(13);
+  });
+
+  it("fetchUser pending untuk id BERBEDA mengosongkan detail lama", async () => {
+    mockedUser.mockResolvedValueOnce(adminUser);
+    const store = makeStore();
+    await store.dispatch(fetchUser(12));
+    expect(selectAdminCurrentUserData(store.getState())?.id).toBe(12);
+
+    let resolveNext!: (u: AdminUser) => void;
+    mockedUser.mockReturnValueOnce(
+      new Promise<AdminUser>((r) => {
+        resolveNext = r;
+      }),
+    );
+    const pending = store.dispatch(fetchUser(13));
+    // Detail lama (id 12) dibuang segera saat pending id berbeda.
+    expect(selectAdminCurrentUserData(store.getState())).toBeNull();
+
+    resolveNext(userB);
+    await pending;
+    expect(selectAdminCurrentUserData(store.getState())?.id).toBe(13);
+  });
 });
 
 describe("adminSlice — cache roles/permissions/settings (sekali per sesi)", () => {
@@ -301,35 +344,6 @@ describe("adminSlice — mutasi", () => {
     vi.clearAllMocks();
   });
 
-  it("createUserThunk fulfilled → current.data + error null", async () => {
-    mockedCreate.mockResolvedValueOnce(adminUser);
-    const store = makeStore();
-
-    await store.dispatch(
-      createUserThunk({ name: "Dewi", nip: "199503152024011002", email: "dewi@kominfo.go.id", roles: ["staf"] }),
-    );
-
-    expect(selectAdminCurrentUserData(store.getState())).toEqual(adminUser);
-    expect(selectAdminCurrentUser(store.getState()).error).toBeNull();
-    expect(mockedCreate).toHaveBeenCalledWith({
-      name: "Dewi",
-      nip: "199503152024011002",
-      email: "dewi@kominfo.go.id",
-      roles: ["staf"],
-    });
-  });
-
-  it("updateUserThunk rejected → current.error berisi pesan 422", async () => {
-    mockedUpdate.mockRejectedValueOnce(new Error("The nip has already been taken."));
-    const store = makeStore();
-
-    await store.dispatch(updateUserThunk({ userId: 12, input: { permissions: [] } }));
-
-    expect(selectAdminCurrentUser(store.getState()).status).toBe("failed");
-    expect(selectAdminCurrentUser(store.getState()).error).toBe("The nip has already been taken.");
-  });
-
-
   it("deleteUserThunk fulfilled → hapus baris dari users.items", async () => {
     mockedDelete.mockResolvedValueOnce("User berhasil dihapus.");
     const store = makeStore();
@@ -363,6 +377,28 @@ describe("adminSlice — mutasi", () => {
     expect(selectAdminUsersList(store.getState()).error).toBe(
       "Import gagal. Silakan periksa format file.",
     );
+  });
+
+  it("error hapus bertahan saat refetch list masih pending (a602c46)", async () => {
+    mockedDelete.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    const store = makeStore();
+
+    await store.dispatch(deleteUserThunk(12));
+    expect(selectAdminUsersList(store.getState()).error).toBe("This action is unauthorized.");
+
+    // Refetch pasca-mutasi gagal masih pending — error TIDAK boleh lenyap.
+    let resolveNext!: (v: { users: AdminUser[]; meta: PaginationMeta }) => void;
+    mockedListUsers.mockReturnValueOnce(
+      new Promise<{ users: AdminUser[]; meta: PaginationMeta }>((r) => {
+        resolveNext = r;
+      }),
+    );
+    const pending = store.dispatch(fetchUsers({}));
+    expect(selectAdminUsersList(store.getState()).error).toBe("This action is unauthorized.");
+
+    resolveNext({ users: [adminUser], meta });
+    await pending;
+    expect(selectAdminUsersList(store.getState()).error).toBeNull();
   });
 
   it("syncRolePermissionsThunk fulfilled → update baris cache roles", async () => {
