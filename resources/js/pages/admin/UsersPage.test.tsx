@@ -240,7 +240,7 @@ describe("UsersPage — hapus user", () => {
     await waitFor(() => expect(mockedListUsers).toHaveBeenCalledTimes(2));
   });
 
-  it("hapus gagal → pesan server tampil; user tidak hilang dari list", async () => {
+  it("hapus gagal → pesan server dirender DI DALAM dialog; user tidak hilang", async () => {
     const u = userEvent.setup();
     mockedDelete.mockRejectedValueOnce(new Error("This action is unauthorized."));
     renderPageAs(["user.manage", "user.delete"]);
@@ -250,11 +250,27 @@ describe("UsersPage — hapus user", () => {
     const dialog = await screen.findByRole("dialog");
     await u.click(within(dialog).getByRole("button", { name: /hapus/i }));
 
+    // Pesan server dirender di dalam DialogContent (overlay tak menutupinya).
     await waitFor(() =>
-      expect(screen.getByText("This action is unauthorized.")).toBeTruthy(),
+      expect(within(dialog).getByText("This action is unauthorized.")).toBeTruthy(),
     );
+    expect(within(dialog).getByTestId("delete-error")).toBeTruthy();
     expect(screen.getByText("Budi Santoso")).toBeTruthy();
     expect(mockedListUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("import >10 MB → pesan ukuran tersaji, tidak memanggil importUsersThunk", async () => {
+    const u = userEvent.setup();
+    renderPageAs(["user.manage", "user.import"]);
+    await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
+
+    const file = new File(["x".repeat(10 * 1024 * 1024 + 1)], "big.csv", {
+      type: "text/csv",
+    });
+    await u.upload(screen.getByTestId("import-input"), file);
+
+    expect(screen.getByText("Ukuran file melebihi 10 MB.")).toBeTruthy();
+    expect(mockedImport).not.toHaveBeenCalled();
   });
 });
 

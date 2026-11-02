@@ -80,8 +80,18 @@ export function UsersPage() {
     };
   }
 
+  /** Batas ukuran import kontrak (`UserController::max:10240` KB) — cek klien
+   *  murah sebelum unggah penuh; server tetap otoritas. */
+  const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+  const [importInvalid, setImportInvalid] = useState<string | null>(null);
+
   /** Import file terpilih — sukses → panel hasil + list refresh page aktif. */
   async function submitImport(file: File) {
+    if (file.size > MAX_IMPORT_BYTES) {
+      setImportInvalid("Ukuran file melebihi 10 MB.");
+      return;
+    }
+    setImportInvalid(null);
     try {
       await dispatch(importUsersThunk(file)).unwrap();
       dispatch(fetchUsers(activeQuery()));
@@ -161,6 +171,16 @@ export function UsersPage() {
           )}
         </div>
       )}
+      {importInvalid && (
+        <p
+          className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+          data-testid="import-invalid"
+        >
+          {importInvalid}
+        </p>
+      )}
+
 
       {error && (
         <p
@@ -255,6 +275,15 @@ export function UsersPage() {
         }}
       >
         <DialogContent>
+          {error ? (
+            <p
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+              data-testid="delete-error"
+            >
+              {error}
+            </p>
+          ) : null}
           <DialogHeader>
             <DialogTitle>Hapus user</DialogTitle>
             <DialogDescription>
