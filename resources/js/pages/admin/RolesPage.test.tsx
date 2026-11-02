@@ -1,0 +1,275 @@
+/**
+ * Unit test RolesPage (modul admin — Task 6).
+ * Kontrak yang dijaga (plan Task 6):
+ * - mount → dispatch `fetchRoles`; bila pemegang `permission.manage` juga
+ *   `fetchPermissions` (cache sekali per sesi di slice);
+ * - kolom grid dari cache `listPermissions` bila pemegang
+ *   `permission.manage`; FALLBACK derived distinct dari `listRoles` bila
+ *   tanpa `permission.manage` (REQuery #4, ter-test kedua arah);
+ * - simpan per role → `updateRolePermissions` sync penuh persis checklist;
+ *   role tak berubah tak mengirim (tombol Simpan disabled/absen aksi);
+ * - 422 lockout kritis admin dirender dan tak lenyap (slice a602c46);
+ * - dialog konfirmasi uncheck permission kritis (`user.manage`,
+ *   `role.manage`, `permission.manage`) pada role `admin`; role lain tanpa
+ *   dialog;
+ * - gate `role.manage`: tanpa itu tak ada aksi simpan.
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { Provider } from "react-redux";
+import type { AdminPermission, AdminRole } from "@/api/types";
+
+vi.mock("@/api/admin", () => ({
+  listUsers: vi.fn(),
+  createUser: vi.fn(),
+  getUserById: vi.fn(),
+  updateUser: vi.fn(),
+  deleteUser: vi.fn(),
+  importUsers: vi.fn(),
+  listRoles: vi.fn(),
+  updateRolePermissions: vi.fn(),
+  listPermissions: vi.fn(),
+  listSettings: vi.fn(),
+  updateSetting: vi.fn(),
+}));
+
+import * as adminApi from "@/api/admin";
+import { RolesPage } from "@/pages/admin/RolesPage";
+import { makeStore } from "@/store";
+import { setUser } from "@/store/authSlice";
+
+const mockedListRoles = adminApi.listRoles as unknown as Mock;
+const mockedListPermissions = adminApi.listPermissions as unknown as Mock;
+const mockedSyncRoles = adminApi.updateRolePermissions as unknown as Mock;
+
+const adminRole: AdminRole = {
+  id: 1,
+  name: "admin",
+  permissions: ["user.manage", "user.create", "role.manage", "permission.manage", "wfh.report.approve"],
+};
+
+const timRole: AdminRole = {
+  id: 3,
+  name: "kepala_tim",
+  permissions: ["wfh.report.approve", "wfh.report.reject"],
+};
+
+const allPermissions: AdminPermission[] = [
+  { id: 1, name: "user.manage" },
+  { id: 2, name: "user.create" },
+  { id: 3, name: "role.manage" },
+  { id: 4, name: "permission.manage" },
+  { id: 8, name: "wfh.report.approve" },
+];
+
+const adminUser = {
+  id: 1,
+  name: "Admin Utama",
+  nip: "198001012023011001",
+  email: "admin@kominfo.go.id",
+  must_change_password: false,
+  is_active: true,
+  roles: ["admin"],
+  permissions: ["user.manage", "role.manage", "permission.manage"],
+};
+
+function renderPageAs(permissions: string[]) {
+  const store = makeStore();
+  store.dispatch(setUser({ ...adminUser, permissions }));
+  render(
+    <Provider store={store}>
+      <RolesPage />
+    </Provider>,
+  );
+  return store;
+}
+
+function rowOf(roleId: number): HTMLElement {
+  return screen.getByTestId(`role-row-${roleId}`);
+}
+
+function checkboxOf(row: HTMLElement, permission: string): HTMLInputElement {
+  return within(row).getByRole("checkbox", { name: permission }) as HTMLInputElement;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockedListPermissions.mockResolvedValue(allPermissions);
+});
+
+describe("RolesPage — grid render & sumber kolom", () => {
+  it("mount → fetchRoles; grid render role sebagai baris", async () => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+    renderPageAs(["role.manage", "permission.manage"]);
+
+    await waitFor(() => expect(mockedListRoles).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+    expect(within(rowOf(1)).getByText("admin")).toBeTruthy();
+    expect(within(rowOf(3)).getByText("kepala_tim")).toBeTruthy();
+  });
+
+  it("pemegang permission.manage → kolom dari cache listPermissions (fetchPermissions dispatched); kolom reject dari luar cache tak ada", async () => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+    renderPageAs(["role.manage", "permission.manage"]);
+
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+    expect(mockedListPermissions).toHaveBeenCalledTimes(1);
+    // Kolom = daftar permissions dari server; `wfh.report.reject` hanya
+    // dimiliki role kepala_tim, bukan bagian cache listPermissions fixture.
+    expect(within(rowOf(3)).getByRole("checkbox", { name: "wfh.report.approve" })).toBeTruthy();
+    expect(within(rowOf(3)).queryByRole("checkbox", { name: "wfh.report.reject" })).toBeNull();
+  });
+
+  it("tanpa permission.manage → fallback kolom derived distinct dari listRoles; listPermissions TIDAK dipanggil (REQuery #4)", async () => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+    renderPageAs(["role.manage"]);
+
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+    expect(mockedListPermissions).not.toHaveBeenCalled();
+    // Derived union kedua role — termasuk reject yang cuma di kepala_tim.
+    expect(checkboxOf(rowOf(3), "wfh.report.reject").checked).toBe(true);
+    expect(checkboxOf(rowOf(1), "user.manage").checked).toBe(true);
+    // checkbox kepalan_tim untuk permission yang bukan miliknya: unchecked.
+    expect(checkboxOf(rowOf(3), "user.manage").checked).toBe(false);
+  });
+});
+
+describe("RolesPage — simpan per role (sync penuh)", () => {
+  beforeEach(() => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+  });
+
+  it("uncheck satu permission → Simpan → updateRolePermissions(roleId, checklist penuh)", async () => {
+    const u = userEvent.setup();
+    mockedSyncRoles.mockResolvedValue({ ...timRole, permissions: ["wfh.report.reject"] });
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+
+    await u.click(checkboxOf(rowOf(3), "wfh.report.approve"));
+    await u.click(within(rowOf(3)).getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() =>
+      expect(mockedSyncRoles).toHaveBeenCalledWith(3, ["wfh.report.reject"]),
+    );
+  });
+
+  it("role tak berubah tidak mengirim — hanya tombol role yang disimpan yang memicu call", async () => {
+    const u = userEvent.setup();
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+
+    // Ubah hanya kepala_tim; admin tak disentuh.
+    await u.click(checkboxOf(rowOf(3), "wfh.report.approve"));
+    await u.click(within(rowOf(3)).getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => expect(mockedSyncRoles).toHaveBeenCalledTimes(1));
+    expect(mockedSyncRoles).toHaveBeenCalledWith(3, ["wfh.report.reject"]);
+  });
+
+  it("tanpa perubahan → tombol Simpan disabled", async () => {
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    const save = within(rowOf(1)).getByRole("button", { name: /simpan/i }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+  });
+
+  it("422 lockout → pesan server dirender dan tetap tampil", async () => {
+    const u = userEvent.setup();
+    mockedSyncRoles.mockRejectedValueOnce(
+      new Error("Role 'admin' tidak boleh kehilangan permission kritis: user.manage."),
+    );
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    await u.click(checkboxOf(rowOf(1), "user.create"));
+    await u.click(within(rowOf(1)).getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Role 'admin' tidak boleh kehilangan permission kritis: user.manage."),
+      ).toBeTruthy(),
+    );
+    expect(mockedSyncRoles).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("RolesPage — dialog konfirmasi uncheck kritis pada role admin", () => {
+  beforeEach(() => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+  });
+
+  it("uncheck user.manage pada role admin → dialog konfirmasi; Batal → checkbox tetap tercentang", async () => {
+    const u = userEvent.setup();
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    await u.click(checkboxOf(rowOf(1), "user.manage"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeTruthy();
+
+    await u.click(within(dialog).getByRole("button", { name: /batal/i }));
+    expect(checkboxOf(rowOf(1), "user.manage").checked).toBe(true);
+  });
+
+  it("konfirmasi → checkbox unchecked; Simpan mengirim checklist tanpa permission kritis", async () => {
+    const u = userEvent.setup();
+    mockedSyncRoles.mockResolvedValue({
+      ...adminRole,
+      permissions: ["role.manage", "permission.manage", "wfh.report.approve"],
+    });
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    await u.click(checkboxOf(rowOf(1), "user.manage"));
+    const dialog = await screen.findByRole("dialog");
+    await u.click(within(dialog).getByRole("button", { name: /lanjut/i }));
+
+    await waitFor(() =>
+      expect(checkboxOf(rowOf(1), "user.manage").checked).toBe(false),
+    );
+
+    await u.click(within(rowOf(1)).getByRole("button", { name: /simpan/i }));
+    await waitFor(() =>
+      expect(mockedSyncRoles).toHaveBeenCalledWith(1, [
+        "user.create",
+        "role.manage",
+        "permission.manage",
+        "wfh.report.approve",
+      ]),
+    );
+  });
+
+  it("uncheck permission biasa pada role kepala_tim → TANPA dialog", async () => {
+    const u = userEvent.setup();
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+
+    await u.click(checkboxOf(rowOf(3), "wfh.report.approve"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(checkboxOf(rowOf(3), "wfh.report.approve").checked).toBe(false);
+  });
+});
+
+describe("RolesPage — gate role.manage", () => {
+  it("tanpa role.manage → tanpa tombol Simpan", async () => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+    renderPageAs(["permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    expect(within(rowOf(1)).queryByRole("button", { name: /simpan/i })).toBeNull();
+    expect(within(rowOf(3)).queryByRole("button", { name: /simpan/i })).toBeNull();
+  });
+
+  it("fetchRoles gagal 403 → pesan server dirender", async () => {
+    mockedListRoles.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    renderPageAs(["role.manage"]);
+
+    await waitFor(() =>
+      expect(screen.getByText("This action is unauthorized.")).toBeTruthy(),
+    );
+  });
+});
