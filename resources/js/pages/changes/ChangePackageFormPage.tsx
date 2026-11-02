@@ -36,7 +36,16 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, FilePlus2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
+import { DateInput } from "@/components/ui/date-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { listFieldUsers } from "@/api/users";
 import type { PickerUser } from "@/api/types";
 import {
@@ -452,11 +461,10 @@ export function ChangePackageFormPage() {
               <FieldLabel htmlFor="change-package-needed-by">
                 Tanggal dibutuhkan
               </FieldLabel>
-              <Input
+              <DateInput
                 id="change-package-needed-by"
-                type="date"
                 value={form.neededByDate}
-                onChange={(e) => set("neededByDate", e.target.value)}
+                onChange={(v) => set("neededByDate", v)}
               />
             </Field>
             <Field orientation="vertical">
@@ -508,31 +516,45 @@ export function ChangePackageFormPage() {
           <div className="flex flex-col gap-4">
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-priority">Prioritas</FieldLabel>
-              <select
-                id="change-package-priority"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                value={form.priority}
-                onChange={(e) =>
-                  set("priority", e.target.value as FormState["priority"])
+              <Select
+                value={form.priority === "" ? undefined : form.priority}
+                onValueChange={(v) =>
+                  set("priority", (v ?? "") as FormState["priority"])
                 }
               >
-                <option value="">Pilih prioritas</option>
-                <option value="normal">Normal</option>
-                <option value="emergency">Emergency</option>
-              </select>
+                <SelectTrigger
+                  id="change-package-priority"
+                  aria-label="Prioritas"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Pilih prioritas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="emergency">Emergency</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-impact">Dampak</FieldLabel>
-              <select
-                id="change-package-impact"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                value={form.impact}
-                onChange={(e) => set("impact", e.target.value as FormState["impact"])}
+              <Select
+                value={form.impact === "" ? undefined : form.impact}
+                onValueChange={(v) =>
+                  set("impact", (v ?? "") as FormState["impact"])
+                }
               >
-                <option value="">Pilih dampak</option>
-                <option value="Minor">Minor</option>
-                <option value="Mayor">Mayor</option>
-              </select>
+                <SelectTrigger
+                  id="change-package-impact"
+                  aria-label="Dampak"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Pilih dampak" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Minor">Minor</SelectItem>
+                  <SelectItem value="Mayor">Mayor</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field orientation="vertical">
               <FieldLabel>Jenis perubahan</FieldLabel>
@@ -542,10 +564,10 @@ export function ChangePackageFormPage() {
                     key={type.id}
                     className="flex items-center gap-2 text-sm"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      aria-label={type.name}
                       checked={form.changeTypeIds.includes(type.id)}
-                      onChange={() => toggleChangeType(type.id)}
+                      onCheckedChange={() => toggleChangeType(type.id)}
                     />
                     {type.name}
                   </label>
@@ -572,22 +594,20 @@ export function ChangePackageFormPage() {
                 <FieldLabel htmlFor="change-package-execution-date">
                   Tanggal eksekusi
                 </FieldLabel>
-                <Input
+                <DateInput
                   id="change-package-execution-date"
-                  type="date"
                   value={form.executionDate}
-                  onChange={(e) => set("executionDate", e.target.value)}
+                  onChange={(v) => set("executionDate", v)}
                 />
               </Field>
               <Field orientation="vertical">
                 <FieldLabel htmlFor="change-package-release-date">
                   Tanggal rilis
                 </FieldLabel>
-                <Input
+                <DateInput
                   id="change-package-release-date"
-                  type="date"
                   value={form.releaseDate}
-                  onChange={(e) => set("releaseDate", e.target.value)}
+                  onChange={(v) => set("releaseDate", v)}
                 />
               </Field>
             </div>
@@ -631,10 +651,10 @@ export function ChangePackageFormPage() {
             </Field>
             <Field orientation="vertical">
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
+                  aria-label="Perlu biaya?"
                   checked={form.costNeeded}
-                  onChange={(e) => set("costNeeded", e.target.checked)}
+                  onCheckedChange={(v) => set("costNeeded", v === true)}
                 />
                 Perlu biaya?
               </label>

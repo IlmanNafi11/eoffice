@@ -23,8 +23,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
+import { userEvent, pickDate, pickSelect } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { ChangePackage, ChangeType } from "@/api/types";
@@ -157,19 +157,13 @@ function renderForm(route: string, overrides?: Partial<typeof staf>) {
 async function fillForSubmit(opts?: { withCost?: boolean }) {
   await userEvent.type(screen.getByLabelText("Deskripsi"), "Migrasi server");
   await userEvent.type(screen.getByLabelText("Alasan"), "Server tua");
-  fireEvent.change(screen.getByLabelText("Tanggal dibutuhkan"), {
-    target: { value: "2025-12-31" },
-  });
-  await userEvent.selectOptions(screen.getByLabelText("Prioritas"), "normal");
-  await userEvent.selectOptions(screen.getByLabelText("Dampak"), "Minor");
+  await pickDate(screen.getByLabelText("Tanggal dibutuhkan"), "2025-12-31");
+  await pickSelect("Prioritas", "Normal");
+  await pickSelect("Dampak", "Minor");
   await userEvent.click(screen.getByRole("checkbox", { name: "Network" }));
   await userEvent.type(screen.getByLabelText("Rencana pengujian"), "Uji migrasi di staging");
-  fireEvent.change(screen.getByLabelText("Tanggal eksekusi"), {
-    target: { value: "2025-12-01" },
-  });
-  fireEvent.change(screen.getByLabelText("Tanggal rilis"), {
-    target: { value: "2025-12-15" },
-  });
+  await pickDate(screen.getByLabelText("Tanggal eksekusi"), "2025-12-01");
+  await pickDate(screen.getByLabelText("Tanggal rilis"), "2025-12-15");
   await userEvent.type(screen.getByLabelText("Hasil implementasi"), "Migrasi selesai");
   await userEvent.type(screen.getByLabelText("Dampak produksi"), "Downtime 1 jam");
   await userEvent.type(screen.getByLabelText("Effort yang dibutuhkan"), "3 orang-hari");
@@ -192,9 +186,7 @@ async function fillInitiation(overrides?: {
   );
   await userEvent.type(screen.getByLabelText("Alasan"), overrides?.reason ?? "Server tua");
   if (overrides?.neededBy !== false) {
-    fireEvent.change(screen.getByLabelText("Tanggal dibutuhkan"), {
-      target: { value: "2025-12-31" },
-    });
+    await pickDate(screen.getByLabelText("Tanggal dibutuhkan"), "2025-12-31");
   }
 }
 
@@ -360,12 +352,8 @@ describe("ChangePackageFormPage — validasi klien Submit", () => {
   it("tanggal rilis < tanggal eksekusi → pesan urutan tanggal, tak ada request", async () => {
     renderForm("/changes/new");
     await fillForSubmit();
-    fireEvent.change(screen.getByLabelText("Tanggal eksekusi"), {
-      target: { value: "2025-12-15" },
-    });
-    fireEvent.change(screen.getByLabelText("Tanggal rilis"), {
-      target: { value: "2025-12-01" },
-    });
+    await pickDate(screen.getByLabelText("Tanggal eksekusi"), "2025-12-15");
+    await pickDate(screen.getByLabelText("Tanggal rilis"), "2025-12-01");
 
     await userEvent.click(screen.getByRole("button", { name: /submit/i }));
 
@@ -429,24 +417,27 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
     expect(
       (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
     ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    expect(screen.getByLabelText("Tanggal dibutuhkan").textContent).toContain(
+      "31 Desember 2025",
+    );
+    expect(screen.getByLabelText("Prioritas").textContent).toContain("Normal");
+    expect(screen.getByLabelText("Dampak").textContent).toContain("Minor");
     expect(
-      (screen.getByLabelText("Tanggal dibutuhkan") as HTMLInputElement).value,
-    ).toBe("2025-12-31");
-    expect((screen.getByLabelText("Prioritas") as HTMLSelectElement).value).toBe("normal");
-    expect((screen.getByLabelText("Dampak") as HTMLSelectElement).value).toBe("Minor");
+      screen.getByRole("checkbox", { name: "Network" }).getAttribute("data-state"),
+    ).toBe("checked");
     expect(
-      (screen.getByRole("checkbox", { name: "Network" }) as HTMLInputElement).checked,
-    ).toBe(true);
+      screen.getByRole("checkbox", { name: "Hardware" }).getAttribute("data-state"),
+    ).toBe("unchecked");
+    // Checkbox kit = tombol Radix; state via data-state.
     expect(
-      (screen.getByRole("checkbox", { name: "Hardware" }) as HTMLInputElement).checked,
-    ).toBe(false);
-    expect((screen.getByLabelText("Perlu biaya?") as HTMLInputElement).checked).toBe(true);
+      screen.getByRole("checkbox", { name: "Perlu biaya?" }).getAttribute("data-state"),
+    ).toBe("checked");
     expect((screen.getByLabelText("Jumlah biaya") as HTMLInputElement).value).toBe(
       "15000000.00",
     );
-    expect(
-      (screen.getByLabelText("Tanggal eksekusi") as HTMLInputElement).value,
-    ).toBe("2025-12-01");
+    expect(screen.getByLabelText("Tanggal eksekusi").textContent).toContain(
+      "1 Desember 2025",
+    );
     // Prefill picker evaluator: label menunjukkan evaluator terpilih (id 27).
     expect(screen.getByLabelText(/evaluator/i).textContent).toContain(
       "Dewi Lestari",
