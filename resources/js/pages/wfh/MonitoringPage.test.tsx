@@ -22,9 +22,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { ApiError } from "@/api/client";
-import userEvent from "@testing-library/user-event";
+import { userEvent, pickDate, pickMonth, pickSelect } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type {
@@ -187,6 +187,25 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 });
 
+/** Kosongkan DateInput lewat tombol hapus (no-op bila memang sudah kosong). */
+async function clearDate(label: string) {
+  const trigger = screen.getByLabelText(label);
+  const clearBtn = within(trigger).queryByRole("button", { name: "hapus tanggal" });
+  if (clearBtn) await userEvent.click(clearBtn);
+}
+
+/** Kosongkan MonthInput lewat tombol hapus (no-op bila memang sudah kosong). */
+async function clearMonth() {
+  const trigger = screen.getByLabelText("Bulan");
+  const clearBtn = within(trigger).queryByRole("button", { name: "hapus bulan" });
+  if (clearBtn) await userEvent.click(clearBtn);
+}
+
+/** Tombol paginasi halaman (aria-label), bukan navigasi kalender/popover. */
+function pageButton(name: "Berikutnya" | "Sebelumnya"): HTMLElement {
+  return screen.getByRole("button", { name });
+}
+
 describe("MonitoringPage — tab & papan harian", () => {
   it("pemilik monitoring.view melihat kedua tab; tab papan aktif default", async () => {
     renderPageAs();
@@ -245,8 +264,7 @@ describe("MonitoringPage — tab & papan harian", () => {
     renderPageAs();
     await screen.findByTestId("monitoring-group-team-3");
 
-    const input = screen.getByLabelText("Tanggal papan") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "2026-07-11" } });
+    await pickDate(screen.getByLabelText("Tanggal papan"), "2026-07-11");
 
     await waitFor(() => {
       expect(mockedBoard).toHaveBeenLastCalledWith({ date: "2026-07-11" });
@@ -311,10 +329,10 @@ describe("MonitoringPage — Semua Laporan", () => {
     renderPageAs();
     await openReportsTab();
 
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "approved" } });
-    fireEvent.change(screen.getByLabelText("Tim"), { target: { value: "3" } });
-    fireEvent.change(screen.getByLabelText("Dari tanggal"), { target: { value: "2026-07-01" } });
-    fireEvent.change(screen.getByLabelText("Sampai tanggal"), { target: { value: "2026-07-31" } });
+    await pickSelect("Status", "approved");
+    await pickSelect("Tim", "Tim Aplikasi");
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
+    await pickDate(screen.getByLabelText("Sampai tanggal"), "2026-07-31");
 
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
@@ -334,26 +352,26 @@ describe("MonitoringPage — Semua Laporan", () => {
     await openReportsTab();
 
     // date terisi → month tidak dikirim walau ikut terisi.
-    fireEvent.change(screen.getByLabelText("Tanggal"), { target: { value: "2026-07-10" } });
-    fireEvent.change(screen.getByLabelText("Bulan"), { target: { value: "2026-07" } });
+    await pickDate(screen.getByLabelText("Tanggal"), "2026-07-10");
+    await pickMonth(screen.getByLabelText("Bulan"), 2026, "Juli");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ date: "2026-07-10", page: 1 });
     });
 
     // date_from tanpa date_to → keduanya tidak dikirim (month juga dikosongkan).
-    fireEvent.change(screen.getByLabelText("Sampai tanggal"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("Dari tanggal"), { target: { value: "2026-07-01" } });
-    fireEvent.change(screen.getByLabelText("Tanggal"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("Bulan"), { target: { value: "" } });
+    await clearDate("Sampai tanggal");
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
+    await clearDate("Tanggal");
+    await clearMonth();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
     });
 
     // Bulan saja → month dikirim; per_page tidak (default 15).
-    fireEvent.change(screen.getByLabelText("Dari tanggal"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("Bulan"), { target: { value: "2026-07" } });
+    await clearDate("Dari tanggal");
+    await pickMonth(screen.getByLabelText("Bulan"), 2026, "Juli");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 1 });
@@ -364,13 +382,13 @@ describe("MonitoringPage — Semua Laporan", () => {
     renderPageAs();
     await openReportsTab();
 
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "pending" } });
+    await pickSelect("Status", "pending");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
     });
 
-    await userEvent.click(screen.getByRole("button", { name: /berikutnya/i }));
+    await userEvent.click(pageButton("Berikutnya"));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 2 });
     });
@@ -387,22 +405,22 @@ describe("MonitoringPage — Semua Laporan", () => {
     await openReportsTab();
 
     // 1. terapkan filter tanggal…
-    fireEvent.change(screen.getByLabelText("Tanggal"), { target: { value: "2026-07-10" } });
+    await pickDate(screen.getByLabelText("Tanggal"), "2026-07-10");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ date: "2026-07-10", page: 1 });
     });
 
     // 2. kosongkan tanggal, terapkan bulan…
-    fireEvent.change(screen.getByLabelText("Tanggal"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("Bulan"), { target: { value: "2026-07" } });
+    await clearDate("Tanggal");
+    await pickMonth(screen.getByLabelText("Bulan"), 2026, "Juli");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 1 });
     });
 
     // 3. pagination HARUS memakai query baru (bulan), bukan `date` basi.
-    await userEvent.click(screen.getByRole("button", { name: /berikutnya/i }));
+    await userEvent.click(pageButton("Berikutnya"));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 2 });
     });
@@ -422,10 +440,11 @@ describe("MonitoringPage — Semua Laporan", () => {
     await openReportsTab();
 
     expect(mockedListTeams).toHaveBeenCalledTimes(1);
-    const teamSelect = screen.getByLabelText("Tim") as HTMLSelectElement;
-    const optionTexts = Array.from(teamSelect.options).map((o) => o.textContent);
-    expect(optionTexts).toContain("Tim Aplikasi");
-    expect(optionTexts).toContain("Tim Jaringan");
+    await userEvent.click(screen.getByLabelText("Tim"));
+    expect(await screen.findByRole("option", { name: "Tim Aplikasi" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Tim Jaringan" })).toBeTruthy();
+    await userEvent.keyboard("{Escape}");
+
   });
 });
 

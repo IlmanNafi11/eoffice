@@ -41,7 +41,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
+import { MonthInput } from "@/components/ui/month-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/wfh/pagination";
 import { PdfDownloadButton } from "@/components/wfh/pdf-download";
@@ -281,11 +289,10 @@ export function MonitoringPage() {
             <CardContent className="flex flex-wrap items-end gap-3">
               <Field className="w-48" orientation="vertical">
                 <FieldLabel htmlFor="monitoring-board-date">Tanggal papan</FieldLabel>
-                <Input
+                <DateInput
                   id="monitoring-board-date"
-                  type="date"
                   value={board.query.date ?? ""}
-                  onChange={(e) => changeBoardDate(e.target.value)}
+                  onChange={changeBoardDate}
                 />
               </Field>
               {board.data && (
@@ -390,86 +397,101 @@ export function MonitoringPage() {
               <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
                 <Field className="w-40" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-status">Status</FieldLabel>
-                  <select
-                    id="monitoring-filter-status"
-                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
+                  <Select
+                    value={status === "" ? undefined : status}
+                    onValueChange={(v) => setStatus(v ?? "")}
                   >
-                    <option value="">Semua status</option>
-                    {WFH_REPORT_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="monitoring-filter-status"
+                      aria-label="Status"
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="Semua status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WFH_REPORT_STATUSES.map((st) => (
+                        <SelectItem key={st} value={st}>
+                          {st}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field className="w-48" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-team">Tim</FieldLabel>
-                  <select
-                    id="monitoring-filter-team"
-                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                    value={teamId}
-                    onChange={(e) => setTeamId(e.target.value)}
+                  <Select
+                    value={teamId === "" ? undefined : teamId}
+                    onValueChange={(v) => setTeamId(v ?? "")}
                   >
-                    <option value="">Semua tim</option>
-                    {(teams ?? []).map((t) => (
-                      <option key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="monitoring-filter-team"
+                      aria-label="Tim"
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="Semua tim" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(teams ?? []).map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field className="w-40" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-date-from">Dari tanggal</FieldLabel>
-                  <Input
+                  <DateInput
                     id="monitoring-filter-date-from"
-                    type="date"
                     value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
+                    onChange={setDateFrom}
                   />
                 </Field>
                 <Field className="w-40" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-date-to">Sampai tanggal</FieldLabel>
-                  <Input
+                  <DateInput
                     id="monitoring-filter-date-to"
-                    type="date"
                     value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
+                    onChange={setDateTo}
                   />
                 </Field>
                 <Field className="w-40" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-date">Tanggal</FieldLabel>
-                  <Input
+                  <DateInput
                     id="monitoring-filter-date"
-                    type="date"
                     value={date}
-                    onChange={(e) => setDate(e.target.value)}
+                    onChange={setDate}
                   />
                 </Field>
                 <Field className="w-40" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-month">Bulan</FieldLabel>
-                  <Input
+                  <MonthInput
                     id="monitoring-filter-month"
-                    type="month"
                     value={month}
-                    onChange={(e) => setMonth(e.target.value)}
+                    onChange={setMonth}
                   />
                 </Field>
                 <Field className="w-36" orientation="vertical">
                   <FieldLabel htmlFor="monitoring-filter-perpage">Per halaman</FieldLabel>
-                  <select
-                    id="monitoring-filter-perpage"
-                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+                  <Select
                     value={perPage?.toString() ?? "15"}
-                    onChange={(e) => applyPerPage(e.target.value)}
+                    onValueChange={applyPerPage}
                   >
-                    {PER_PAGE_OPTIONS.map((n) => (
-                      <option key={n} value={String(n)}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="monitoring-filter-perpage"
+                      aria-label="Per halaman"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PER_PAGE_OPTIONS.map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Button type="submit">Terapkan</Button>
               </form>
