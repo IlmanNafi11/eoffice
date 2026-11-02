@@ -21,7 +21,7 @@ use App\Domains\Wfh\Http\Controllers\WfhMonitoringController;
 use App\Http\Controllers\QrVerificationController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SignatureController;
-use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 
@@ -30,10 +30,16 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])-
 Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:auth');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth');
 
-// Public by design (QR on a printed document), but still throttled: the token
-// is 256-bit and unguessable, and a limiter keeps the endpoint from being used
-// as a free token-oracle/amplifier if a QR ever leaks.
-Route::get('/verify/{token}', [QrVerificationController::class, 'verify'])->middleware('throttle:60,1');
+// QR on already-printed documents points at /api/verify/{token}. Browsers
+// (camera scanners) send Accept: text/html — they land on the SPA page. Every
+// other consumer (JSON, curl, no Accept header) keeps the raw JSON contract.
+Route::get('/verify/{token}', function (Request $request, string $token) {
+    if (str_contains($request->header('Accept', ''), 'text/html')) {
+        return redirect()->to('/verify/'.$token, 302);
+    }
+
+    return app(QrVerificationController::class)->verify($token);
+})->middleware('throttle:60,1');
 
 Route::middleware('auth:sanctum')->post('/auth/change-password', [AuthController::class, 'changePassword']);
 

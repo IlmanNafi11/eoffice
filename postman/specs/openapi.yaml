@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Intern Kominfo API
-  version: 6.6.0
+  version: 6.7.0
   description: |
     API for the Intern Kominfo application — a government intern management
     platform with Work-From-Home (WFH) reporting, change management workflows,
@@ -10,6 +10,13 @@ info:
     Authentication uses Laravel Sanctum bearer tokens.
     Authorization uses Spatie permission-based roles (admin, kepala_bidang, kepala_tim, staf).
 
+    **v6.7.0 — QR verification lands on the SPA page:**
+    - `GET /api/verify/{token}` with `Accept: text/html` now returns **302**
+      redirecting to the public SPA page `/verify/{token}` (QR codes on
+      already-printed PDFs keep working for scanners). JSON consumers
+      (`Accept: application/json`, curl, no Accept header) are unchanged.
+    - QR codes on newly generated PDFs encode the SPA path
+      `{app.url}/verify/{token}` directly.
 
     **v6.6.0 — Unified user payload:**
     - All user-bearing endpoints (`/auth/login`, `/auth/me`, `/profile`,
@@ -5080,6 +5087,19 @@ paths:
           description: 64-character hex verification token.
           example: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
       responses:
+        "302":
+          description: >-
+            HTML clients (QR scanner browsers) are redirected to the public SPA
+            page. Applies only when `Accept: text/html`; JSON clients keep the
+            JSON responses below.
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /verify/{token}
+          content:
+            text/html: {}
+
         "200":
           description: Document verified
           content:

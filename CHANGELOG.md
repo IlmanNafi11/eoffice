@@ -39,6 +39,11 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 - Endpoint verifikasi QR publik `GET /verify/{token}` kini di-rate-limit
   (`throttle:60,1`) — token tetap 256-bit, limiter mencegahnya dipakai sebagai
   oracle/amplifier bila QR bocor.
+- QR pada PDF kini mengarah ke halaman SPA `/verify/{token}` (bukan
+  `/api/verify/{token}` yang memunculkan JSON mentah saat discan). QR pada
+  dokumen yang sudah tercetak tetap berfungsi: `GET /api/verify/{token}` dengan
+  `Accept: text/html` di-redirect (302) ke halaman SPA yang sama; kontrak JSON
+  untuk klien non-HTML tidak berubah.
 - `.env.example` memakai `LOG_LEVEL=warning`, bukan `debug`.
 - `ChangePackageController::destroy` memakai permission route-nya
   (`change.initiation.delete`), bukan `update`; `authorize()` ditambahkan
