@@ -7,9 +7,9 @@
  *
  * Alur (plan Task 5 + spec):
  * - Bagian Inisiasi: bidang read-only dari `user.team.field` (create) / data
- *   (`edit`, `initiation.field`); `needed_by_date` (date input), deskripsi,
- *   alasan. TIDAK ada select bidang (tak ada endpoint daftar bidang) dan TIDAK
- *   ada input evaluator (Resolved #1 — evaluator diset server, bukan UI).
+ *   (edit) — tak ada select bidang; `needed_by_date`, deskripsi, alasan, dan
+ *   picker evaluator (Combobox dari `GET /users` via `listFieldUsers` —
+ *   Resolved #1 digugurkan: evaluator kini dipilih inisiator; null = belum).
  * - Bagian Implementasi: priority normal/emergency, impact Minor/Mayor,
  *   checkbox change types (dari `fetchChangeTypes`, cache slice), test plan,
  *   tanggal eksekusi ≤ tanggal rilis (validasi klien), implementation_result,
@@ -36,6 +36,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, FilePlus2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { listFieldUsers } from "@/api/users";
+import type { PickerUser } from "@/api/types";
 import {
   Card,
   CardContent,
@@ -116,6 +119,8 @@ export function ChangePackageFormPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [validation, setValidation] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [evaluatorId, setEvaluatorId] = useState<number | null>(null);
+  const [evaluators, setEvaluators] = useState<PickerUser[]>([]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -129,6 +134,21 @@ export function ChangePackageFormPage() {
   useEffect(() => {
     dispatch(fetchChangeTypes());
   }, [dispatch]);
+
+  /** Daftar evaluator aktif sebidang (GET /users) — gagal diam (picker kosong). */
+  useEffect(() => {
+    let cancelled = false;
+    listFieldUsers()
+      .then((users) => {
+        if (!cancelled) setEvaluators(users);
+      })
+      .catch(() => {
+        /* picker tetap kosong; validasi server 422 menutup sisanya */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /** Prefill dari data show (edit mode) — hanya sekali saat data masuk. */
   const [prefilledFor, setPrefilledFor] = useState<number | null>(null);
@@ -152,6 +172,7 @@ export function ChangePackageFormPage() {
         costNeeded: impl?.cost_needed ?? false,
         costAmount: impl?.cost_amount ?? "",
       });
+      setEvaluatorId(impl?.evaluator_id ?? null);
       setPrefilledFor(id);
     }
   }, [isEdit, pkg, id, prefilledFor]);
@@ -176,6 +197,7 @@ export function ChangePackageFormPage() {
   /** Bangun payload implementation draft (semua prop nullable). */
   function implementationDraft(): PackageImplementationDraftInput {
     return {
+      evaluator_id: evaluatorId,
       priority: form.priority === "" ? null : form.priority,
       impact: form.impact === "" ? null : form.impact,
       change_type_ids: form.changeTypeIds.length > 0 ? form.changeTypeIds : null,
@@ -202,6 +224,7 @@ export function ChangePackageFormPage() {
         reason: form.reason,
       },
       implementation: {
+        evaluator_id: evaluatorId,
         priority: form.priority as "normal" | "emergency",
         impact: form.impact as "Minor" | "Mayor",
         change_type_ids: form.changeTypeIds,
@@ -450,6 +473,24 @@ export function ChangePackageFormPage() {
                 id="change-package-reason"
                 value={form.reason}
                 onChange={(e) => set("reason", e.target.value)}
+              />
+            </Field>
+            <Field orientation="vertical">
+              <FieldLabel htmlFor="change-package-evaluator">Evaluator</FieldLabel>
+              <Combobox
+                aria-label="Evaluator"
+                items={evaluators.map((u) => ({
+                  value: String(u.id),
+                  label: u.name,
+                  hint: u.nip,
+                }))}
+                value={evaluatorId === null ? null : String(evaluatorId)}
+                onValueChange={(v) =>
+                  setEvaluatorId(v === null ? null : Number(v))
+                }
+                placeholder="Pilih evaluator"
+                searchPlaceholder="Cari nama / NIP…"
+                emptyMessage="Tidak ada evaluator aktif"
               />
             </Field>
           </div>

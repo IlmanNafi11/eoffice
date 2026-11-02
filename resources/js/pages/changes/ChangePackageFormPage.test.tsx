@@ -12,7 +12,9 @@
  *   `cost_amount` bila `cost_needed`; draft hanya memvalidasi deskripsi+alasan;
  * - `field_id` terkunci dari `user.team.field.id` (create) / data (edit) —
  *   read-only, tanpa select bidang;
- * - TIDAK ada input evaluator (Resolved #1);
+ * - Combobox evaluator dari `listFieldUsers` (GET /users); prefill edit dari
+ *   `implementation.evaluator_id`; draft & submit payload membawa
+ *   `evaluator_id` (null tanpa pilihan) — Resolved #1 digugurkan;
  * - pesan server 422 (amenang `current.error`) tampil dengan role alert dan
  *   tak lenyap selama form tetap termuat;
  * - tombol digate: create = `change.initiation.create` + tim/bidang terisi;
@@ -42,7 +44,12 @@ vi.mock("@/api/change-package", () => ({
   listChangeTypes: vi.fn(),
 }));
 
+vi.mock("@/api/users", () => ({
+  listFieldUsers: vi.fn(),
+}));
+
 import * as changePackageApi from "@/api/change-package";
+import * as usersApi from "@/api/users";
 import { ChangePackageFormPage } from "@/pages/changes/ChangePackageFormPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
@@ -52,6 +59,7 @@ const mockedCreate = changePackageApi.createPackage as unknown as Mock;
 const mockedUpdate = changePackageApi.updatePackage as unknown as Mock;
 const mockedSubmit = changePackageApi.submitPackage as unknown as Mock;
 const mockedChangeTypes = changePackageApi.listChangeTypes as unknown as Mock;
+const mockedListFieldUsers = usersApi.listFieldUsers as unknown as Mock;
 
 const changeTypes: ChangeType[] = [
   { id: 1, name: "Hardware" },
@@ -100,8 +108,9 @@ const editPkg: ChangePackage = {
     change_initiation_id: 12,
     priority: "normal",
     impact: "Minor",
-    test_plan: "Uji migrasi di staging",
     execution_date: "2025-12-01",
+    evaluator_id: 27,
+    test_plan: "Uji migrasi di staging",
     release_date: "2025-12-15",
     implementation_result: "Migrasi selesai",
     production_impact: "Downtime 1 jam",
@@ -118,6 +127,11 @@ const submittedPkg: ChangePackage = {
   initiation: { ...editPkg.initiation, status: "pending" },
   implementation: { ...editPkg.implementation!, status: "submitted" },
 };
+/** Daftar evaluator dari GET /users (PickerUser). */
+const pickerUsers = [
+  { id: 27, name: "Dewi Lestari", nip: "199503152024011002", team: { id: 5, name: "Tim Aplikasi" } },
+  { id: 28, name: "Rina Marlina", nip: "198807152022011003", team: { id: 5, name: "Tim Aplikasi" } },
+];
 
 /** Render form pada route create atau edit, dengan user khusus (default staf). */
 function renderForm(route: string, overrides?: Partial<typeof staf>) {
@@ -195,6 +209,7 @@ const draftImplementation = {
   production_impact: null,
   required_effort: null,
   resources: null,
+  evaluator_id: null,
   cost_needed: false,
   // `cost_amount` sengaja TIDAK dikirim bila cost_needed false.
 };
@@ -207,6 +222,7 @@ const fullSubmitInput = {
     reason: "Server tua",
   },
   implementation: {
+    evaluator_id: null,
     priority: "normal",
     impact: "Minor",
     change_type_ids: [2],
@@ -225,6 +241,7 @@ const fullSubmitInput = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockedChangeTypes.mockResolvedValue(changeTypes);
+  mockedListFieldUsers.mockResolvedValue(pickerUsers);
   mockedShow.mockResolvedValue(editPkg);
   mockedCreate.mockResolvedValue(editPkg);
   mockedUpdate.mockResolvedValue(editPkg);
@@ -232,7 +249,7 @@ beforeEach(() => {
 });
 
 describe("ChangePackageFormPage — create mode (/changes/new)", () => {
-  it("render bidang read-only, checkbox change types, dan TANPA input evaluator/field select", async () => {
+  it("render bidang read-only, checkbox change types, dan picker evaluator", async () => {
     renderForm("/changes/new");
 
     // Bidang read-only dari user.team.field — teks tampil, tidak ada select.
@@ -243,8 +260,8 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(await screen.findByRole("checkbox", { name: "Hardware" })).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "Network" })).toBeTruthy();
 
-    // Resolved #1: tanpa input evaluator.
-    expect(screen.queryByLabelText(/evaluator/i)).toBeNull();
+    // Resolved #1 digugurkan: picker evaluator tampil; listFieldUsers dipanggil.
+    expect(mockedListFieldUsers).toHaveBeenCalled();
   });
 
   it('"Simpan Draft" → POST draft payload nested persis skema, lalu navigasi detail', async () => {
@@ -265,6 +282,42 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
       });
     });
     expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+  it("pilih evaluator → submit payload membawa evaluator_id", async () => {
+    renderForm("/changes/new");
+    await fillForSubmit();
+
+    // Buka combobox evaluator → pilih "Dewi Lestari" (id 27).
+    await userEvent.click(screen.getByLabelText(/evaluator/i));
+    await userEvent.click(await screen.findByText("Dewi Lestari"));
+
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => {
+      expect(mockedSubmit).toHaveBeenCalledWith(12, {
+        ...fullSubmitInput,
+        implementation: { ...fullSubmitInput.implementation, evaluator_id: 27 },
+      });
+    });
+  });
+
+  it("draft tanpa pilih evaluator → evaluator_id null", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith({
+        initiation: {
+          field_id: 3,
+          needed_by_date: "2025-12-31",
+          description: "Migrasi server",
+          reason: "Server tua",
+        },
+        implementation: draftImplementation,
+      });
+    });
   });
 
   it("draft tanpa deskripsi → validasi klien, createPackage TIDAK dipanggil", async () => {
@@ -394,6 +447,10 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
     expect(
       (screen.getByLabelText("Tanggal eksekusi") as HTMLInputElement).value,
     ).toBe("2025-12-01");
+    // Prefill picker evaluator: label menunjukkan evaluator terpilih (id 27).
+    expect(screen.getByLabelText(/evaluator/i).textContent).toContain(
+      "Dewi Lestari",
+    );
   });
 
   it('"Simpan Draft" → PUT updatePackage(12, draft input); navigasi detail', async () => {
@@ -412,7 +469,7 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
           description: "Migrasi server aplikasi e-Office ke cloud Kominfo",
           reason: "Server on-premise sudah tidak memadai.",
         },
-        implementation: fullSubmitInput.implementation,
+        implementation: { ...fullSubmitInput.implementation, evaluator_id: 27 },
       });
     });
     expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
@@ -434,7 +491,7 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
           description: "Migrasi server aplikasi e-Office ke cloud Kominfo",
           reason: "Server on-premise sudah tidak memadai.",
         },
-        implementation: fullSubmitInput.implementation,
+        implementation: { ...fullSubmitInput.implementation, evaluator_id: 27 },
       });
     });
     expect(mockedUpdate).not.toHaveBeenCalled();
