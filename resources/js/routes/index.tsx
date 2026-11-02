@@ -7,6 +7,9 @@
  * - `/login` publik (di luar guard)
  * - Alur reset password publik (openapi: security[]): `/forgot-password` →
  *   `/verify-otp` → `/reset-password`
+ * - `/verify/:token` publik (modul verification, openapi: security[]): kartu
+ *   hasil verifikasi dokumen QR — di luar guard, tanpa AppShell, tanpa entri
+ *   nav-registry (bukan fitur sesi login).
  * - Route terlindungi dibungkus `ProtectedRoute` (guard sesi + must_change)
  *   dan `SessionBootstrap` (rehidrasi user via GET /auth/me). `/change-password`
  *   berada di dalam guard karena endpoint bearer; ia lolos guard via path.
@@ -24,6 +27,7 @@ import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { OtpVerificationPage } from "@/pages/auth/OtpVerificationPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
+import { VerifyPage } from "@/pages/verification/VerifyPage";
 import { WfhReportsPage } from "@/pages/wfh/WfhReportsPage";
 import { WfhReportDetailPage } from "@/pages/wfh/WfhReportDetailPage";
 import { TeamReportsPage } from "@/pages/wfh/TeamReportsPage";
@@ -83,4 +87,5 @@ export const router = createBrowserRouter([
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/verify-otp", element: <OtpVerificationPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },
+  { path: "/verify/:token", element: <VerifyPage /> },
 ]);
