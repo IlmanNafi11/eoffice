@@ -13,6 +13,11 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   (S2): bukti perubahan tidak lagi di-serve sebagai URL statis `/storage/*`.
 - `DocNumberGenerator` membaca prefix dokumen dari `config('change-mgmt.doc_prefix')`
   (`CHANGE_DOC_PREFIX`), bukan literal yang di-hard-code.
+- `GET /api/users` — daftar user aktif read-only untuk dropdown picker
+  (mis. evaluator pada form change-package), di-scope bidang: non-admin hanya
+  melihat user aktif di bidang sendiri; admin/`user.manage` boleh `?field_id=`.
+  User non-aktif dan user tanpa tim tidak pernah dikembalikan (konsisten
+  dengan aturan validasi evaluator lintas-bidang).
 
 ### Changed
 - `DemoUsersSeeder` gagal tertutup (fail closed): menolak berjalan di luar

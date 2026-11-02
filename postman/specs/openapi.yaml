@@ -17,6 +17,10 @@ info:
       (`Accept: application/json`, curl, no Accept header) are unchanged.
     - QR codes on newly generated PDFs encode the SPA path
       `{app.url}/verify/{token}` directly.
+    - Added `GET /api/users` — a read-only, field-scoped active-user list for
+      dropdown pickers (e.g. the change-package evaluator selector). Visible to
+      any authenticated user; non-admins see only their own bidang, admins /
+      `user.manage` hold the same `field_id` filter as `GET /api/teams`.
 
     **v6.6.0 — Unified user payload:**
     - All user-bearing endpoints (`/auth/login`, `/auth/me`, `/profile`,
@@ -3354,6 +3358,76 @@ paths:
                   value:
                     success: true
                     data: []
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Unauthenticated.
+
+  # ── Users (dropdown picker) ──────────────────────────────────────
+  /api/users:
+    get:
+      tags: [Organization]
+      summary: List active users for dropdown (e.g. evaluator) selection
+      operationId: listUsersForPicker
+      security:
+        - bearerAuth: []
+      description: |
+        Returns active users, optionally scoped to one bidang (field) — used
+        by the change-package form's evaluator picker and similar dropdowns.
+
+        Visible to any authenticated user (no permission gate), but scoped:
+        - Non-admin users (no `user.manage`): only active users of their own
+          bidang; the `field_id` parameter is ignored.
+        - Admin / `user.manage`: all active fields' users; `field_id` filters.
+
+        Inactive users and users without a team are never returned — the
+        evaluator validation rule only accepts active users with a team in
+        the same bidang as the package creator.
+      parameters:
+        - name: field_id
+          in: query
+          description: Optional bidang filter (admin / user.manage only).
+          required: false
+          schema:
+            type: integer
+            example: 1
+      responses:
+        "200":
+          description: Active user list (own bidang for non-admin; empty array
+            if the actor has no team)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserResource"
+              example:
+                success: true
+                data:
+                  - id: 27
+                    name: Dewi Lestari
+                    nip: "199503152024011002"
+                    email: dewi@kominfo.go.id
+                    rank: Pengatur Muda
+                    position: Staf Pelaksana
+                    team:
+                      id: 3
+                      name: Tim Aplikasi Informatika
+                      field:
+                        id: 1
+                        name: Bidang Teknologi Informasi
         "401":
           description: Unauthenticated
           content:
