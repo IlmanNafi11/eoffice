@@ -31,7 +31,13 @@ interface FileInputProps
    */
   onFilesChange?: (files: File[]) => void;
   accept?: string;
+  /** Teks tombol saat belum ada file. */
   placeholder?: string;
+  /**
+   * Nama aksesibel untuk `<input type="file">` tersembunyi (sr-only). Default
+   * memakai `placeholder`. Dipakai test & pembaca layar untuk menemukan input.
+   */
+  inputLabel?: string;
   /** Tampilkan tombol hapus saat ada file (default true). */
   clearable?: boolean;
 }
@@ -43,6 +49,7 @@ function FileInput({
   onFilesChange,
   accept,
   placeholder = "Pilih file",
+  inputLabel,
   clearable = true,
   disabled,
   className,
@@ -86,6 +93,7 @@ function FileInput({
         id={id}
         type="file"
         accept={accept}
+        aria-label={inputLabel ?? placeholder}
         multiple={multiple}
         disabled={disabled}
         onChange={handleChange}

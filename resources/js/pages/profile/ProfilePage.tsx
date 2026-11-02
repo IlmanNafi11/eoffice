@@ -9,7 +9,7 @@
  * - Error 422 dari backend ditampilkan per-field (ApiError.errors).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/ui/file-input";
 import { ApiError } from "@/api/client";
 import { uploadSignature, updateProfile, fetchSignatureObjectUrl } from "@/api/profile";
 import { setUser, selectUser } from "@/store/authSlice";
@@ -44,7 +45,6 @@ export function ProfilePage() {
   // dan selalu 401 — lihat `fetchSignatureObjectUrl`.
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Object URL preview disimpan di ref agar lifecycle-nya terpusat: setiap
   // URL baru me-revoke URL sebelumnya, dan cleanup unmount me-revoke URL
@@ -116,8 +116,7 @@ export function ProfilePage() {
     }
   }
 
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handleFileChange(file: File | null) {
     // Guard double-select: event `change` kedua yang ter-antre sebelum
     // re-render tidak boleh memicu upload multipart paralel (ship review #4).
     if (!file || !user || uploading) return;
@@ -149,7 +148,6 @@ export function ProfilePage() {
       }
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -295,13 +293,12 @@ export function ProfilePage() {
 
             <Field>
               <FieldLabel htmlFor="profile-signature">Unggah tanda tangan</FieldLabel>
-              <Input
-                ref={fileInputRef}
+              <FileInput
                 id="profile-signature"
-                name="signature"
-                type="file"
                 accept="image/png,image/jpeg,image/jpg"
-                onChange={handleFileChange}
+                placeholder="Pilih file tanda tangan…"
+                inputLabel="Unggah tanda tangan"
+                onFileChange={(f) => void handleFileChange(f)}
                 disabled={uploading}
                 data-testid="signature-input"
               />

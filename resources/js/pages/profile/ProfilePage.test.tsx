@@ -86,6 +86,11 @@ beforeEach(() => {
   mockedFetchUrl.mockResolvedValue("blob:preview-1");
 });
 
+/** Input file tersembunyi milik `FileInput` (data-testid ada di tombol). */
+function signatureInput(): HTMLInputElement {
+  return document.getElementById("profile-signature") as HTMLInputElement;
+}
+
 describe("ProfilePage — save profil", () => {
   it("mengirim PUT /profile dengan field terisi; sukses menyegarkan user", async () => {
     mockedUpdate.mockResolvedValueOnce({ ...user, position: "Analis Sistem" });
@@ -151,7 +156,7 @@ describe("ProfilePage — upload tanda tangan", () => {
     renderProfile();
 
     const file = new File(["png-bytes"], "ttd.png", { type: "image/png" });
-    await userEvent.upload(screen.getByTestId("signature-input"), file);
+    await userEvent.upload(signatureInput(), file);
 
     await waitFor(() => expect(mockedUpload).toHaveBeenCalledTimes(1));
     expect(mockedUpload.mock.calls[0]![0]).toBeInstanceOf(FormData);
@@ -168,7 +173,7 @@ describe("ProfilePage — upload tanda tangan", () => {
     renderProfile();
 
     const file = new File(["png-bytes"], "ttd.png", { type: "image/png" });
-    await userEvent.upload(screen.getByTestId("signature-input"), file);
+    await userEvent.upload(signatureInput(), file);
 
     await waitFor(() => expect(mockedUpload).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/belum ada tanda tangan/i)).toBeTruthy();
@@ -185,7 +190,7 @@ describe("ProfilePage — upload tanda tangan", () => {
     renderProfile();
 
     const file = new File(["bad"], "ttd.png", { type: "image/png" });
-    await userEvent.upload(screen.getByTestId("signature-input"), file);
+    await userEvent.upload(signatureInput(), file);
 
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toMatch(
@@ -193,7 +198,7 @@ describe("ProfilePage — upload tanda tangan", () => {
       ),
     );
     // Input direset agar file yang sama bisa dipilih ulang (uji kelanjutan).
-    expect((screen.getByTestId("signature-input") as HTMLInputElement).value).toBe("");
+    expect(signatureInput().value).toBe("");
   });
 });
 

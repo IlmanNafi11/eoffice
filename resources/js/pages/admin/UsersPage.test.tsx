@@ -150,7 +150,7 @@ describe("UsersPage — permission gates (sintetik, bukan role)", () => {
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
 
     expect(screen.getByRole("button", { name: /buat user/i })).toBeTruthy();
-    expect(screen.getByLabelText(/pilih file import/i)).toBeTruthy();
+    expect(screen.getByLabelText("Pilih file import")).toBeTruthy(); // tombol FileInput
     expect(screen.getByTestId(`delete-user-12`)).toBeTruthy();
   });
 
@@ -158,13 +158,13 @@ describe("UsersPage — permission gates (sintetik, bukan role)", () => {
     renderPageAs(["user.manage", "user.import", "user.delete"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
     expect(screen.queryByRole("button", { name: /buat user/i })).toBeNull();
-    expect(screen.getByLabelText(/pilih file import/i)).toBeTruthy();
+    expect(screen.getByLabelText("Pilih file import")).toBeTruthy(); // tombol FileInput
   });
 
   it("tanpa user.import → tanpa input file import", async () => {
     renderPageAs(["user.manage", "user.create", "user.delete"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
-    expect(screen.queryByLabelText(/pilih file import/i)).toBeNull();
+    expect(screen.queryByLabelText("Pilih file import")).toBeNull();
   });
 
   it("tanpa user.delete → tanpa tombol hapus per baris", async () => {

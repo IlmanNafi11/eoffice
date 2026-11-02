@@ -7,9 +7,10 @@
  * `fetchSignatureObjectUrl` di `api/profile.ts`.
  */
 import * as React from "react";
-import { ImageOff, Trash2, Upload, Loader2 } from "lucide-react";
+import { ImageOff, Trash2, Loader2 } from "lucide-react";
 import { httpClient } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
 import type { WfhAttendance, WfhSession } from "@/api/types";
 
 /** Ambil bytes masker absensi lewat client ber-otorisasi → object URL. */
@@ -115,7 +116,6 @@ function AttendanceRow({
 }) {
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const previewUrlRef = React.useRef<string | null>(null);
-  const inputRef = React.useRef<HTMLInputElement>(null);
 
   const setAndTrack = React.useCallback((next: string | null) => {
     if (previewUrlRef.current && previewUrlRef.current !== next) {
@@ -149,13 +149,11 @@ function AttendanceRow({
     [],
   );
 
-  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handleFileChange(file: File | null) {
     // Early-return: dua event `change` ter-antre sebelum re-render jangan
     // memicu upload paralel (ship review #4 double-select guard).
     if (!file || uploading) return;
     await onUpload(file);
-    if (inputRef.current) inputRef.current.value = "";
   }
 
   return (
@@ -193,27 +191,14 @@ function AttendanceRow({
               Hapus
             </Button>
           ) : null}
-          <div>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              id={`attendance-upload-${session}`}
-              className="sr-only"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
-            <Button type="button" variant="outline" size="sm" asChild disabled={uploading}>
-              <label htmlFor={`attendance-upload-${session}`}>
-                {uploading ? (
-                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                ) : (
-                  <Upload aria-hidden="true" className="size-4" />
-                )}
-                Unggah foto
-              </label>
-            </Button>
-          </div>
+          <FileInput
+            id={`attendance-upload-${session}`}
+            accept="image/*"
+            placeholder="Unggah foto"
+            onFileChange={(f) => void handleFileChange(f)}
+            disabled={uploading}
+            size="sm"
+          />
         </div>
       ) : null}
     </div>

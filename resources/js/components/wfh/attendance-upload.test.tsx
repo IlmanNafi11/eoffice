@@ -70,6 +70,7 @@ describe("AttendanceUploadList", () => {
     expect(screen.getByText(/siang/i)).toBeTruthy();
 
     const file = new File(["jpg"], "pagi.jpg", { type: "image/jpeg" });
+    // FileInput: input file tersembunyi (sr-only) dengan id per sesi.
     const inputs = screen.getAllByLabelText(/unggah foto/i);
     await userEvent.upload(inputs[0]!, file);
     await waitFor(() => expect(onUpload).toHaveBeenCalledWith({ session: "pagi", photo: file }));
@@ -133,12 +134,18 @@ describe("AttendanceUploadList", () => {
     );
 
     const file = new File(["x"], "pagi.jpg", { type: "image/jpeg" });
-    await userEvent.upload(screen.getByLabelText(/unggah foto/i), file);
+    const hidden = document.getElementById(
+      "attendance-upload-pagi",
+    ) as HTMLInputElement;
+    await userEvent.upload(hidden, file);
     await waitFor(() => expect(onUpload).toHaveBeenCalled());
 
-    // finally mengembalikan `uploading` → label "Unggah foto" kembali aktif.
+    // finally mengembalikan `uploading` → input kembali aktif (disabled lepas).
     await waitFor(() => {
-      expect(screen.getByText(/unggah foto/i)).toBeTruthy();
+      expect(
+        (document.getElementById("attendance-upload-pagi") as HTMLInputElement)
+          .disabled,
+      ).toBe(false);
     });
   });
 
