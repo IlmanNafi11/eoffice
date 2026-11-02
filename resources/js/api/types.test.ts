@@ -29,6 +29,16 @@ import type {
   PackageDraftInput,
   PackageSubmitInput,
   ListPackagesQuery,
+  AdminUser,
+  AdminRole,
+  AdminRoleName,
+  AdminPermission,
+  ImportResult,
+  SettingsMap,
+  StoreUserInput,
+  UpdateUserInput,
+  ListUsersQuery,
+  SettingValueUpdate,
 } from "@/api/types";
 // Fixtures verbatim dari postman/specs/openapi.yaml (examples).
 
@@ -488,5 +498,158 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
   it("ListPackagesQuery hanya per_page/page/status (+field_id persis openapi)", () => {
     const q: ListPackagesQuery = { per_page: 15, page: 2, status: "pending" };
     expect(q.status).toBe("pending");
+  });
+});
+
+// Fixtures verbatim dari postman/specs/openapi.yaml (User Management / RBAC / Settings).
+
+const adminUser: AdminUser = {
+  id: 12,
+  name: "Dewi Lestari",
+  nip: "199503152024011002",
+  email: "dewi@kominfo.go.id",
+  rank: "Pengatur Muda",
+  position: "Staf Pelaksana",
+  phone: "081345678901",
+  is_active: true,
+  roles: ["staf"],
+  permissions: ["wfh.attendance.create", "wfh.report.create", "wfh.report.update"],
+  created_at: "2025-07-14T08:30:00.000000Z",
+  team: {
+    id: 3,
+    name: "Tim Aplikasi",
+    leader: { id: 5, name: "Siti Nurhaliza" },
+    field: { id: 1, name: "Bidang Teknologi Informasi" },
+  },
+};
+
+describe("api/types — kontrak domain admin (openapi.yaml tag User Management / RBAC / Settings)", () => {
+  it("AdminUser = UserResource: required id/name/nip/email/is_active; opsional sesuai skema", () => {
+    const minimal: AdminUser = {
+      id: 1,
+      name: "Budi Santoso",
+      nip: "199001012023011001",
+      email: "budi@kominfo.go.id",
+      is_active: true,
+      roles: ["staf"],
+      permissions: [],
+    };
+    expect(minimal.is_active).toBe(true);
+    expect(adminUser.team?.field?.name).toBe("Bidang Teknologi Informasi");
+    // @ts-expect-error — nip wajib di UserResource; tidak boleh hilang
+    const bad: AdminUser = {
+      id: 1,
+      name: "x",
+      email: "x@kominfo.go.id",
+      is_active: true,
+      roles: [],
+      permissions: [],
+    };
+    expect(bad).toBeDefined();
+
+  });
+
+  it("AdminRole sesuai RoleResource; AdminPermission sesuai PermissionResource", () => {
+    const role: AdminRole = {
+      id: 2,
+      name: "kepala_bidang",
+      permissions: ["wfh.report.approve", "wfh.report.reject", "wfh.monitoring.view"],
+    };
+    const perm: AdminPermission = { id: 7, name: "wfh.report.approve" };
+    expect(role.permissions.length).toBe(3);
+    expect(perm.name).toBe("wfh.report.approve");
+  });
+
+  it("AdminRoleName adalah enum kontrak StoreUserRequest.roles", () => {
+    const names: AdminRoleName[] = ["admin", "kepala_bidang", "kepala_tim", "staf"];
+    // @ts-expect-error — role di luar enum kontrak ditolak
+    const bogus: AdminRoleName = "superadmin";
+    expect(names).toHaveLength(4);
+    expect(bogus).toBeDefined();
+  });
+
+  it("ImportResult sesuai POST /admin/users/import — {imported, skipped, errors[]}", () => {
+    const result: ImportResult = {
+      imported: 3,
+      skipped: 1,
+      errors: ["Baris 4: NIP 199001012023011001 sudah terdaftar."],
+    };
+    expect(result.errors).toHaveLength(1);
+    const bad: ImportResult = {
+      imported: 1,
+      skipped: 0,
+      // @ts-expect-error — errors string[], bukan number[]
+      errors: [4],
+    };
+    expect(bad).toBeDefined();
+  });
+
+  it("SettingsMap = map flat {key: value} dari GET /admin/settings", () => {
+    const settings: SettingsMap = {
+      password_default_admin: "admin123",
+      password_default_user: "user1234",
+      wfh_allowed_days: [1, 2, 3, 4, 5],
+      wfh_sessions: ["pagi", "siang", "sore"],
+    };
+    expect(Object.keys(settings)).toHaveLength(4);
+  });
+
+  it("StoreUserInput sesuai StoreUserRequest — wajib name/nip/email/roles; opsional lain persis skema", () => {
+    const full: StoreUserInput = {
+      name: "Budi Santoso",
+      nip: "199503152024011002",
+      email: "budi@kominfo.go.id",
+      team_id: 3,
+      rank: "Penata Muda",
+      position: "Programmer",
+      phone: "081234567890",
+      password: "rahasiaBudi123",
+      roles: ["staf"],
+      permissions: ["wfh.report.approve"],
+    };
+    // password tidak dikirim → server injek default dari Settings (openapi:470-474).
+    const noPassword: StoreUserInput = {
+      name: "Dewi Lestari",
+      nip: "199503152024011002",
+      email: "dewi@kominfo.go.id",
+      roles: ["staf"],
+    };
+    expect(full.roles).toEqual(["staf"]);
+    expect("password" in noPassword).toBe(false);
+    // @ts-expect-error — nip wajib pada StoreUserRequest
+    const bad: StoreUserInput = {
+      name: "Tanpa NIP",
+      email: "x@kominfo.go.id",
+      roles: ["staf"],
+    };
+    expect(bad).toBeDefined();
+  });
+
+  it("UpdateUserInput sesuai UpdateUserRequest — semua opsional; is_active edit-saja di sini", () => {
+    const touch: UpdateUserInput = { position: "Analis Sistem Informasi", is_active: false };
+    const empty: UpdateUserInput = {};
+    expect(touch.is_active).toBe(false);
+    expect(Object.keys(empty)).toHaveLength(0);
+    // permissions hilang ≠ kosong; [] dikirim eksplisit (sync penuh).
+    const clear: UpdateUserInput = { permissions: [] };
+    expect(clear.permissions).toEqual([]);
+  });
+
+  it("ListUsersQuery hanya per_page/page — sesuai parameter GET /admin/users", () => {
+    const q: ListUsersQuery = { page: 2, per_page: 15 };
+    // @ts-expect-error — filter tak dikenal ditolak
+    const extra: ListUsersQuery = { q: "budi" };
+    expect(q.page).toBe(2);
+    expect(extra).toBeDefined();
+  });
+
+  it("SettingValueUpdate sesuai UpdateSettingRequest — {key, value}", () => {
+    const u: SettingValueUpdate = { key: "password_default_user", value: "BaruUser123!" };
+    expect(u.key).toBe("password_default_user");
+    // @ts-expect-error — value wajib ada di UpdateSettingRequest
+    const bad: SettingValueUpdate = {
+      key: "password_default_user",
+    };
+    expect(bad).toBeDefined();
   });
 });

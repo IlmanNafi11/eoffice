@@ -564,3 +564,103 @@ export interface ListPackagesQuery {
   status?: ChangePackageStatus;
   field_id?: number;
 }
+
+// ── Admin (RBAC User Management + Settings) ─────────────────────────
+
+/**
+ * Role pada kontrak `StoreUserRequest.roles` / `UpdateUserRequest.roles`
+ * (enum openapi) — union literal, BUKAN `string` bebas.
+ */
+export type AdminRoleName = "admin" | "kepala_bidang" | "kepala_tim" | "staf";
+
+/**
+ * `#/components/schemas/UserResource` — resource user dari `/admin/users*`.
+ * `roles`/`permissions` selalu dipancarkan (v6.6.0: UserResource tunggal);
+ * `team?: TeamNested` hadir saat relasi di-load.
+ */
+export interface AdminUser {
+  id: number;
+  name: string;
+  nip: string;
+  email: string;
+  rank?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  is_active: boolean;
+  roles: string[];
+  permissions: string[];
+  created_at?: string | null;
+  team?: TeamNested | null;
+}
+
+/** `#/components/schemas/RoleResource` — role + permission sync-full. */
+export interface AdminRole {
+  id: number;
+  name: string;
+  permissions: string[];
+}
+
+/** `#/components/schemas/PermissionResource` — baris `{id, name}`. */
+export interface AdminPermission {
+  id: number;
+  name: string;
+}
+
+/** `POST /admin/users/import` — `data` berbentuk `{imported, skipped, errors[]}`. */
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+/** `GET /admin/settings` — map flat `{key: value}` (nilai ter-decode scalar/struktur). */
+export type SettingsMap = Record<string, unknown>;
+
+/**
+ * `#/components/schemas/StoreUserRequest` — wajib `name/nip/email/roles`;
+ * `password` opsional (kosong → server injek default dari Settings).
+ */
+export interface StoreUserInput {
+  name: string;
+  nip: string;
+  email: string;
+  team_id?: number | null;
+  rank?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  password?: string | null;
+  roles: AdminRoleName[];
+  permissions?: string[] | null;
+}
+
+/**
+ * `#/components/schemas/UpdateUserRequest` — semua opsional (`sometimes`);
+ * `permissions?: string[]` sync penuh (replace semua direct permission).
+ */
+export interface UpdateUserInput {
+  name?: string;
+  nip?: string;
+  email?: string;
+  team_id?: number | null;
+  rank?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  roles?: AdminRoleName[];
+  permissions?: string[];
+  is_active?: boolean;
+}
+
+/** Query `GET /admin/users` — `per_page` (default 15), `page` implicit. */
+export interface ListUsersQuery {
+  page?: number;
+  per_page?: number;
+}
+
+/**
+ * `PUT /admin/settings/{key}` — `#/components/schemas/UpdateSettingRequest`
+ * (body `{value}`) + `key` dari path (`encodeURIComponent`).
+ */
+export interface SettingValueUpdate {
+  key: string;
+  value: unknown;
+}
