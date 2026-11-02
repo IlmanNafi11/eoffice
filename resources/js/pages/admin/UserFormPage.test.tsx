@@ -448,6 +448,28 @@ describe("UserFormPage — edit mode (/admin/users/:userId/edit)", () => {
     const [, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
     expect(input.is_active).toBe(false);
   });
+  it("uncheck SEMUA direct permissions → updateUser mengirim permissions: [] (bukan omit)", async () => {
+    const u = userEvent.setup();
+    renderForm("/admin/users/12/edit");
+
+    // Prefill gabungan [wfh.report.create, wfh.report.approve].
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "wfh.report.create" })).toBeTruthy(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "wfh.report.approve" })).toBeTruthy(),
+    );
+
+    await u.click(screen.getByRole("checkbox", { name: "wfh.report.create" }));
+    await u.click(screen.getByRole("checkbox", { name: "wfh.report.approve" }));
+
+    await u.click(screen.getByRole("button", { name: /simpan/i }));
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
+
+    const [, input] = mockedUpdate.mock.calls[0] as [number, Record<string, unknown>];
+    expect("permissions" in input).toBe(true);
+    expect(input.permissions).toEqual([]);
+  });
 
   it("uncheck role lalu centang role lain → roles[] dikirim; permissions TIDAK (tak disentuh)", async () => {
     const u = userEvent.setup();
