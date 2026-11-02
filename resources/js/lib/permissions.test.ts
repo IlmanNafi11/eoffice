@@ -255,6 +255,7 @@ describe("lib/nav-registry — visibleNav() per role", () => {
       "team-report",
       "changes",
       "users",
+      "roles",
       "settings",
       "profile",
     ]);

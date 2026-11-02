@@ -31,6 +31,10 @@ import { MonitoringPage } from "@/pages/wfh/MonitoringPage";
 import { ChangesPage } from "@/pages/changes/ChangesPage";
 import { ChangePackageFormPage } from "@/pages/changes/ChangePackageFormPage";
 import { ChangePackageDetailPage } from "@/pages/changes/ChangePackageDetailPage";
+import { UsersPage } from "@/pages/admin/UsersPage";
+import { UserFormPage } from "@/pages/admin/UserFormPage";
+import { RolesPage } from "@/pages/admin/RolesPage";
+import { SettingsPage } from "@/pages/admin/SettingsPage";
 
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
 
@@ -67,6 +71,11 @@ export const router = createBrowserRouter([
           { path: "/changes/new", element: <ChangePackageFormPage /> },
           { path: "/changes/:packageId/edit", element: <ChangePackageFormPage /> },
           { path: "/changes/:packageId", element: <ChangePackageDetailPage /> },
+          { path: "/admin/users", element: <UsersPage /> },
+          { path: "/admin/users/new", element: <UserFormPage /> },
+          { path: "/admin/users/:userId/edit", element: <UserFormPage /> },
+          { path: "/admin/roles", element: <RolesPage /> },
+          { path: "/admin/settings", element: <SettingsPage /> },
         ],
       },
     ],

@@ -17,6 +17,7 @@ import {
   Home,
   Monitor,
   Settings,
+  ShieldCheck,
   UserCog,
   UserRound,
   UsersRound,
@@ -76,6 +77,13 @@ export const NAV_REGISTRY: NavItem[] = [
     path: "/admin/users",
     icon: UserCog,
     requiredPermission: "user.manage",
+  },
+  {
+    id: "roles",
+    label: "Peran & Permission",
+    path: "/admin/roles",
+    icon: ShieldCheck,
+    requiredPermission: "role.manage",
   },
   {
     id: "settings",
