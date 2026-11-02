@@ -171,7 +171,7 @@ export function ChangePackageFormPage() {
     ? pkg?.initiation.status === "draft" &&
       pkg?.initiation.initiator_id === user?.id &&
       can(user, "change.initiation.submit")
-    : can(user, "change.initiation.submit");
+    : Boolean(user?.team?.field) && can(user, "change.initiation.submit");
 
   /** Bangun payload implementation draft (semua prop nullable). */
   function implementationDraft(): PackageImplementationDraftInput {

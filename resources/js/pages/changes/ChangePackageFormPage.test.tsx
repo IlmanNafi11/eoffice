@@ -276,6 +276,18 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(screen.getByTestId("change-package-form-validation")).toBeTruthy();
     expect(mockedCreate).not.toHaveBeenCalled();
   });
+  it("pemegang submit TANPA tim/bidang (admin) → tanpa tombol Submit (REQuery #2, ship#7)", async () => {
+    renderForm("/changes/new", {
+      roles: ["admin"],
+      permissions: ["change.initiation.view", "change.initiation.submit"],
+      team: undefined,
+    });
+
+    // Tombol Submit pasti 422 (field_id kosong) — tidak boleh dirender; admin
+    // juga tanpa "Simpan Draft" (tanpa create tanpa tim).
+    expect(screen.queryByRole("button", { name: /submit/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /simpan draft/i })).toBeNull();
+  });
 });
 
 describe("ChangePackageFormPage — validasi klien Submit", () => {

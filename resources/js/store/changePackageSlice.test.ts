@@ -253,6 +253,54 @@ describe("changePackageSlice — fetchPackage", () => {
     // Baru setelah fetch sukses, error bersih.
     expect(selectChangePackageCurrent(store.getState()).error).toBeNull();
   });
+  it("pindah paket: data id lama dikosongkan saat pending — tak tampil/diajukan sbg paket lain (ship#7)", async () => {
+    mockedShow.mockResolvedValueOnce(pkg);
+    const store = makeStore();
+    await store.dispatch(fetchPackage(12));
+    expect(selectChangePackageCurrentData(store.getState())?.initiation.id).toBe(12);
+
+    // Navigasi ke paket 13: fetch lambat — data 12 harus HILANG seketika.
+    let resolveSlow!: (value: ChangePackage) => void;
+    mockedShow.mockReturnValueOnce(
+      new Promise<ChangePackage>((res) => {
+        resolveSlow = res;
+      }),
+    );
+    const pending = store.dispatch(fetchPackage(13));
+    expect(selectChangePackageCurrentData(store.getState())).toBeNull();
+
+    const pkg13: ChangePackage = {
+      initiation: { ...pkg.initiation, id: 13 },
+      implementation: pkg.implementation,
+    };
+    resolveSlow(pkg13);
+    await pending;
+    expect(selectChangePackageCurrentData(store.getState())?.initiation.id).toBe(13);
+  });
+
+  it("respons basi (out-of-order) untuk detail tidak menimpa data terbaru", async () => {
+    let resolveSlow!: (value: ChangePackage) => void;
+    mockedShow.mockReturnValueOnce(
+      new Promise<ChangePackage>((res) => {
+        resolveSlow = res;
+      }),
+    );
+    const pkg13: ChangePackage = {
+      initiation: { ...pkg.initiation, id: 13 },
+      implementation: pkg.implementation,
+    };
+    mockedShow.mockResolvedValueOnce(pkg13);
+    const store = makeStore();
+
+    const first = store.dispatch(fetchPackage(12));
+    const second = store.dispatch(fetchPackage(13));
+    await second;
+    expect(selectChangePackageCurrentData(store.getState())?.initiation.id).toBe(13);
+
+    resolveSlow(pkg); // respons lama (12) tiba terlambat → harus dibuang.
+    await first;
+    expect(selectChangePackageCurrentData(store.getState())?.initiation.id).toBe(13);
+  });
 });
 
 describe("changePackageSlice — mutations", () => {

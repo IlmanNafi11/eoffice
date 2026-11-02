@@ -46,6 +46,8 @@ export interface ChangePackageCurrentState {
   data: ChangePackage | null;
   status: ChangePackageFetchStatus;
   error: string | null;
+  /** requestId dispatch detail terakhir — respons basi (id lama/out-of-order) dibuang. */
+  latestRequestId: string | null;
 }
 
 export interface ChangeTypesState {
@@ -71,7 +73,7 @@ export function initialChangePackageState(): ChangePackageState {
       perPage: null,
       latestRequestId: null,
     },
-    current: { data: null, status: "idle", error: null },
+    current: { data: null, status: "idle", error: null, latestRequestId: null },
     changeTypes: { items: [], status: "idle" },
   };
 }
@@ -273,17 +275,26 @@ const slice = createSlice({
           (action.payload as string | undefined) ?? action.error.message ?? "Gagal memuat daftar.";
       })
       // ── Detail ────────────────────────────────────────────────
-      .addCase(fetchPackage.pending, (state) => {
+      .addCase(fetchPackage.pending, (state, action) => {
         // Jangan bersihkan error: refetch pasca-mutasi gagal tak boleh
         // melenyapkan pesan 422 (a602c46) — error bertahan sampai fetch sukses.
         state.current.status = "loading";
+        const requestedId = action.meta.arg;
+        // Kosongkan `data` hanya saat pindah paket (id berbeda) — refetch paket
+        // yang sama (pasca-mutasi) mempertahankan data agar tak flash loading.
+        if (state.current.data && state.current.data.initiation.id !== requestedId) {
+          state.current.data = null;
+        }
+        state.current.latestRequestId = action.meta.requestId;
       })
       .addCase(fetchPackage.fulfilled, (state, action) => {
+        if (state.current.latestRequestId !== action.meta.requestId) return;
         state.current.status = "succeeded";
         state.current.data = action.payload;
         state.current.error = null;
       })
       .addCase(fetchPackage.rejected, (state, action) => {
+        if (state.current.latestRequestId !== action.meta.requestId) return;
         state.current.status = "failed";
         state.current.error =
           (action.payload as string | undefined) ?? action.error.message ?? "Gagal memuat paket.";
