@@ -30,7 +30,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         }
 
         return $query
-            ->with(['team.field', 'roles.permissions', 'permissions'])
+            ->with(['team.field', 'team.leader', 'roles.permissions', 'permissions'])
             ->get();
     }
 }

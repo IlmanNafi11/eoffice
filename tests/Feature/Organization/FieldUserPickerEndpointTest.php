@@ -202,6 +202,31 @@ class FieldUserPickerEndpointTest extends TestCase
         $this->assertGreaterThan(0, $largeRole, 'Roles must still be loaded for the list.');
     }
 
+    public function test_list_eager_loads_team_leaders_without_n_plus_one(): void
+    {
+        $admin = User::factory()->create(['team_id' => null]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        foreach (range(1, 5) as $i) {
+            $leader = User::factory()->create();
+            $team = Team::factory()->create(['leader_id' => $leader->id]);
+            $member = User::factory()->create(['team_id' => $team->id]);
+            $member->assignRole('staf');
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $this->getJson('/api/users')->assertOk();
+
+        $lazyLeaderLoads = $this->countMatching('"users"."id" = ? and "users"."deleted_at" is null');
+        $this->assertSame(
+            0,
+            $lazyLeaderLoads,
+            'team.leader must be batch-eager-loaded, never one query per row.',
+        );
+    }
+
     private function countMatching(string $needle): int
     {
         return collect(DB::getQueryLog())
