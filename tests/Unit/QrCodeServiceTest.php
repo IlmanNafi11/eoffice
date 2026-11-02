@@ -46,8 +46,9 @@ class QrCodeServiceTest extends TestCase
 
         $url = $this->service->generateVerificationUrl($token);
 
-        $this->assertStringContainsString('/api/verify/', $url);
+        $this->assertStringContainsString('/verify/', $url);
+        $this->assertStringNotContainsString('/api/verify', $url);
         $this->assertStringContainsString(config('app.url'), $url);
-        $this->assertStringEndsWith("/api/verify/{$token}", $url);
+        $this->assertStringEndsWith("/verify/{$token}", $url);
     }
 }

@@ -34,6 +34,6 @@ class QrCodeService
      */
     public function generateVerificationUrl(string $token): string
     {
-        return config('app.url')."/api/verify/{$token}";
+        return config('app.url')."/verify/{$token}";
     }
 }
