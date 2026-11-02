@@ -43,7 +43,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/ui/file-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -330,16 +330,15 @@ export function ChangePackageDetailPage() {
               <FieldLabel htmlFor="change-package-attachment-input" className="sr-only">
                 Unggah Lampiran
               </FieldLabel>
-              <Input
+              <FileInput
                 id="change-package-attachment-input"
-                type="file"
+                data-testid="change-package-attachment-input"
                 multiple
                 className="w-72"
                 disabled={uploading}
-                data-testid="change-package-attachment-input"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  e.target.value = "";
+                placeholder="Pilih lampiran…"
+                onFileChange={() => undefined}
+                onFilesChange={(files) => {
                   if (files.length === 0) return;
                   void (async () => {
                     setUploading(true);

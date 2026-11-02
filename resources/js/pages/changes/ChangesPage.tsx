@@ -33,6 +33,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/wfh/pagination";
 import { WfhStatusBadge } from "@/components/wfh/status-badge";
@@ -133,33 +140,48 @@ export function ChangesPage() {
           <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
             <Field className="w-52" orientation="vertical">
               <FieldLabel htmlFor="changes-filter-status">Status</FieldLabel>
-              <select
-                id="changes-filter-status"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                value={statusSelect}
-                onChange={(e) => setStatusSelect(e.target.value as ChangePackageStatus | "")}
+              <Select
+                value={statusSelect === "" ? undefined : statusSelect}
+                onValueChange={(v) =>
+                  setStatusSelect((v ?? "") as ChangePackageStatus | "")
+                }
               >
-                <option value="">Semua status</option>
-                <option value="draft">Draf</option>
-                <option value="pending">Menunggu persetujuan</option>
-                <option value="approved">Disetujui</option>
-                <option value="rejected">Ditolak</option>
-              </select>
+                <SelectTrigger
+                  id="changes-filter-status"
+                  aria-label="Status"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Semua status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draf</SelectItem>
+                  <SelectItem value="pending">Menunggu persetujuan</SelectItem>
+                  <SelectItem value="approved">Disetujui</SelectItem>
+                  <SelectItem value="rejected">Ditolak</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field className="w-36" orientation="vertical">
               <FieldLabel htmlFor="changes-filter-perpage">Per halaman</FieldLabel>
-              <select
-                id="changes-filter-perpage"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+              <Select
                 value={perPageSelect?.toString() ?? "15"}
-                onChange={(e) => applyPerPage(e.target.value)}
+                onValueChange={applyPerPage}
               >
-                {[10, 15, 25, 50, 100].map((n) => (
-                  <option key={n} value={String(n)}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="changes-filter-perpage"
+                  aria-label="Per halaman"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 15, 25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Button type="submit">Terapkan</Button>
           </form>

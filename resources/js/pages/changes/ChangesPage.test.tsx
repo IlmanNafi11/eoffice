@@ -16,8 +16,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
+import { userEvent, settlePortal } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { ChangePackage, PaginationMeta } from "@/api/types";
@@ -121,6 +121,13 @@ beforeEach(() => {
   mockedList.mockResolvedValue({ packages: [pkgA, pkgB], meta });
 });
 
+/** Buka Select status, pilih opsi, settle portal (helper test kit). */
+async function pickStatus(label: string) {
+  await userEvent.click(screen.getByLabelText("Status"));
+  await userEvent.click(await screen.findByRole("option", { name: label }));
+  await settlePortal();
+}
+
 describe("ChangesPage — fetch awal & render", () => {
   it("mount mem-fetch daftar dengan query bersih dan menampilkan baris", async () => {
     renderPage();
@@ -208,7 +215,7 @@ describe("ChangesPage — filter & paginate", () => {
     await screen.findByText("001/9/1.1/114/2025");
     mockedList.mockClear();
 
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "pending" } });
+    await pickStatus("Menunggu persetujuan");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
@@ -232,7 +239,7 @@ describe("ChangesPage — filter & paginate", () => {
     await screen.findByText("001/9/1.1/114/2025");
 
     // 1. Terapkan filter status pending.
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "pending" } });
+    await pickStatus("Menunggu persetujuan");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
@@ -272,7 +279,9 @@ describe("ChangesPage — filter & paginate", () => {
     await screen.findByText("001/9/1.1/114/2025");
     mockedList.mockClear();
 
-    await userEvent.selectOptions(screen.getByLabelText("Per halaman"), "25");
+    await userEvent.click(screen.getByLabelText("Per halaman"));
+    await userEvent.click(await screen.findByRole("option", { name: "25" }));
+    await settlePortal();
 
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ per_page: 25, page: 1 });

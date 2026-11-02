@@ -5,7 +5,7 @@
  * `onFileChange(File | null)`. Empat consumer tinggal ganti elemen.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { FileInput } from "@/components/ui/file-input";
@@ -73,5 +73,60 @@ describe("FileInput — kontrak onFileChange", () => {
     });
     render(<FileInput onFileChange={vi.fn()} file={file} aria-label="Lampiran" />);
     expect(screen.getByText("eksternal.docx")).toBeTruthy();
+  });
+});
+
+describe("FileInput — mode multiple (Task 10)", () => {
+  it("upload 2 file → onFilesChange([f1, f2]) dan label jumlah tampil", async () => {
+    const user = userEvent.setup();
+    const onFilesChange = vi.fn();
+    render(
+      <FileInput onFileChange={vi.fn()} onFilesChange={onFilesChange} multiple />,
+    );
+
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    expect(input.multiple).toBe(true);
+
+    const f1 = new File(["a"], "satu.pdf", { type: "application/pdf" });
+    const f2 = new File(["b"], "dua.pdf", { type: "application/pdf" });
+    await user.upload(input, [f1, f2]);
+
+    expect(onFilesChange).toHaveBeenCalledWith([f1, f2]);
+    expect(screen.getByText("2 file dipilih")).toBeTruthy();
+  });
+
+  it("hapus file (multi) → onFilesChange([]) dan kembali ke placeholder", async () => {
+    const user = userEvent.setup();
+    const onFilesChange = vi.fn();
+    render(
+      <FileInput onFileChange={vi.fn()} onFilesChange={onFilesChange} multiple />,
+    );
+
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(input, new File(["x"], "c.t", { type: "text/plain" }));
+    // Satu file di mode multi tetap menampilkan namanya (bukan hitungan).
+    await screen.findByText("c.t");
+
+    await user.click(screen.getByRole("button", { name: /hapus file/i }));
+    expect(onFilesChange).toHaveBeenLastCalledWith([]);
+    expect(screen.getByText(/pilih file/i)).toBeTruthy();
+  });
+
+  it("dialog dibatalkan (0 file) → onFilesChange TIDAK dipanggil", async () => {
+    const onFilesChange = vi.fn();
+    render(
+      <FileInput onFileChange={vi.fn()} onFilesChange={onFilesChange} multiple />,
+    );
+
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    // Dialog batal = change event tanpa file sama sekali.
+    fireEvent.change(input, { target: { files: [] } });
+    expect(onFilesChange).not.toHaveBeenCalled();
   });
 });
