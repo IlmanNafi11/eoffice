@@ -680,3 +680,21 @@ export interface QrVerification {
   status: string;
   message: string;
 }
+
+// ── Picker evaluator (modul organization — GET /api/users) ──────────
+
+/** Query `GET /users` (listUsersForPicker) — admin/`user.manage` saja. */
+export interface ListFieldUsersQuery {
+  field_id?: number;
+}
+
+/**
+ * Baris `GET /users` — subset `UserResource` yang dipakai picker evaluator
+ * (daftar aktif satu bidang, non-paginated): identitas + tim untuk label.
+ */
+export interface PickerUser {
+  id: number;
+  name: string;
+  nip: string;
+  team?: TeamNested | null;
+}
