@@ -74,3 +74,45 @@ The map, not filename guessing, is the index of what exists.
 | 2026-11-02 | `admin` | 12 operations: listUsers/createUser/getUserById/updateUser/deleteUser/importUsers (user mgmt), listRoles/updateRolePermissions/listPermissions (RBAC), listSettings/updateSetting (settings), + listTeams dipinjam dari `api/wfh-team` (bukan duplikasi) | 8 commits (`784ba9a`…`b169c26`); 40 test files / 495 tests green, `tsc --noEmit` clean, `npm run build` exit 0; unconsumed-scan 12 op = 0; permission-scan file modul ⊆ seeder (8 nama persis: user.create/delete/import/manage/update, role.manage, permission.manage, setting.manage); test lama pass unmodified (0 baris `-` pada diff test range, 2233 insertions; `store/index.ts` hanya +reducer). E2E manual 4 peran in a real browser (admin buat user tanpa password → login default → must_change tersaji; import CSV valid+duplikat → `1 diimpor, 1 dilewati` + pesan baris; uncheck `user.manage` pada role admin → dialog konfirmasi → 422 lockout tersaji; ubah `password_default_user` → user baru login pakai default baru; staf → 3 menu admin hilang + URL langsung → 403 Indonesia). Catatan E2E: NIP numerik murni (mis. `88880001`) gagal import server-side (`The N.nip field must be a string` — Maatwebsite row-validation coercion; pre-existing backend quirk, out of scope FE) — workaround smoke pakai NIP berawalan nol. Human review disetujui 2026-11-02. |
 | 2026-11-02 | `admin` (ship-review #8) | 3 persona sejajar (code-reviewer: GO 0C/0H/1M/2L; security-auditor: GO 0C/0H/0M/1L; test-engineer: REQUEST CHANGES 1H/3M/3L) | 1 High + 3 Medium ditutup: H1 error hapus terdorong keluar oleh dialog overlay z-50 (pola b309c73) → error dirender di dalam DialogContent; M2 guard race `fetchUser` (latestRequestId + clear-on-different-id) dites; M3 `updateUser` permissions `[]` (sync penuh) dites form-level; M4 guard error import-file ≤10 MB klien. Bonus kualitas: `createUserThunk`/`updateUserThunk` + matcher dead-code dihapus (dipanggil langsung api/admin.ts). 495 → 498 tests post-fix (+6 regresi mutation-verified: 2 race fetchUser, 1 permissions-[], 1 error-survival, 1 size-guard, 1 delete-in-dialog; −3 echo/dead). 3 commit fix `0f5fc38`/`462f792`/`884e108` + `52f1035` (catatan). tsc + build bersih; backend phpunit 734 OK + Pint (tak berubah; 2 PHPUnit deprecations pre-existing). |
 | 2026-11-02 | `verification` | 1 operation: verifyQrToken — halaman publik `/verify/{token}` (card centered tanpa login): doc_type/doc_number/report_date (bila ada)/status/message; 404/429 tersaji dari ApiError; token salah bentuk dicek klien tanpa panggilan API | 3 commits (`716f33d`…`5499a80`); 42 test files / 508 tests green, `tsc --noEmit` clean, `npm run build` exit 0; unconsumed-scan 59/59 op = 0 (modul terakhir inisiatif); permission-scan file modul = hasil kosong (publik, tanpa gate); test lama pass unmodified (0 baris `-` diff test; `store/index.ts` & `nav-registry.ts` TIDAK berubah). E2E manual 4 alur publik in a real browser tanpa login (WFH-236 approved → card lengkap; Change Initiation tanpa `report_date` → render tanpa baris tanggal; token acak 64-hex → 404 "tidak ditemukan" tersaji `role="alert"`; token `abc` → "tidak valid" dengan 0 network request; login staf tab lain → tetap tanpa sidebar/AppShell). Human review disetujui 2026-11-02. Risiko tercatat: QR tercetak mengarah `/api/verify/{token}` (path API, bukan SPA) — keputusan backend/deploy, di luar modul ini. || 2026-11-02 | `admin`+`verification` (ship-review #9, final) | 3 persona sejajar pada range `origin/features/frontend..5c27ad7` (17 commit, hanya frontend): code-reviewer APPROVE 0C/0H/3M/4L/5 nit, security-auditor GO 0C/0H/0M/3L/2 info, test-engineer GO (verdict GO — semua gate hijau). Merge: 0 blocker; aksesibilitas M1 (nav edit baris tak keyboard-reachable) + keamanan M2 (plaintext `password_default_*`), M3 (perPage desync clamp), konvergen L1 (guard `permission.manage` pada fetchPermissions UserFormPage), L3 allowlist ekstensi import, L4 key duplikat errors[] | Semua ditutup dalam 1 commit post-review: nav edit jadi `Link` (keyboard-reachable, asersi href), `password_default_*` dimask `type=password` + tombol reveal (regresi), `fetchUsers.fulfilled` sinkron `perPage` dari `meta.per_page` (server ClampsPerPage; 2 regresi), `fetchPermissions()` digate `permission.manage` (2 regresi, pola RolesPage), guard ekstensi `.xlsx/.xls/.csv` sebelum unggah (fireEvent — user-event v14 mematuhi `accept`), key errors[] `\${i}-\${err}`. 508 → 513 tests green ×2 run berturut, `tsc --noEmit` clean, `npm run build` exit 0; risiko tercatat (tidak blocking): token bearer di localStorage + tanpa CSP (header tier web-server, di luar range), backend redaksi `password_default_*` read → tiket backend |
+
+## Capability Map: Form Consistency animate-ui + Backend Alignment (FE)
+
+> Source intent: `docs/intent/frontend-form-consistency-and-backend-alignment.md` (confirmed 2026-11-02).
+> Contract: `postman/specs/openapi.yaml` (unchanged 59 ops; konsumsi baru satu op yang sudah ada:
+> `GET /api/users` dari backend issues #1). Branch: `features/frontend`.
+> Inisiatif **tuntas** (2026-11-02): 14/14 task — ~24 kontrol native di 12 file diganti
+> komponen bergaya animate-ui.com (`components/ui/*` via primitif `@animate-ui/react`);
+> audit grep native NOL di seluruh `resources/js`.
+
+**Consumer:** SPA repo ini. Backend out of scope (merge `features/backend` untuk endpoint).
+
+| Module id | Responsibility | Reuses primitives from |
+|---|---|---|
+| `ui-form-kit` | `Select`, `Checkbox`, `Popover`, `Calendar`, `Combobox`, `Command`, `DateInput`, `MonthInput`, `FileInput` (semua impor primitif `@animate-ui/react/*`) | — |
+| `evaluator-picker` | `PickerUser` + API `listFieldUsers` (`GET /api/users` field-scoped, activeOnly); Combobox evaluator di `ChangePackageFormPage` | `ui-form-kit` |
+| `page-migration` | Migrasi halaman: admin (2), changes (2), WFH reports trio, MonitoringPage, ChangePackageFormPage sisa, Profile + attendance-upload | `ui-form-kit`, `evaluator-picker` |
+
+## Build order
+
+```
+merge backend → ui-form-kit → evaluator-picker → page-migration → closeout
+```
+
+**Per module**: spec dilipat ke `tasks/plan.md` (Ground-truth + Keputusan D1–D9 + acceptance
+per task) atas arahan user; recovery: D1–D9 sumber kebenaran teknis.
+
+## Status
+
+| Module id | Status |
+|---|---|
+| `ui-form-kit` | **CLOSED 2026-11-02** (Tasks 2–4: deps `react-day-picker`/`date-fns`/`cmdk`, shadcn add 5 komponen, animate CLI; adapter DateInput, FileInput, Combobox + Command) |
+| `evaluator-picker` | **CLOSED 2026-11-02** (Tasks 6–8: `listFieldUsers` + tipe `PickerUser` Resolved; Combobox evaluator di form paket) |
+| `page-migration` | **CLOSED 2026-11-02** (Tasks 9–13: admin, changes, trio WFH, monitoring, profile — commit `bd38d6c`…`ad9c97c`; 564 → 546 test penggabungan helper portal) |
+
+## Closure log
+
+| Date | Module | Scope closed | Evidence |
+|---|---|---|---|
+| 2026-11-02 | `ui-form-kit` | Select/Checkbox/Popover/Calendar/Command shadcn + animate; adapter DateInput (string `""` ⇄ tanggal, kontrak lama utuh), FileInput (`inputLabel` aksesibel, reset, clear), MonthInput (BRL `yyyy-MM`), Combobox | Task 2 `npm test` smoke Select jsdom; Task 3–5 test per komponen; `tsc`+build hijau per commit |
+| 2026-11-02 | `evaluator-picker` | `listFieldUsers` (users.ts + users.test.ts), tipe `PickerUser`; Combobox evaluator (mount fetch, pilih, clear) | Task 6–8 test hijau; payload `evaluator_id` dites |
+| 2026-11-02 | `page-migration` + closeout | ~24 kontrol native → kit di 12 file: admin 2 halaman, changes 2, WfhReports/TeamReports/ReportDetail, MonitoringPage (filter+board), ChangePackageFormPage sisa (3 date, 2 select, 2 checkbox), ProfileFileInput, attendance-upload | Commit `bd38d6c`…`ad9c97c`; audit grep native = NOL; 48 files / 546 tests green, tsc + build bersih; E2E browser nyata: form paket submit end-to-end (date picker → select → combobox evaluator `GET /api/users` → Submit → detail `/changes/161`), FileInput tanda tangan upload → preview `naturalWidth`>0, QR `/api/verify/{token}` 302 → SPA `/verify/{token}` render |

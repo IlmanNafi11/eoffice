@@ -5,6 +5,17 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Changed (frontend, 2026-11-02 — inisiatif form-consistency)
+- Seluruh kontrol native SPA (~24 di 12 file: select, date, month,
+  checkbox, radio, file) diganti komponen bergaya animate-ui.com di
+  `resources/js/components/ui/*` (`Select`, `Checkbox`, `DateInput`,
+  `MonthInput`, `FileInput`, `Combobox`) — kanvas form konsisten,
+  audit grep kontrol native = nol.
+- Form change-package: picker evaluator baru (Combobox) dari
+  `GET /api/users` (field-scoped, active-only) untuk issue backend #1;
+  tanggal dibutuhkan/eksekusi/rilis memakai calendar popover, bukan
+  `input type=date`.
+
 ### Added
 - Health probe `GET /up`: tanpa autentikasi, memeriksa koneksi database,
   menjawab `503` bila database tidak tercapai (sebelumnya orchestrator hanya
