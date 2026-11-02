@@ -664,3 +664,19 @@ export interface SettingValueUpdate {
   key: string;
   value: unknown;
 }
+
+// ── QR Verification (modul verification) ────────────────────────────
+
+/**
+ * `#/components/schemas/QrVerificationResponse.data` — `GET /verify/{token}`.
+ * `report_date` hanya ada untuk doc_type "WFH Report" (Change Initiation
+ * tidak memilikinya); `doc_type` string bebas agar tipe dokumen baru dari
+ * server tetap ter-render tanpa perubahan UI.
+ */
+export interface QrVerification {
+  doc_type: string;
+  doc_number: string;
+  report_date?: string | null;
+  status: string;
+  message: string;
+}
