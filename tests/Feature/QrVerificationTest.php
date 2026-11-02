@@ -150,4 +150,34 @@ class QrVerificationTest extends TestCase
 
         $this->getJson("/api/verify/{$token}")->assertStatus(429);
     }
+
+    public function test_html_accept_redirects_to_spa(): void
+    {
+        $token = bin2hex(random_bytes(32));
+
+        $this->get('/api/verify/'.$token, ['Accept' => 'text/html'])
+            ->assertRedirect('/verify/'.$token);
+    }
+
+    public function test_json_accept_is_unchanged(): void
+    {
+        $token = bin2hex(random_bytes(32));
+
+        $this->getJson('/api/verify/'.$token)
+            ->assertStatus(404)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_html_redirect_path_still_throttled(): void
+    {
+        $token = bin2hex(random_bytes(32));
+
+        for ($i = 0; $i < 60; $i++) {
+            $this->get('/api/verify/'.$token, ['Accept' => 'text/html'])
+                ->assertRedirect('/verify/'.$token);
+        }
+
+        $this->get('/api/verify/'.$token, ['Accept' => 'text/html'])
+            ->assertStatus(429);
+    }
 }

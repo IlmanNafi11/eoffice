@@ -8,6 +8,7 @@ use App\Domains\Organization\Http\Resources\UserResource;
 use App\Domains\Organization\Repositories\UserRepositoryInterface;
 use App\Exceptions\ApiException;
 use App\Models\User;
+use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
 use App\Support\Import\UserImport;
@@ -42,6 +43,38 @@ class UserController extends Controller
         );
 
         return ApiResponse::paginated($users, UserResource::class);
+    }
+
+    /**
+     * Read-only user list for dropdown pickers (e.g. evaluator selection in
+     * the change-package form). No permission gate: everyone authenticated may
+     * call it, but non-admins are scoped to their own bidang — matching the
+     * evaluator rule, which only accepts active users from the creator's
+     * field. Admins (and user.manage holders) may pass ?field_id=; the param is
+     * ignored for scoped users.
+     */
+    public function indexForField(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->hasRole(Roles::ADMIN) || $user->can('user.manage')) {
+            $fieldId = $request->filled('field_id') ? $request->integer('field_id') : null;
+
+            return ApiResponse::ok(
+                UserResource::collection($this->userRepository->listActiveForField($fieldId)),
+            );
+        }
+
+        $user->loadMissing('team.field');
+        $fieldId = $user->team?->field_id;
+
+        if ($fieldId === null) {
+            return ApiResponse::ok(UserResource::collection(collect()));
+        }
+
+        return ApiResponse::ok(
+            UserResource::collection($this->userRepository->listActiveForField($fieldId)),
+        );
     }
 
     public function store(StoreUserRequest $request): JsonResponse

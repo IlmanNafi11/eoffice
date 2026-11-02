@@ -13,6 +13,11 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   (S2): bukti perubahan tidak lagi di-serve sebagai URL statis `/storage/*`.
 - `DocNumberGenerator` membaca prefix dokumen dari `config('change-mgmt.doc_prefix')`
   (`CHANGE_DOC_PREFIX`), bukan literal yang di-hard-code.
+- `GET /api/users` — daftar user aktif read-only untuk dropdown picker
+  (mis. evaluator pada form change-package), di-scope bidang: non-admin hanya
+  melihat user aktif di bidang sendiri; admin/`user.manage` boleh `?field_id=`.
+  User non-aktif dan user tanpa tim tidak pernah dikembalikan (konsisten
+  dengan aturan validasi evaluator lintas-bidang).
 
 ### Changed
 - `DemoUsersSeeder` gagal tertutup (fail closed): menolak berjalan di luar
@@ -39,6 +44,11 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 - Endpoint verifikasi QR publik `GET /verify/{token}` kini di-rate-limit
   (`throttle:60,1`) — token tetap 256-bit, limiter mencegahnya dipakai sebagai
   oracle/amplifier bila QR bocor.
+- QR pada PDF kini mengarah ke halaman SPA `/verify/{token}` (bukan
+  `/api/verify/{token}` yang memunculkan JSON mentah saat discan). QR pada
+  dokumen yang sudah tercetak tetap berfungsi: `GET /api/verify/{token}` dengan
+  `Accept: text/html` di-redirect (302) ke halaman SPA yang sama; kontrak JSON
+  untuk klien non-HTML tidak berubah.
 - `.env.example` memakai `LOG_LEVEL=warning`, bukan `debug`.
 - `ChangePackageController::destroy` memakai permission route-nya
   (`change.initiation.delete`), bukan `update`; `authorize()` ditambahkan
