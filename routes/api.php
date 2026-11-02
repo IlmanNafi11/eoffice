@@ -58,6 +58,9 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
     // Teams (dropdown options)
     Route::get('/teams', [TeamController::class, 'index']);
+    // Users (dropdown picker: evaluator etc.) — read-only, field-scoped in
+    // the controller (admin/user.manage see all; everyone else own bidang).
+    Route::get('/users', [UserController::class, 'indexForField']);
     // Admin User Management
     Route::middleware('permission:user.manage')->group(function () {
         Route::get('/admin/users', [UserController::class, 'index']);
