@@ -107,4 +107,37 @@ describe("Combobox — generik single-select", () => {
     renderCombobox({ value: null });
     expect(screen.queryByRole("button", { name: /hapus pilihan/i })).toBeNull();
   });
+
+  it("keyboard: buka → ketik filter → Enter memilih item ter-highlight", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    renderCombobox({ value: null, onValueChange });
+
+    await user.click(screen.getByRole("combobox", { name: "Evaluator" }));
+    const search = await screen.findByPlaceholderText(/cari/i);
+    await user.type(search, "sumber");
+    await waitFor(() => expect(screen.queryByText("Keuangan")).toBeNull());
+
+    // cmdk menyorot item pertama hasil filter; Enter memilihnya.
+    await user.keyboard("{Enter}");
+
+    expect(onValueChange).toHaveBeenCalledWith("hr");
+  });
+
+  it("keyboard: Escape menutup popover tanpa mengubah value", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    renderCombobox({ value: null, onValueChange });
+
+    await user.click(screen.getByRole("combobox", { name: "Evaluator" }));
+    await screen.findByPlaceholderText(/cari/i);
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      const triggers = screen.queryAllByRole("combobox", { name: "Evaluator" });
+      const closed = triggers.some((t) => t.getAttribute("aria-expanded") === "false");
+      expect(closed).toBe(true);
+    });
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
 });

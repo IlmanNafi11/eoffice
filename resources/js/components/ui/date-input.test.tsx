@@ -85,4 +85,35 @@ describe("DateInput — kontrak string", () => {
     const trigger = screen.getByRole("button", { name: /15 Agustus 2026/ });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
+
+  it("M3 regresi: data-day hanya ISO di gridcell (react-day-picker), tombol hari tak menimpanya", async () => {
+    const user = userEvent.setup();
+    render(<DateInput value="2026-08-12" onChange={vi.fn()} />);
+    await user.click(screen.getByText("12 Agustus 2026"));
+
+    const cell = document.body.querySelector<HTMLElement>('[data-day="2026-08-15"]');
+    expect(cell).toBeTruthy();
+    expect(cell!.getAttribute("data-day")).toBe("2026-08-15");
+
+    // Button HARUS tanpa data-day sendiri: nilai locale-dependent ("15/8/2026"
+    // vs "8/15/2026") pernah membuat kontrak query tidak deterministik (M3).
+    const btn = cell!.querySelector("button");
+    expect(btn).toBeTruthy();
+    expect(btn!.hasAttribute("data-day")).toBe(false);
+  });
+
+  it("keyboard: Escape menutup popover kalender tanpa onChange", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<DateInput value="" onChange={onChange} />);
+
+    await user.click(screen.getByText("Pilih tanggal"));
+    expect(screen.getByRole("button", { name: /pilih tanggal/i }).getAttribute("aria-expanded")).toBe("true");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /pilih tanggal/i }).getAttribute("aria-expanded")).toBe("false");
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
