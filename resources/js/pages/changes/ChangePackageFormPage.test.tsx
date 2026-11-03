@@ -312,6 +312,26 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     });
   });
 
+  it("M2 regresi: prioritas/dampak draft bisa dikosongkan kembali lewat opsi —", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    // Pilih, lalu reset ke opsi "—" → draft payload kembali null (bukan basi).
+    await pickSelect("Prioritas", "Normal");
+    await pickSelect("Dampak", "Minor");
+    await pickSelect("Prioritas", "—");
+    await pickSelect("Dampak", "—");
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith({
+        initiation: expect.objectContaining({ description: "Migrasi server" }),
+        implementation: draftImplementation,
+      });
+    });
+  });
+
   it("draft tanpa deskripsi → validasi klien, createPackage TIDAK dipanggil", async () => {
     renderForm("/changes/new");
     await userEvent.type(screen.getByLabelText("Alasan"), "Server tua");

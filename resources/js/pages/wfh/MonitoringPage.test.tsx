@@ -426,6 +426,31 @@ describe("MonitoringPage — Semua Laporan", () => {
     });
   });
 
+  it("M2 regresi: opsi Semua status & Semua tim mengembalikan filter ke semua", async () => {
+    renderPageAs();
+    await openReportsTab();
+
+    // Set filter aktif…
+    await pickSelect("Status", "approved");
+    await pickSelect("Tim", "Tim Aplikasi");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({
+        status: "approved",
+        team_id: 3,
+        page: 1,
+      });
+    });
+
+    // …lalu reset keduanya lewat opsi "Semua" dan terapkan ulang.
+    await pickSelect("Status", "Semua status");
+    await pickSelect("Tim", "Semua tim");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
+    });
+  });
+
   it("list kosong → empty state bahasa Indonesia", async () => {
     mockedList.mockResolvedValue({ reports: [], meta: { ...meta, total: 0, last_page: 1 } });
     renderPageAs();

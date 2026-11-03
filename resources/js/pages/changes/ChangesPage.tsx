@@ -154,6 +154,7 @@ export function ChangesPage() {
                   <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Semua status</SelectItem>
                   <SelectItem value="draft">Draf</SelectItem>
                   <SelectItem value="pending">Menunggu persetujuan</SelectItem>
                   <SelectItem value="approved">Disetujui</SelectItem>

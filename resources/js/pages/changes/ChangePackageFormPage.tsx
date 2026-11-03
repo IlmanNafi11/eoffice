@@ -530,6 +530,7 @@ export function ChangePackageFormPage() {
                   <SelectValue placeholder="Pilih prioritas" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">—</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
                   <SelectItem value="emergency">Emergency</SelectItem>
                 </SelectContent>
@@ -551,6 +552,7 @@ export function ChangePackageFormPage() {
                   <SelectValue placeholder="Pilih dampak" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">—</SelectItem>
                   <SelectItem value="Minor">Minor</SelectItem>
                   <SelectItem value="Mayor">Mayor</SelectItem>
                 </SelectContent>

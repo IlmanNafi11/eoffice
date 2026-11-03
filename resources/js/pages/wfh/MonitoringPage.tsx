@@ -409,6 +409,7 @@ export function MonitoringPage() {
                       <SelectValue placeholder="Semua status" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Semua status</SelectItem>
                       {WFH_REPORT_STATUSES.map((st) => (
                         <SelectItem key={st} value={st}>
                           {st}
@@ -431,6 +432,7 @@ export function MonitoringPage() {
                       <SelectValue placeholder="Semua tim" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Semua tim</SelectItem>
                       {(teams ?? []).map((t) => (
                         <SelectItem key={t.id} value={String(t.id)}>
                           {t.name}

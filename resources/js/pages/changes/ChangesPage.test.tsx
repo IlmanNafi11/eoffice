@@ -124,7 +124,9 @@ beforeEach(() => {
 /** Buka Select status, pilih opsi, settle portal (helper test kit). */
 async function pickStatus(label: string) {
   await userEvent.click(screen.getByLabelText("Status"));
-  await userEvent.click(await screen.findByRole("option", { name: label }));
+  const items = await screen.findAllByRole("option", { name: label });
+  const item = items.find((el) => el.getAttribute("data-slot") === "select-item") ?? items[items.length - 1]!;
+  await userEvent.click(item);
   await settlePortal();
 }
 
@@ -255,6 +257,23 @@ describe("ChangesPage — filter & paginate", () => {
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
+    });
+  });
+
+  it("M2 regresi: opsi Semua status mengembalikan filter ke semua", async () => {
+    renderPage();
+    await screen.findByText("001/9/1.1/114/2025");
+
+    await pickStatus("Menunggu persetujuan");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
+    });
+
+    await pickStatus("Semua status");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
     });
   });
 

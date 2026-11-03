@@ -47,7 +47,19 @@ export async function settlePortal() {
 /** Pilih opsi `Select` (Radix) lewat trigger berlabel, lalu settle portal. */
 export async function pickSelect(label: string | RegExp, optionName: string | RegExp) {
   await userEvent.click(screen.getByLabelText(label));
-  await userEvent.click(await screen.findByRole("option", { name: optionName }));
+  // Radix mirrors every SelectItem into a hidden native <option>
+  // (SelectBubbleInput) and keeps exited content mounted (inert) until jsdom
+  // completes the exit animation. Pick the visible Radix item inside the
+  // active content only.
+  const items = await screen.findAllByRole("option", { name: optionName });
+  const item =
+    items.find((el) => {
+      const container = el.closest('[data-slot="select-content"], [role="listbox"]');
+      const visible =
+        container !== null && !container.hasAttribute("inert") && !container.hasAttribute("aria-hidden");
+      return visible && el.getAttribute("data-slot") === "select-item";
+    }) ?? items[items.length - 1]!;
+  await userEvent.click(item);
   await settlePortal();
 }
 
