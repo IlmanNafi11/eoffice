@@ -4,6 +4,7 @@
  * shell ini di `routes/index.tsx`, jadi di sini hanya layout murni.
  */
 
+import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Header } from "@/components/layout/Header";
@@ -16,7 +17,9 @@ export function AppShell() {
       <SidebarInset>
         <Header />
         <main className="flex-1 p-4 md:p-6">
-          <Outlet />
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </main>
       </SidebarInset>
     </SidebarProvider>

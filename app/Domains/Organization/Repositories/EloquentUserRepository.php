@@ -30,7 +30,9 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         }
 
         return $query
-            ->with(['team.field', 'team.leader', 'roles.permissions', 'permissions'])
+            // PickerUserResource serializes only team + team.leader + team.field;
+            // roles.permissions/permissions would be dead weight here (ship #12).
+            ->with(['team.field', 'team.leader'])
             ->get();
     }
 }

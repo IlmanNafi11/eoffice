@@ -85,4 +85,34 @@ class SettingsValidationTest extends TestCase
 
         $this->assertSame(['pagi', 'sore'], Setting::get('wfh_sessions'));
     }
+
+    public function test_allowed_days_accepts_empty_list_to_disable_wfh(): void
+    {
+        $this->putJson('/api/admin/settings/wfh_allowed_days', ['value' => []])
+            ->assertOk();
+
+        $this->assertSame([], Setting::get('wfh_allowed_days'));
+    }
+
+    public function test_allowed_days_rejects_associative_array(): void
+    {
+        $this->putJson('/api/admin/settings/wfh_allowed_days', ['value' => ['a' => 1]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['value']);
+    }
+
+    public function test_sessions_accepts_empty_list_to_disable_sessions(): void
+    {
+        $this->putJson('/api/admin/settings/wfh_sessions', ['value' => []])
+            ->assertOk();
+
+        $this->assertSame([], Setting::get('wfh_sessions'));
+    }
+
+    public function test_sessions_rejects_associative_array(): void
+    {
+        $this->putJson('/api/admin/settings/wfh_sessions', ['value' => ['x' => 'pagi']])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['value']);
+    }
 }

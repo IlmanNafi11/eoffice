@@ -222,4 +222,43 @@ class ReportDateFilterTest extends TestCase
         $response->assertStatus(200)->assertJsonPath('meta.total', 1);
         $this->assertSame('2026-07-15', $response->json('data.0.report_date'));
     }
+
+    public function test_partial_range_to_only_still_filters(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        // date_to-only = upper bound: on/before passes, after it excluded.
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-01',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-10',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-20',
+        ]);
+
+        $response = $this->getJson('/api/wfh/reports?date_to=2026-07-10');
+
+        $response->assertStatus(200)->assertJsonPath('meta.total', 2);
+        $this->assertSame(
+            ['2026-07-10', '2026-07-01'],
+            $response->json('data.*.report_date'),
+        );
+    }
+
+    public function test_invalid_date_to_returns_422(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/wfh/reports?date_to=not-a-date')
+            ->assertStatus(422);
+    }
 }

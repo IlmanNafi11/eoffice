@@ -155,8 +155,12 @@ class QrVerificationTest extends TestCase
     {
         $token = bin2hex(random_bytes(32));
 
-        $this->get('/api/verify/'.$token, ['Accept' => 'text/html'])
-            ->assertRedirect('/verify/'.$token);
+        $response = $this->get('/api/verify/'.$token, ['Accept' => 'text/html']);
+
+        $response->assertRedirect('/verify/'.$token);
+        // Relative Location — NOT absolutized via UrlGenerator from the
+        // (spoofable) Host header (ship review #12).
+        $this->assertSame('/verify/'.$token, $response->headers->get('Location'));
     }
 
     public function test_json_accept_is_unchanged(): void

@@ -2,16 +2,16 @@
  * Adapter `MonthInput` (Task 11, pola D3 seperti `DateInput`): state form
  * seluruh halaman adalah `string` `yyyy-MM` atau `""` — adapter ini
  * mempertahankan kontrak itu. menggantikan `<input type="month">` native.
- *
  * Komposisi: `Popover` animate + grid 12 bulan + navigasi tahun (tanpa
  * primitif animate-ui setara, sama seperti Calendar). Label trigger
- * terformat locale id ("September 2026"); clear-able lewat tombol ikon di
- * dalam trigger (stopPropagation agar popover tidak menutup duluan).
+ * terformat locale id ("September 2026"); clear-able lewat tombol ikon
+ * sibling trigger (bukan nested — ARIA-in-ARIA, ship review #12).
  */
 import * as React from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ClearButton } from "@/components/ui/clear-button";
 import {
   Popover,
   PopoverContent,
@@ -85,85 +85,70 @@ function MonthInput({
   };
 
   return (
-    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setNavYear(null); }}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "w-45 justify-between gap-1.5 font-normal",
-            !parsed && "text-muted-foreground",
-            className,
-          )}
-          {...props}
-        >
-          <span>{label}</span>
-          {clearable && parsed && !disabled ? (
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label="hapus bulan"
-              title="Hapus bulan"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange("");
-                setNavYear(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onChange("");
-                  setNavYear(null);
-                }
-              }}
-              className="rounded-sm p-0.5 opacity-60 hover:opacity-100"
+    <div className={cn("flex items-center gap-1.5", className)}>
+      <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setNavYear(null); }}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            disabled={disabled}
+            className={cn(
+              "w-45 justify-between gap-1.5 font-normal",
+              !parsed && "text-muted-foreground",
+            )}
+            {...props}
+          >
+            <span>{label}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-3" align="start">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="tahun sebelumnya"
+              onClick={() => setNavYear(shownYear - 1)}
             >
-              <X className="size-3.5 pointer-events-none" />
-            </span>
-          ) : null}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-3" align="start">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="tahun sebelumnya"
-            onClick={() => setNavYear(shownYear - 1)}
-          >
-            <ChevronLeft aria-hidden="true" className="size-4" />
-          </Button>
-          <span className="text-sm font-medium">{shownYear}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="tahun berikutnya"
-            onClick={() => setNavYear(shownYear + 1)}
-          >
-            <ChevronRight aria-hidden="true" className="size-4" />
-          </Button>
-        </div>
-        <div className="grid grid-cols-3 gap-1" data-slot="month-input-grid">
-          {MONTH_NAMES_ID.map((name, i) => {
-            const active = parsed && parsed.year === shownYear && parsed.month === i + 1;
-            return (
-              <Button
-                key={name}
-                type="button"
-                variant={active ? "default" : "ghost"}
-                size="sm"
-                onClick={() => pick(i + 1)}
-              >
-                {name}
-              </Button>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
+              <ChevronLeft aria-hidden="true" className="size-4" />
+            </Button>
+            <span className="text-sm font-medium">{shownYear}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="tahun berikutnya"
+              onClick={() => setNavYear(shownYear + 1)}
+            >
+              <ChevronRight aria-hidden="true" className="size-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-1" data-slot="month-input-grid">
+            {MONTH_NAMES_ID.map((name, i) => {
+              const active = parsed && parsed.year === shownYear && parsed.month === i + 1;
+              return (
+                <Button
+                  key={name}
+                  type="button"
+                  variant={active ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => pick(i + 1)}
+                >
+                  {name}
+                </Button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+      <ClearButton
+        clearable={clearable}
+        visible={Boolean(parsed)}
+        disabled={disabled}
+        label="hapus bulan"
+        title="Hapus bulan"
+        onClear={() => { onChange(""); setNavYear(null); }}
+      />
+    </div>
   );
 }
 

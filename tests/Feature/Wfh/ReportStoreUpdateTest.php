@@ -160,4 +160,28 @@ class ReportStoreUpdateTest extends TestCase
 
         $this->assertSame('draft', WfhReport::find($reportId)->status);
     }
+
+    public function test_store_rejects_future_report_date(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/wfh/reports', [
+            'report_date' => now()->addYear()->toDateString(),
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['report_date']);
+    }
+
+    public function test_store_rejects_absurdly_old_report_date(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/wfh/reports', [
+            'report_date' => '2019-12-31',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['report_date']);
+    }
 }

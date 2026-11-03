@@ -226,8 +226,10 @@ class FieldUserPickerEndpointTest extends TestCase
         $this->assertSame($smallPivot, $largePivot, 'Permission pivot queries must stay flat as rows grow.');
         $this->assertSame($smallRole, $largeRole, 'Role pivot queries must stay flat as rows grow.');
         $this->assertSame($smallTotal, $largeTotal, 'Total query count must stay flat as rows grow.');
-        $this->assertGreaterThan(0, $largePivot, 'Permissions must still be loaded for the list.');
-        $this->assertGreaterThan(0, $largeRole, 'Roles must still be loaded for the list.');
+        // Lean picker payload (PickerUserResource) exposes no permission/role
+        // data, so these relations are deliberately NOT eager-loaded (ship #12).
+        $this->assertSame(0, $largePivot, 'Permission pivots should not load for the lean picker.');
+        $this->assertSame(0, $largeRole, 'Role pivots should not load for the lean picker.');
     }
 
     public function test_list_eager_loads_team_leaders_without_n_plus_one(): void

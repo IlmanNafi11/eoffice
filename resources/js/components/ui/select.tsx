@@ -1,3 +1,11 @@
+/**
+ * Konvensi reset filter (ship review #12): opsi "kosongkan" dipakai sebagai
+ * `<SelectItem value="">…</SelectItem>`. Radix menyembunyikan children item
+ * `value=""` yang sedang dipilih (`shouldShowPlaceholder("")` → trigger
+ * menampilkan `placeholder` `SelectValue`), JADI label placeholder HARUS
+ * sama dengan label item (mis. "Semua status" ⇔ "Semua status"). Mengubah
+ * salah satunya saja akan menampilkan label yang salah di trigger.
+ */
 import * as React from "react"
 import { cn } from "cn"
 import { Select as SelectPrimitive } from "@animate-ui/react/primitives/radix-ui"

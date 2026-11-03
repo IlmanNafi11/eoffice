@@ -187,10 +187,13 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 });
 
-/** Kosongkan DateInput lewat tombol hapus (no-op bila memang sudah kosong). */
+/** Kosongkan DateInput lewat tombol hapus (no-op bila memang sudah kosong).
+ * Clear button adalah sibling trigger (bukan nested), ship review #12. */
 async function clearDate(label: string) {
   const trigger = screen.getByLabelText(label);
-  const clearBtn = within(trigger).queryByRole("button", { name: "hapus tanggal" });
+  const clearBtn = trigger.parentElement?.querySelector<HTMLButtonElement>(
+    'button[aria-label="hapus tanggal"]',
+  );
   if (clearBtn) await userEvent.click(clearBtn);
 }
 

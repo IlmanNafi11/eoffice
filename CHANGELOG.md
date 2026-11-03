@@ -5,6 +5,33 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (frontend+backend, 2026-11-03 — tindak lanjut ship-review #12)
+- `PUT /api/admin/settings/{key}`: `wfh_allowed_days`/`wfh_sessions`
+  menerima array kosong (= WFH/sesi nonaktif, fail-closed di attendance &
+  reminder); rule `value` kini `present` (key wajib ada) bukan `required`
+  yang menolak `[]`. Non-list/assoc tetap 422 (test baru 4 kasus).
+- Filter laporan WFH: `date_to` tanpa `date_from` kini teruji (batas atas
+  saja), plus suite baru `AdminDateRangeWiringTest` menutup wiring rentang
+  di endpoint admin (from+to, to-only, date_from cacat → 422).
+- A11y: tombol hapus (`X`) `DateInput`/`MonthInput`/`TimeInput` kini
+  `Button` sibling trigger — bukan `role="button"` nested di dalam
+  `<button>` (ARIA-in-ARIA) — dedup via `ClearButton` bersama
+  (`clear-button.tsx`), setara pola Combobox/FileInput.
+- Keamanan: redirect QR `GET /api/verify/{token}` memancarkan `Location`
+  relatif (Symfony `RedirectResponse` langsung) — Laravel `redirect()`
+  mengabsolutkan via header Host yang bisa dipalsukan di belakang proxy
+  yang salah konfigurasi. Test mengunci Location relatif.
+- Keamanan: picker `GET /api/users` tidak lagi eager-load
+  `roles.permissions`/`permissions` (dead weight — `PickerUserResource`
+  tidak pernah menyerialisasi keduanya); test pivot kini mengunci 0 query.
+- `POST /wfh/reports`: `report_date` dibatasi `<= hari ini` dan
+  `>= 2020-01-01` — foto absensi ditulis sebelum cek unique-key, jadi
+  tanggal tak terbatas sebelumnya memungkinkan autentik user menyebarkan
+  direktori arbitrer di disk (ship #12; menutup temuan pre-existing).
+- Performa: route-level code splitting (`React.lazy` per halaman +
+  `Suspense` di AppShell & route publik) — bundle utama 1.002 kB → 396 kB
+  (gzip 122 kB), halaman berat (admin/WFH/changes) termuat on-demand.
+
 ### Changed (frontend+backend, 2026-11-03 — inisiatif ux-fixes: pengaturan, WFH personal, RBAC)
 - `WfhReportsPage`: filter pasangan date+month diganti rentang
   `date_from`–`date_to` (kalender popover, inklusif); Monitoring tab "Semua

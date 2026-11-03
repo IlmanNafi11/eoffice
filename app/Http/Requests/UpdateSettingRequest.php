@@ -13,8 +13,11 @@ class UpdateSettingRequest extends FormRequest
 
     public function rules(): array
     {
+        // `present` (bukan `required`): key wajib ada, tapi array kosong sah
+        // untuk wfh_allowed_days/wfh_sessions (subset kosong = nonaktif).
+        // Format tetap dijaga closure per key di bawah.
         return [
-            'value' => ['required', $this->valueFormatRule()],
+            'value' => ['present', $this->valueFormatRule()],
         ];
     }
 
@@ -50,10 +53,14 @@ class UpdateSettingRequest extends FormRequest
         }
     }
 
-    /** `wfh_allowed_days` — array integer ISO 1..7 (subset bebas). */
+    /**
+     * `wfh_allowed_days` — array integer ISO 1..7 (subset bebas, boleh kosong
+     * = WFH nonaktif; attendance dan reminder memperlakukan daftar kosong
+     * sebagai fail-closed).
+     */
     private function guardAllowedDays(mixed $value, \Closure $fail): void
     {
-        if (! is_array($value) || $value === [] || array_is_list($value) === false) {
+        if (! is_array($value) || array_is_list($value) === false) {
             $fail('Hari kerja WFH harus berupa daftar angka hari (1..7).');
 
             return;
@@ -68,12 +75,12 @@ class UpdateSettingRequest extends FormRequest
         }
     }
 
-    /** `wfh_sessions` — array subset {pagi, siang, sore}. */
+    /** `wfh_sessions` — array subset {pagi, siang, sore}, boleh kosong (= sesi WFH nonaktif). */
     private function guardSessions(mixed $value, \Closure $fail): void
     {
         $allowed = ['pagi', 'siang', 'sore'];
 
-        if (! is_array($value) || $value === [] || array_is_list($value) === false) {
+        if (! is_array($value) || array_is_list($value) === false) {
             $fail('Sesi absensi WFH harus berupa daftar nama sesi yang valid.');
 
             return;
@@ -114,7 +121,7 @@ class UpdateSettingRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'value.required' => 'Nilai setting wajib diisi.',
+            'value.present' => 'Nilai setting wajib diisi.',
         ];
     }
 }

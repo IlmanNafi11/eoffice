@@ -4,13 +4,13 @@
  * mempertahankan kontrak itu, menggantikan `<input type="time">` native.
  *
  * Komposisi: `Popover` animate + dua kolom jam (00..23) dan menit (langkah 5).
- * Label trigger menampilkan `HH:mm`; clear-able lewat tombol ikon di dalam
- * trigger (stopPropagation agar popover tidak menutup duluan).
+ * Label trigger menampilkan `HH:mm`; clear-able lewat tombol ikon sibling
+ * trigger (bukan nested — ARIA-in-ARIA, ship review #12).
  */
 import * as React from "react";
-import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ClearButton } from "@/components/ui/clear-button";
 import {
   Popover,
   PopoverContent,
@@ -81,43 +81,21 @@ function TimeInput({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "w-45 justify-between gap-1.5 font-normal",
-            !parsed && "text-muted-foreground",
-            className,
-          )}
-          {...props}
-        >
-          <span>{label}</span>
-          {clearable && parsed && !disabled ? (
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label="hapus jam"
-              title="Hapus jam"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange("");
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onChange("");
-                }
-              }}
-              className="rounded-sm p-0.5 opacity-60 hover:opacity-100"
-            >
-              <X className="size-3.5 pointer-events-none" />
-            </span>
-          ) : null}
-        </Button>
-      </PopoverTrigger>
+    <div className={cn("flex items-center gap-1.5", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            disabled={disabled}
+            className={cn(
+              "w-45 justify-between gap-1.5 font-normal",
+              !parsed && "text-muted-foreground",
+            )}
+            {...props}
+          >
+            <span>{label}</span>
+          </Button>
+        </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="start">
         <div className="flex gap-2">
           <div className="grid max-h-56 grid-cols-3 gap-1 overflow-auto" data-slot="time-input-hour">
@@ -158,7 +136,16 @@ function TimeInput({
           </div>
         </div>
       </PopoverContent>
-    </Popover>
+      </Popover>
+      <ClearButton
+        clearable={clearable}
+        visible={Boolean(parsed)}
+        disabled={disabled}
+        label="hapus jam"
+        title="Hapus jam"
+        onClear={() => onChange("")}
+      />
+    </div>
   );
 }
 

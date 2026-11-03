@@ -17,30 +17,35 @@
  * - Halaman Beranda (placeholder) menunggu modul WFH/Change/fase berikutnya;
  *   outletnya tetap minimal.
  */
+import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
-import { ChangePasswordPage } from "@/pages/auth/ChangePasswordPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
-import { ProfilePage } from "@/pages/profile/ProfilePage";
-import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
-import { LoginPage } from "@/pages/auth/LoginPage";
-import { OtpVerificationPage } from "@/pages/auth/OtpVerificationPage";
-import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
-import { VerifyPage } from "@/pages/verification/VerifyPage";
-import { WfhReportsPage } from "@/pages/wfh/WfhReportsPage";
-import { WfhReportDetailPage } from "@/pages/wfh/WfhReportDetailPage";
-import { TeamReportsPage } from "@/pages/wfh/TeamReportsPage";
-import { MonitoringPage } from "@/pages/wfh/MonitoringPage";
-import { ChangesPage } from "@/pages/changes/ChangesPage";
-import { ChangePackageFormPage } from "@/pages/changes/ChangePackageFormPage";
-import { ChangePackageDetailPage } from "@/pages/changes/ChangePackageDetailPage";
-import { UsersPage } from "@/pages/admin/UsersPage";
-import { UserFormPage } from "@/pages/admin/UserFormPage";
-import { RolesPage } from "@/pages/admin/RolesPage";
-import { SettingsPage } from "@/pages/admin/SettingsPage";
-
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
+
+// Route-level code splitting (ship review #12): the animate-ui kit (Select,
+// Popover, Command, Calendar, FileInput) pushed the single bundle past 1 MB.
+// Heavy page modules load on demand; the auth/reset/verify pages stay small
+// enough to remain in the bootstrap chunk so login is never split.
+const LoginPage = lazy(() => import("@/pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })));
+const ChangePasswordPage = lazy(() => import("@/pages/auth/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage })));
+const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })));
+const OtpVerificationPage = lazy(() => import("@/pages/auth/OtpVerificationPage").then((m) => ({ default: m.OtpVerificationPage })));
+const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
+const VerifyPage = lazy(() => import("@/pages/verification/VerifyPage").then((m) => ({ default: m.VerifyPage })));
+const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage").then((m) => ({ default: m.ProfilePage })));
+const WfhReportsPage = lazy(() => import("@/pages/wfh/WfhReportsPage").then((m) => ({ default: m.WfhReportsPage })));
+const WfhReportDetailPage = lazy(() => import("@/pages/wfh/WfhReportDetailPage").then((m) => ({ default: m.WfhReportDetailPage })));
+const TeamReportsPage = lazy(() => import("@/pages/wfh/TeamReportsPage").then((m) => ({ default: m.TeamReportsPage })));
+const MonitoringPage = lazy(() => import("@/pages/wfh/MonitoringPage").then((m) => ({ default: m.MonitoringPage })));
+const ChangesPage = lazy(() => import("@/pages/changes/ChangesPage").then((m) => ({ default: m.ChangesPage })));
+const ChangePackageFormPage = lazy(() => import("@/pages/changes/ChangePackageFormPage").then((m) => ({ default: m.ChangePackageFormPage })));
+const ChangePackageDetailPage = lazy(() => import("@/pages/changes/ChangePackageDetailPage").then((m) => ({ default: m.ChangePackageDetailPage })));
+const UsersPage = lazy(() => import("@/pages/admin/UsersPage").then((m) => ({ default: m.UsersPage })));
+const UserFormPage = lazy(() => import("@/pages/admin/UserFormPage").then((m) => ({ default: m.UserFormPage })));
+const RolesPage = lazy(() => import("@/pages/admin/RolesPage").then((m) => ({ default: m.RolesPage })));
+const SettingsPage = lazy(() => import("@/pages/admin/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 
 /** Placeholder outlet `/` sampai modul WFH/Change (fase berikutnya). */
 function HomePage() {
@@ -53,7 +58,14 @@ function HomePage() {
 }
 
 export const router = createBrowserRouter([
-  { path: "/login", element: <LoginPage /> },
+  {
+    path: "/login",
+    element: (
+      <Suspense fallback={null}>
+        <LoginPage />
+      </Suspense>
+    ),
+  },
   {
     element: (
       <SessionBootstrap>
@@ -84,8 +96,36 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
-  { path: "/verify-otp", element: <OtpVerificationPage /> },
-  { path: "/reset-password", element: <ResetPasswordPage /> },
-  { path: "/verify/:token", element: <VerifyPage /> },
+  {
+    path: "/forgot-password",
+    element: (
+      <Suspense fallback={null}>
+        <ForgotPasswordPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/verify-otp",
+    element: (
+      <Suspense fallback={null}>
+        <OtpVerificationPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/reset-password",
+    element: (
+      <Suspense fallback={null}>
+        <ResetPasswordPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/verify/:token",
+    element: (
+      <Suspense fallback={null}>
+        <VerifyPage />
+      </Suspense>
+    ),
+  },
 ]);

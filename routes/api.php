@@ -21,6 +21,7 @@ use App\Http\Controllers\QrVerificationController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SignatureController;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 
@@ -36,9 +37,15 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->m
 // text/html entry with q > 0 — wildcards/q=0 don't count) and the redirect
 // only fires for well-formed tokens; malformed ones fall through so every
 // client gets the same 404 envelope (ship review #10, SEC-02).
+//
+// The Location header is issued as a relative path — NOT absolutized via
+// redirect()->to() — so a spoofed Host / X-Forwarded-Host on a misconfigured
+// proxy cannot steer scanners to an attacker origin (ship review #12).
 Route::get('/verify/{token}', function (Request $request, string $token) {
     if (QrVerificationController::wantsHtml($request) && preg_match('/^[a-f0-9]{64}$/', $token)) {
-        return redirect()->to('/verify/'.$token, 302);
+        // Symfony directly — Laravel's redirect()/redirect()->to() absolutize
+        // through UrlGenerator::to() from the (spoofable) Host header.
+        return new RedirectResponse('/verify/'.$token, 302);
     }
 
     return app(QrVerificationController::class)->verify($token);
