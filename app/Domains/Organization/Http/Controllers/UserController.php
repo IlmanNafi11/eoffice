@@ -4,6 +4,7 @@ namespace App\Domains\Organization\Http\Controllers;
 
 use App\Domains\Organization\Http\Requests\StoreUserRequest;
 use App\Domains\Organization\Http\Requests\UpdateUserRequest;
+use App\Domains\Organization\Http\Resources\PickerUserResource;
 use App\Domains\Organization\Http\Resources\UserResource;
 use App\Domains\Organization\Repositories\UserRepositoryInterface;
 use App\Exceptions\ApiException;
@@ -61,7 +62,7 @@ class UserController extends Controller
             $fieldId = $request->filled('field_id') ? $request->integer('field_id') : null;
 
             return ApiResponse::ok(
-                UserResource::collection($this->userRepository->listActiveForField($fieldId)),
+                PickerUserResource::collection($this->userRepository->listActiveForField($fieldId)),
             );
         }
 
@@ -69,11 +70,11 @@ class UserController extends Controller
         $fieldId = $user->team?->field_id;
 
         if ($fieldId === null) {
-            return ApiResponse::ok(UserResource::collection(collect()));
+            return ApiResponse::ok(PickerUserResource::collection(collect()));
         }
 
         return ApiResponse::ok(
-            UserResource::collection($this->userRepository->listActiveForField($fieldId)),
+            PickerUserResource::collection($this->userRepository->listActiveForField($fieldId)),
         );
     }
 

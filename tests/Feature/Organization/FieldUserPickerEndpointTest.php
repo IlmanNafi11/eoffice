@@ -51,6 +51,34 @@ class FieldUserPickerEndpointTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_picker_payload_is_lean_and_never_exposes_sensitive_fields(): void
+    {
+        $field = Field::factory()->create();
+        $team = Team::factory()->create(['field_id' => $field->id, 'leader_id' => null]);
+        $member = User::factory()->create(['team_id' => $team->id]);
+        $member->assignRole('staf');
+        $member->givePermissionTo('user.manage');
+        Sanctum::actingAs($member);
+
+        $data = $this->getJson('/api/users')->assertOk()->json('data');
+        $this->assertCount(1, $data);
+
+        $pick = $data[0];
+        $this->assertSame(
+            ['id', 'name', 'nip', 'team'],
+            array_keys($pick),
+            'Picker payload must stay lean (SEC-01): no email/roles/permissions/must_change_password.',
+        );
+        $this->assertSame($member->id, $pick['id']);
+        $this->assertSame($member->name, $pick['name']);
+        $this->assertSame($member->nip, $pick['nip']);
+        $this->assertSame(
+            ['id', 'name', 'field'],
+            array_keys($pick['team']),
+            'Team node must omit leader when none is set, mirroring the FE PickerUser type.',
+        );
+    }
+
     public function test_inactive_users_never_listed_for_admin_too(): void
     {
         $field = Field::factory()->create();

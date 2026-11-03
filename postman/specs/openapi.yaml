@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Intern Kominfo API
-  version: 6.7.0
+  version: 6.7.1
   description: |
     API for the Intern Kominfo application — a government intern management
     platform with Work-From-Home (WFH) reporting, change management workflows,
@@ -747,7 +747,79 @@ components:
           current_page: 1
           last_page: 5
           total: 72
-    # ── WFH Session Config ─────────────────────────────────────────
+    PickerUserResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PickerUserResource"
+      example:
+        success: true
+        data:
+          - id: 27
+            name: Dewi Lestari
+            nip: "199503152024011002"
+            team:
+              id: 3
+              name: Tim Aplikasi Informatika
+              leader:
+                id: 12
+                name: Budi Santoso
+              field:
+                id: 1
+                name: Bidang Teknologi Informasi
+    PickerUserResource:
+      type: object
+      required: [id, name, nip]
+      description: |
+        Lean projection for dropdown pickers (`GET /api/users`). Deliberately
+        omits email, roles, effective permissions, must_change_password and
+        signature URL — fields previously gated behind `user.manage`.
+      properties:
+        id:
+          type: integer
+          example: 27
+        name:
+          type: string
+          example: Dewi Lestari
+        nip:
+          type: string
+          example: "199503152024011002"
+        team:
+          nullable: true
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 3
+            name:
+              type: string
+              example: Tim Aplikasi Informatika
+            leader:
+              nullable: true
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 12
+                name:
+                  type: string
+                  example: Budi Santoso
+            field:
+              nullable: true
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                name:
+                  type: string
+                  example: Bidang Teknologi Informasi
     WfhSessionConfigResponse:
       type: object
       required: [data]
@@ -3312,6 +3384,10 @@ paths:
         Inactive users and users without a team are never returned — the
         evaluator validation rule only accepts active users with a team in
         the same bidang as the package creator.
+
+        The payload is a lean picker projection (id, name, nip, team):
+        no email, roles, permissions or account-state fields — those stay
+        gated behind the admin user list (ship review #10, SEC-01).
       parameters:
         - name: field_id
           in: query
@@ -3336,19 +3412,19 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/UserResource"
+                      $ref: "#/components/schemas/PickerUserResource"
               example:
                 success: true
                 data:
                   - id: 27
                     name: Dewi Lestari
                     nip: "199503152024011002"
-                    email: dewi@kominfo.go.id
-                    rank: Pengatur Muda
-                    position: Staf Pelaksana
                     team:
                       id: 3
                       name: Tim Aplikasi Informatika
+                      leader:
+                        id: 12
+                        name: Budi Santoso
                       field:
                         id: 1
                         name: Bidang Teknologi Informasi
