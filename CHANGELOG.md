@@ -5,6 +5,31 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Changed (frontend+backend, 2026-11-03 — inisiatif ux-fixes: pengaturan, WFH personal, RBAC)
+- `WfhReportsPage`: filter pasangan date+month diganti rentang
+  `date_from`–`date_to` (kalender popover, inklusif); Monitoring tab "Semua
+  Laporan" idem (rentang mencakup hari tunggal via from=to). UI tak pernah
+  mengirim `month` lagi; backend tetap menerimanya (kompatibel). Tombol
+  "Buat Laporan" (pilih tanggal → get-or-create → navigate) kini tampil
+  untuk semua pemegang `wfh.report.create`.
+- Halaman Pengaturan dinamis: label Indonesia + kontrol sesuai jenis nilai
+  dari kamus `settings-meta.ts` — 7 checkbox hari kerja (ISO 1..7), 3
+  checkbox sesi fixed, `TimeInput` adapter `HH:mm` non-native (Popover 24
+  jam × langkah menit 5), password tetap masked + dialog konfirmasi; key tak
+  dikenal tetap tampil sebagai teks. Nilai array dikirim apa adanya
+  (sebelumnya JSON string read-only).
+- `PUT /api/admin/settings/{key}` memvalidasi format per key di server:
+  `wfh_notify_start_time` `H:i` 24-jam, `wfh_allowed_days` array integer
+  1..7, `wfh_sessions` subset {pagi,siang,sore}; `password_default_*`
+  tetap 8..255 karakter. Input cacat → 422 dengan pesan Indonesia.
+- Peran & Permission: nama permission programatik tak lagi menjadi label
+  checkbox; kamus `permissions-meta.ts` (38 permission seeder) merendernya
+  sebagai label Indonesia dikelompokkan per section modul (Manajemen
+  Pengguna / RBAC / WFH / Manajemen Perubahan / Pengaturan) di dalam tiap
+  card role. Permission tak dikenal tetap tampil di "Lainnya" — grid RBAC
+  selalu mencerminkan daftar server. Sync penuh, dialog lockout, dan gate
+  tidak berubah.
+
 ### Changed (frontend, 2026-11-02 — inisiatif form-consistency)
 - Seluruh kontrol native SPA (~24 di 12 file: select, date, month,
   checkbox, radio, file) diganti komponen bergaya animate-ui.com di
