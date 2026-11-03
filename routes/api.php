@@ -30,10 +30,14 @@ Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middlewar
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth');
 
 // QR on already-printed documents points at /api/verify/{token}. Browsers
-// (camera scanners) send Accept: text/html — they land on the SPA page. Every
-// other consumer (JSON, curl, no Accept header) keeps the raw JSON contract.
+// (camera scanners) explicitly ask for text/html — they land on the SPA page.
+// Every other consumer (JSON, curl's */*, absent Accept) keeps the raw JSON
+// contract. Parsing lives in QrVerificationController::wantsHtml (explicit
+// text/html entry with q > 0 — wildcards/q=0 don't count) and the redirect
+// only fires for well-formed tokens; malformed ones fall through so every
+// client gets the same 404 envelope (ship review #10, SEC-02).
 Route::get('/verify/{token}', function (Request $request, string $token) {
-    if (str_contains($request->header('Accept', ''), 'text/html')) {
+    if (QrVerificationController::wantsHtml($request) && preg_match('/^[a-f0-9]{64}$/', $token)) {
         return redirect()->to('/verify/'.$token, 302);
     }
 

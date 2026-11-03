@@ -180,4 +180,39 @@ class QrVerificationTest extends TestCase
         $this->get('/api/verify/'.$token, ['Accept' => 'text/html'])
             ->assertStatus(429);
     }
+
+    public function test_html_redirect_requires_explicit_accept_html_token(): void
+    {
+        $token = bin2hex(random_bytes(32));
+
+        // Wildcard (curl default), xhtml+xml, text/html;q=0 and an empty
+        // Accept must NOT redirect: these are JSON/API consumers, not camera
+        // scanners. (A true "absent Accept" is untestable through $this->get:
+        // Symfony Request::create injects a browser-default text/html header
+        // when none is given, so an explicit empty string is the closest
+        // proxy.)
+        foreach ([
+            ['Accept' => '*/*'],
+            ['Accept' => 'application/xhtml+xml'],
+            ['Accept' => 'text/html;q=0'],
+            ['Accept' => ''],
+        ] as $headers) {
+            $this->get('/api/verify/'.$token, $headers)
+                ->assertStatus(404)
+                ->assertJsonPath('success', false);
+        }
+
+        // Case-insensitive explicit text/html still redirects (browser scanners).
+        $this->get('/api/verify/'.$token, ['Accept' => 'TEXT/HTML'])
+            ->assertRedirect('/verify/'.$token);
+    }
+
+    public function test_invalid_tokens_never_redirect_even_with_html_accept(): void
+    {
+        foreach (['not-a-token', strtoupper(bin2hex(random_bytes(32))), bin2hex(random_bytes(31))] as $bad) {
+            $this->get('/api/verify/'.$bad, ['Accept' => 'text/html'])
+                ->assertStatus(404)
+                ->assertJsonPath('success', false);
+        }
+    }
 }
