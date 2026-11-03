@@ -28,8 +28,20 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   (mis. evaluator pada form change-package), di-scope bidang: non-admin hanya
   melihat user aktif di bidang sendiri; admin/`user.manage` boleh `?field_id=`.
   User non-aktif dan user tanpa tim tidak pernah dikembalikan (konsisten
-  dengan aturan validasi evaluator lintas-bidang).
-
+  dengan aturan validasi evaluator lintas-bidang). Payload memakai proyeksi
+  lean `PickerUserResource` (`id`, `name`, `nip`, `team`) — email/roles/
+  permissions/must_change_password tidak lagi bocor ke picker (ship #10 SEC-01);
+  `team.leader` ikut eager-load sehingga daftar tetap flat walau tim ber-pemimpin.
+- Redirect QR lama (`GET /api/verify/{token}` → SPA) kini hanya untuk Accept
+  yang secara eksplisit meminta `text/html` dengan q>0 (wildcard `*/*`, absent,
+  dan `text/html;q=0` tetap menerima JSON), dan hanya untuk token berformat
+  64-hex — token cacat selalu menjawab 404 JSON yang sama (ship #10 SEC-02).
+- Kontrol select hasil migrasi animate-ui kembali punya opsi reset ("Semua
+  status", "Semua tim", "—" di draft prioritas/dampak) sehingga filter form
+  bisa dikembalikan ke kosong tanpa reload (ship #10 M2).
+- Kalender popover: atribut `data-day` locale-dependent di tombol hari dihapus;
+  kontrak query deterministik memakai `data-day` ISO milik gridcell
+  react-day-picker (ship #10 M3).
 ### Changed
 - `DemoUsersSeeder` gagal tertutup (fail closed): menolak berjalan di luar
   `local`/`testing` dan tidak pernah menulis kata sandi yang terdokumentasi
