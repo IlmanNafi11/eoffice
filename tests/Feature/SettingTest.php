@@ -83,14 +83,16 @@ class SettingTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_non_password_settings_are_not_length_limited(): void
+    public function test_password_default_accepts_a_value_up_to_255_characters(): void
     {
+        // Upper bound guard: exactly 255 is accepted, 256 is rejected
+        // (SettingsValidationTest covers the formatted keys' formats).
         $admin = User::factory()->create();
         $admin->assignRole('admin');
         Sanctum::actingAs($admin);
 
-        $this->putJson('/api/admin/settings/wfh_notify_start_time', [
-            'value' => str_repeat('x', 300),
+        $this->putJson('/api/admin/settings/password_default_user', [
+            'value' => str_repeat('a', 255),
         ])->assertStatus(200);
     }
 

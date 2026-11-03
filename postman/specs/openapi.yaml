@@ -1929,7 +1929,12 @@ components:
       required: [value]
       properties:
         value:
-          description: Any scalar or JSON-encodable structure.
+          description: >
+            Any scalar or JSON-encodable structure (arrays are writable).
+            Per-key format: `wfh_notify_start_time` = `HH:mm` 24-jam;
+            `wfh_allowed_days` = list integer ISO 1..7 (subset bebas);
+            `wfh_sessions` = list subset of {pagi,siang,sore};
+            `password_default_*` = string 8..255 karakter. Invalid format → 422.
           example: "RahasiaBaru123!"
       example:
         value: "RahasiaBaru123!"
