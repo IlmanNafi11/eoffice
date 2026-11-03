@@ -187,11 +187,14 @@ export interface WfhSessionConfig {
   allowed_days: number[];
 }
 
-/** Query `GET /wfh/reports` — filter opsional; `date` menang atas `month`. */
+/** Query `GET /wfh/reports` — filter opsional; urutan precedence:
+ * `date_from`/`date_to` > `date` > `month` (kontrak openapi v6.8.0). */
 export interface ListWfhReportsQuery {
   per_page?: number;
   date?: string;
   month?: string;
+  date_from?: string;
+  date_to?: string;
   /**
    * Halaman paginator — dibaca Laravel `paginate()` dari query `page` walau
    * tidak dideklarasikan di openapi.yaml (meta `current_page` membuktikannya).

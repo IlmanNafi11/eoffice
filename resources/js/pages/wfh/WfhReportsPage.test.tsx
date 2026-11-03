@@ -36,8 +36,17 @@ import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
 
 const mockedList = wfhApi.listWfhReports as unknown as Mock;
+const mockedCreate = wfhApi.createWfhReport as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 10, total: 12 };
+
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 const reportA: WfhReport = {
   id: 1,
@@ -69,9 +78,9 @@ const user = {
   permissions: ["wfh.report.create"],
 };
 
-function renderPage() {
+function renderPage(userOverride = user) {
   const store = makeStore();
-  store.dispatch(setUser(user));
+  store.dispatch(setUser(userOverride));
 
   render(
     <Provider store={store}>
@@ -90,7 +99,9 @@ function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockedList.mockResolvedValue({ reports: [reportA, reportB], meta });
+  mockedCreate.mockResolvedValue(reportA);
 });
+
 
 describe("WfhReportsPage — fetch awal & render", () => {
   it("mount mem-fetch daftar dan menampilkan baris tanggal + status", async () => {
@@ -222,5 +233,56 @@ describe("WfhReportsPage — filter & paginate", () => {
       // Bukan gabungan query lama ({page: 2}) — reset bersih ke halaman 1.
       expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
     });
+  });
+});
+
+describe("WfhReportsPage — tombol Buat Laporan & dialog create", () => {
+  it("menampilkan tombol Buat Laporan bila punya wfh.report.create", async () => {
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    expect(screen.getByRole("button", { name: /buat laporan/i })).toBeTruthy();
+  });
+
+  it("menyembunyikan tombol tanpa wfh.report.create", async () => {
+    renderPage({ ...user, permissions: ["wfh.report.export_pdf"] });
+    await screen.findByText("2026-08-10");
+
+    expect(screen.queryByRole("button", { name: /buat laporan/i })).toBeNull();
+  });
+
+  it("dialog default hari ini → create mem-POST {report_date} lalu navigate ke detail", async () => {
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    await screen.findByRole("dialog");
+
+    // Dialog DateInput default hari ini: submit langsung memakai tanggal
+    // berjalan (format yyyy-MM-dd lokal) — bukan input native ber-value.
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
+
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith({ report_date: todayIso() });
+    });
+    expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
+  });
+
+  it("get-or-create 200 (laporan sudah ada) tetap navigate ke detail", async () => {
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    // create mengembalikan laporan yang sudah ada (id 2) — perilaku 200.
+    mockedCreate.mockResolvedValueOnce(reportB);
+
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith({ report_date: todayIso() });
+    });
+    expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
   });
 });

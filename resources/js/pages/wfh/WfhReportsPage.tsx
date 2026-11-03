@@ -14,14 +14,24 @@
  * - status fetch gagal → pesan `list.error` dari slice.
  *
  * Konvensi Phase 1: pesan UI Indonesia, typed hooks, komponen `.tsx`.
- * Aksi "Tambah Laporan" bukan bagian task list ini (slice create menyusul).
+ * Task UX-fixes Task 2: tombol "Buat Laporan" (gate `wfh.report.create`)
+ * → dialog DateInput default hari ini → `createWfhReport({report_date})`
+ * → navigate `/wfh/{id}` (get-or-create 200/201 sama-sama navigate).
  */
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -30,8 +40,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { DateInput } from "@/components/ui/date-input";
 import { MonthInput } from "@/components/ui/month-input";
+import { DateInput, toDateString } from "@/components/ui/date-input";
 import {
   Select,
   SelectContent,
@@ -49,22 +59,35 @@ import {
   selectWfhListMeta,
 } from "@/store/wfhSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { can } from "@/lib/permissions";
+import { selectUser } from "@/store/authSlice";
+import { createWfhReport } from "@/api/wfh";
 
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
 
 export function WfhReportsPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const user = useAppSelector(selectUser);
 
   const { status, error, query } = useAppSelector(selectWfhList);
   const items = useAppSelector(selectWfhListItems);
   const meta = useAppSelector(selectWfhListMeta);
+
+  const canCreate = can(user, "wfh.report.create");
 
   // Filter lokal: baru dikirim ke backend saat "Terapkan" (menghindari fetch
   // per karakter). `perPage` null = pakai default backend (tidak dikirim).
   const [date, setDate] = useState("");
   const [month, setMonth] = useState("");
   const [perPage, setPerPage] = useState<number | null>(null);
+
+  // Dialog create: DateInput bersifat lokal (get-or-create 200/201 di sisi
+  // server; respons apa pun di-navigate ke detail).
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDate, setCreateDate] = useState(() => toDateString(new Date()));
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchWfhReports({}));
@@ -111,6 +134,29 @@ export function WfhReportsPage() {
     );
   }
 
+  /** Buka dialog → reset tanggal ke hari ini + bersihkan error. */
+  function openCreate() {
+    setCreateDate(toDateString(new Date()));
+    setCreateError(null);
+    setCreateOpen(true);
+  }
+
+  /** Create → navigate ke detail (200 get-or-create & 201 sama-sama). */
+  async function submitCreate() {
+    if (creating || !createDate) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const created = await createWfhReport({ report_date: createDate });
+      setCreateOpen(false);
+      navigate(`/wfh/${created.id}`);
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : "Gagal membuat laporan.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -120,7 +166,15 @@ export function WfhReportsPage() {
             Daftar laporan kerja dari rumah Anda.
           </p>
         </div>
-        <ClipboardList aria-hidden="true" className="size-5 text-muted-foreground" />
+        <div className="flex items-center gap-2">
+          {canCreate ? (
+            <Button type="button" onClick={openCreate}>
+              <Plus aria-hidden="true" className="size-4" />
+              Buat Laporan
+            </Button>
+          ) : null}
+          <ClipboardList aria-hidden="true" className="size-5 text-muted-foreground" />
+        </div>
       </div>
 
       <Card size="sm">
@@ -219,6 +273,52 @@ export function WfhReportsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buat Laporan</DialogTitle>
+            <DialogDescription>
+              Pilih tanggal kerja. Bila laporan untuk tanggal itu sudah ada,
+              Anda akan diarahkan ke laporan tersebut.
+            </DialogDescription>
+          </DialogHeader>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="wfh-create-date">Tanggal</FieldLabel>
+            <DateInput
+              id="wfh-create-date"
+              value={createDate}
+              onChange={setCreateDate}
+            />
+          </Field>
+          {createError && (
+            <p
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+              data-testid="wfh-create-error"
+            >
+              {createError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={creating}
+              onClick={() => setCreateOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={creating || createDate === ""}
+              onClick={() => void submitCreate()}
+            >
+              Buat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
