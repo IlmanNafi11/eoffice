@@ -42,7 +42,6 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { DateInput } from "@/components/ui/date-input";
-import { MonthInput } from "@/components/ui/month-input";
 import {
   Select,
   SelectContent,
@@ -156,8 +155,6 @@ export function MonitoringPage() {
   const [teamId, setTeamId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [date, setDate] = useState("");
-  const [month, setMonth] = useState("");
   const [perPage, setPerPage] = useState<number | null>(null);
   const [teams, setTeams] = useState<TeamResource[] | null>(null);
 
@@ -190,8 +187,6 @@ export function MonitoringPage() {
         ...(list.query.team_id !== undefined ? { team_id: list.query.team_id } : {}),
         ...(list.query.date_from !== undefined ? { date_from: list.query.date_from } : {}),
         ...(list.query.date_to !== undefined ? { date_to: list.query.date_to } : {}),
-        ...(list.query.date !== undefined ? { date: list.query.date } : {}),
-        ...(list.query.month !== undefined ? { month: list.query.month } : {}),
         page,
       }),
     );
@@ -199,21 +194,19 @@ export function MonitoringPage() {
 
   /**
    * Terapkan filter dari input lokal → selalu kembali ke halaman 1.
-   * `date_from`/`date_to` hanya dikirim berpasangan (biarkan presedensi backend
-   * jalan); `month` hanya bila `date` kosong.
+   * Rentang inklusif: from/to boleh diberikan sendiri-sendiri (hari tunggal
+   * = from sama dengan to); keduanya kosong = semua laporan.
    */
   function applyFilter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPerPage(null);
 
-    const rangeFrom = dateFrom && dateTo ? { date_from: dateFrom, date_to: dateTo } : {};
-    const exactDate = date ? { date } : month ? { month } : {};
     dispatch(
       fetchAdminReports({
         ...(status ? { status: status as "draft" | "pending" | "approved" | "rejected" } : {}),
         ...(teamId ? { team_id: Number(teamId) } : {}),
-        ...rangeFrom,
-        ...exactDate,
+        ...(dateFrom ? { date_from: dateFrom } : {}),
+        ...(dateTo ? { date_to: dateTo } : {}),
         page: 1,
       }),
     );
@@ -229,8 +222,6 @@ export function MonitoringPage() {
         ...(list.query.team_id !== undefined ? { team_id: list.query.team_id } : {}),
         ...(list.query.date_from !== undefined ? { date_from: list.query.date_from } : {}),
         ...(list.query.date_to !== undefined ? { date_to: list.query.date_to } : {}),
-        ...(list.query.date !== undefined ? { date: list.query.date } : {}),
-        ...(list.query.month !== undefined ? { month: list.query.month } : {}),
         ...(Number.isFinite(n) ? { per_page: n } : {}),
         page: 1,
       }),
@@ -455,22 +446,6 @@ export function MonitoringPage() {
                     id="monitoring-filter-date-to"
                     value={dateTo}
                     onChange={setDateTo}
-                  />
-                </Field>
-                <Field className="w-40" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-date">Tanggal</FieldLabel>
-                  <DateInput
-                    id="monitoring-filter-date"
-                    value={date}
-                    onChange={setDate}
-                  />
-                </Field>
-                <Field className="w-40" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-month">Bulan</FieldLabel>
-                  <MonthInput
-                    id="monitoring-filter-month"
-                    value={month}
-                    onChange={setMonth}
                   />
                 </Field>
                 <Field className="w-36" orientation="vertical">

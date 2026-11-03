@@ -24,7 +24,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { ApiError } from "@/api/client";
-import { userEvent, pickDate, pickMonth, pickSelect } from "@/test/portal";
+import { userEvent, pickDate, pickSelect } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type {
@@ -194,12 +194,6 @@ async function clearDate(label: string) {
   if (clearBtn) await userEvent.click(clearBtn);
 }
 
-/** Kosongkan MonthInput lewat tombol hapus (no-op bila memang sudah kosong). */
-async function clearMonth() {
-  const trigger = screen.getByLabelText("Bulan");
-  const clearBtn = within(trigger).queryByRole("button", { name: "hapus bulan" });
-  if (clearBtn) await userEvent.click(clearBtn);
-}
 
 /** Tombol paginasi halaman (aria-label), bukan navigasi kalender/popover. */
 function pageButton(name: "Berikutnya" | "Sebelumnya"): HTMLElement {
@@ -347,34 +341,22 @@ describe("MonitoringPage — Semua Laporan", () => {
     });
   });
 
-  it("presedensi & kebersihan query: date menang atas month; date_from tanpa date_to tak dikirim; per_page 15 default tak dikirim", async () => {
+  it("kebersihan query rentang: from saja terkirim, kosong = semua; per_page 15 default tak dikirim", async () => {
     renderPageAs();
     await openReportsTab();
 
-    // date terisi → month tidak dikirim walau ikut terisi.
-    await pickDate(screen.getByLabelText("Tanggal"), "2026-07-10");
-    await pickMonth(screen.getByLabelText("Bulan"), 2026, "Juli");
+    // from tanpa to → date_from saja terkirim.
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ date: "2026-07-10", page: 1 });
+      expect(mockedList).toHaveBeenLastCalledWith({ date_from: "2026-07-01", page: 1 });
     });
 
-    // date_from tanpa date_to → keduanya tidak dikirim (month juga dikosongkan).
-    await clearDate("Sampai tanggal");
-    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
-    await clearDate("Tanggal");
-    await clearMonth();
+    // from dikosongkan → tidak ada filter tanggal terkirim.
+    await clearDate("Dari tanggal");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
-    });
-
-    // Bulan saja → month dikirim; per_page tidak (default 15).
-    await clearDate("Dari tanggal");
-    await pickMonth(screen.getByLabelText("Bulan"), 2026, "Juli");
-    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
-    await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 1 });
     });
   });
 
@@ -400,29 +382,34 @@ describe("MonitoringPage — Semua Laporan", () => {
     });
   });
 
-  it("regresi H1: filter dikosongkan tidak bocor ke pagination berikutnya", async () => {
+  it("regresi H1: filter rentang dikosongkan tidak bocor ke pagination berikutnya", async () => {
     renderPageAs();
     await openReportsTab();
 
-    // 1. terapkan filter tanggal…
-    await pickDate(screen.getByLabelText("Tanggal"), "2026-07-10");
+    // 1. terapkan filter rentang…
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
+    await pickDate(screen.getByLabelText("Sampai tanggal"), "2026-07-31");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ date: "2026-07-10", page: 1 });
+      expect(mockedList).toHaveBeenLastCalledWith({
+        date_from: "2026-07-01",
+        date_to: "2026-07-31",
+        page: 1,
+      });
     });
 
-    // 2. kosongkan tanggal, terapkan bulan…
-    await clearDate("Tanggal");
-    await pickMonth(screen.getByLabelText("Bulan"), 2026, "Juli");
+    // 2. kosongkan rentang, terapkan ulang…
+    await clearDate("Dari tanggal");
+    await clearDate("Sampai tanggal");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 1 });
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
     });
 
-    // 3. pagination HARUS memakai query baru (bulan), bukan `date` basi.
+    // 3. pagination HARUS memakai query baru (tanpa rentang), bukan rentang basi.
     await userEvent.click(pageButton("Berikutnya"));
     await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-07", page: 2 });
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 2 });
     });
   });
 

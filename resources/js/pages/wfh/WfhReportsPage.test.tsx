@@ -1,11 +1,9 @@
 /**
  * Unit test WfhReportsPage (frontend-phase2 — Phase 3 task list page).
  * Kontrak yang dijaga (plan Task "WfhReportsPage"):
- * - mount → dispatch `fetchWfhReports` dengan query aktif dari slice;
- * - filter date (YYYY-MM-DD) / month (YYYY-MM) → fetch ulang dengan query itu
- *   (`date` menang atas `month` di backend, kontrak openapi);
- * - "Terapkan" tanpa filter → fetch ulang TANPA date/month (reset);
- * - ubah per halaman → fetch dengan `per_page`, kembali ke halaman 1;
+ * - filter rentang date_from/date_to (YYYY-MM-DD) bersifat lokal sampai
+ *   "Terapkan" ditekan, lalu fetch ulang (kontrak openapi v6.8.0: precedence
+ *   range > date > month di backend; UI hanya mengirim rentang);
  * - pagination primitive → fetch halaman berikut dengan query aktif;
  * - klik baris → navigasi ke `/wfh/:reportId`;
  * - list kosong → empty state bahasa Indonesia; fetch gagal → pesan error.
@@ -13,7 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { userEvent, pickDate, pickMonth, pickSelect } from "@/test/portal";
+import { userEvent, pickDate, pickSelect } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { PaginationMeta, WfhReport } from "@/api/types";
@@ -146,29 +144,34 @@ describe("WfhReportsPage — fetch awal & render", () => {
 });
 
 describe("WfhReportsPage — filter & paginate", () => {
-  it("filter tanggal + Terapkan → fetch dengan query date (month kosong tak dikirim)", async () => {
+  it("filter rentang (from + to) → fetch dengan date_from + date_to", async () => {
     renderPage();
     await screen.findByText("2026-08-10");
     mockedList.mockClear();
 
-    await pickDate(screen.getByLabelText(/tanggal/i), "2026-08-10");
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-08-01");
+    await pickDate(screen.getByLabelText("Sampai tanggal"), "2026-08-31");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ date: "2026-08-10", page: 1 });
+      expect(mockedList).toHaveBeenLastCalledWith({
+        date_from: "2026-08-01",
+        date_to: "2026-08-31",
+        page: 1,
+      });
     });
   });
 
-  it("filter bulan → fetch dengan query month YYYY-MM", async () => {
+  it("rentang parsial (hanya from) → kirim date_from saja", async () => {
     renderPage();
     await screen.findByText("2026-08-10");
     mockedList.mockClear();
 
-    await pickMonth(screen.getByLabelText(/bulan/i), 2026, "September");
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-08-15");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
-      expect(mockedList).toHaveBeenLastCalledWith({ month: "2026-09", page: 1 });
+      expect(mockedList).toHaveBeenLastCalledWith({ date_from: "2026-08-15", page: 1 });
     });
   });
 

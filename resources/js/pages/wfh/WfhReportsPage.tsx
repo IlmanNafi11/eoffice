@@ -3,9 +3,9 @@
  *
  * Alur (plan Task "WfhReportsPage"):
  * - mount → `fetchWfhReports` dengan query bersih (halaman 1);
- * - filter tanggal (YYYY-MM-DD) / bulan (YYYY-MM) bersifat lokal sampai
- *   "Terapkan" ditekan, lalu fetch ulang (openapi: `date` menang atas `month`
- *   di sisi backend; frontend hanya meneruskan yang terisi);
+ * - filter rentang date_from/date_to (YYYY-MM-DD) bersifat lokal sampai
+ *   "Terapkan" ditekan, lalu fetch ulang (kontrak openapi v6.8.0; UI tak
+ *   pernah mengirim `date`/`month`);
  * - per halaman (`per_page`, clamp backend 1..100) → fetch ulang dari halaman 1,
  *   nilai default (15) TIDAK dikirim supaya query tetap ramping;
  * - pagination primitive (`components/wfh/pagination`) → fetch halaman tujuan
@@ -40,7 +40,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { MonthInput } from "@/components/ui/month-input";
 import { DateInput, toDateString } from "@/components/ui/date-input";
 import {
   Select,
@@ -78,8 +77,8 @@ export function WfhReportsPage() {
 
   // Filter lokal: baru dikirim ke backend saat "Terapkan" (menghindari fetch
   // per karakter). `perPage` null = pakai default backend (tidak dikirim).
-  const [date, setDate] = useState("");
-  const [month, setMonth] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [perPage, setPerPage] = useState<number | null>(null);
 
   // Dialog create: DateInput bersifat lokal (get-or-create 200/201 di sisi
@@ -99,8 +98,8 @@ export function WfhReportsPage() {
   function fetchPage(page: number) {
     dispatch(
       fetchWfhReports({
-        ...(query.date ? { date: query.date } : {}),
-        ...(query.month ? { month: query.month } : {}),
+        ...(query.date_from ? { date_from: query.date_from } : {}),
+        ...(query.date_to ? { date_to: query.date_to } : {}),
         ...(perPage != null ? { per_page: perPage } : {}),
         page,
       }),
@@ -113,26 +112,27 @@ export function WfhReportsPage() {
     setPerPage(null);
     dispatch(
       fetchWfhReports({
-        ...(month ? { month } : {}),
-        ...(date ? { date } : {}),
+        ...(dateFrom ? { date_from: dateFrom } : {}),
+        ...(dateTo ? { date_to: dateTo } : {}),
         page: 1,
       }),
     );
   }
 
-  /** Ganti per halaman → reset ke halaman 1, filter date/month tetap. */
+  /** Ganti per halaman → reset ke halaman 1, filter rentang tetap. */
   function applyPerPage(value: string) {
     const n = Number.parseInt(value, 10);
     setPerPage(Number.isFinite(n) ? n : null);
     dispatch(
       fetchWfhReports({
-        ...(query.date ? { date: query.date } : {}),
-        ...(query.month ? { month: query.month } : {}),
+        ...(query.date_from ? { date_from: query.date_from } : {}),
+        ...(query.date_to ? { date_to: query.date_to } : {}),
         ...(Number.isFinite(n) ? { per_page: n } : {}),
         page: 1,
       }),
     );
   }
+
 
   /** Buka dialog → reset tanggal ke hari ini + bersihkan error. */
   function openCreate() {
@@ -180,20 +180,20 @@ export function WfhReportsPage() {
       <Card size="sm">
         <CardContent>
           <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
-            <Field className="w-48" orientation="vertical">
-              <FieldLabel htmlFor="wfh-filter-date">Tanggal</FieldLabel>
+            <Field className="w-44" orientation="vertical">
+              <FieldLabel htmlFor="wfh-filter-date-from">Dari tanggal</FieldLabel>
               <DateInput
-                id="wfh-filter-date"
-                value={date}
-                onChange={setDate}
+                id="wfh-filter-date-from"
+                value={dateFrom}
+                onChange={setDateFrom}
               />
             </Field>
             <Field className="w-44" orientation="vertical">
-              <FieldLabel htmlFor="wfh-filter-month">Bulan</FieldLabel>
-              <MonthInput
-                id="wfh-filter-month"
-                value={month}
-                onChange={setMonth}
+              <FieldLabel htmlFor="wfh-filter-date-to">Sampai tanggal</FieldLabel>
+              <DateInput
+                id="wfh-filter-date-to"
+                value={dateTo}
+                onChange={setDateTo}
               />
             </Field>
             <Field className="w-36" orientation="vertical">
