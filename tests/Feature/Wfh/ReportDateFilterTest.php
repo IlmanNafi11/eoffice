@@ -131,4 +131,95 @@ class ReportDateFilterTest extends TestCase
         $this->getJson('/api/wfh/reports?month=2026/01')
             ->assertStatus(422);
     }
+
+    public function test_index_filters_by_date_range(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $insideFrom = WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-10',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-20',
+        ]);
+        $insideTo = WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-15',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-09',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-21',
+        ]);
+
+        $this->getJson('/api/wfh/reports?date_from=2026-07-10&date_to=2026-07-15')
+            ->assertStatus(200)
+            ->assertJsonPath('meta.total', 2);
+
+        $ids = $this->getJson('/api/wfh/reports?date_from=2026-07-10&date_to=2026-07-15')
+            ->assertStatus(200)
+            ->json('data.*.id');
+
+        // Repository orders by report_date desc: 07-15 first, then 07-10.
+        $this->assertSame([$insideTo->id, $insideFrom->id], $ids);
+    }
+
+    public function test_date_range_takes_precedence_over_date(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-15',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-20',
+        ]);
+
+        // `date` alone matches only 2026-07-20; the range must win and return both.
+        $this->getJson('/api/wfh/reports?date_from=2026-07-15&date_to=2026-07-20&date=2026-07-20')
+            ->assertStatus(200)
+            ->assertJsonPath('meta.total', 2);
+    }
+
+    public function test_invalid_date_from_returns_422(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/wfh/reports?date_from=not-a-date')
+            ->assertStatus(422);
+    }
+
+    public function test_partial_range_from_only_still_filters(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-01',
+        ]);
+        WfhReport::factory()->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-15',
+        ]);
+
+        $response = $this->getJson('/api/wfh/reports?date_from=2026-07-10');
+
+        $response->assertStatus(200)->assertJsonPath('meta.total', 1);
+        $this->assertSame('2026-07-15', $response->json('data.0.report_date'));
+    }
 }

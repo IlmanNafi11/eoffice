@@ -34,13 +34,15 @@ class ReportController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'date' => ['nullable', 'date'],
             'month' => ['nullable', 'date_format:Y-m'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
         ]);
 
         $perPage = self::perPage($request);
-        $bounds = DateRangeHelper::resolve($validated['date'] ?? null, $validated['month'] ?? null);
+        $bounds = DateRangeHelper::fromRequest($request);
 
         $reports = $this->wfhRepository->paginateReportsForUser($request->user()->id, $perPage, $bounds);
 
@@ -74,7 +76,7 @@ class ReportController extends Controller
         $perPage = self::perPage($request);
 
         // date_from/date_to take precedence; then date/month; no filter = all reports.
-        $bounds = $this->resolveAdminBounds($request);
+        $bounds = DateRangeHelper::fromRequest($request);
 
         $filters = array_filter([
             'field_id' => $fieldId,
@@ -87,29 +89,6 @@ class ReportController extends Controller
         $reports = $this->wfhRepository->paginateAllReports($perPage, $filters);
 
         return $this->paginatedReportResponse($reports);
-    }
-
-    /**
-     * Resolve admin date bounds: date_from/date_to take precedence,
-     * then date/month, then no filter (all reports).
-     *
-     * @return array{date_from: ?string, date_to: ?string}
-     */
-    private function resolveAdminBounds(Request $request): array
-    {
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
-
-        // date_from/date_to take precedence; then date/month; no filter = all reports.
-        if ($dateFrom !== null || $dateTo !== null) {
-            return ['date_from' => $dateFrom, 'date_to' => $dateTo];
-        }
-
-        if ($request->hasAny(['date', 'month'])) {
-            return DateRangeHelper::resolve($request->input('date'), $request->input('month'));
-        }
-
-        return ['date_from' => null, 'date_to' => null];
     }
 
     private function paginatedReportResponse(LengthAwarePaginator $reports): JsonResponse
