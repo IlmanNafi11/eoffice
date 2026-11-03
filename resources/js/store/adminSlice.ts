@@ -224,10 +224,10 @@ export const syncRolePermissionsThunk = createAsyncThunk<
   },
 );
 
-/** PUT /admin/settings/{key} — value string. */
+/** PUT /admin/settings/{key} — value scalar atau array (backend menerima array). */
 export const updateSettingThunk = createAsyncThunk<
   { key: string; value: unknown },
-  { key: string; value: string }
+  { key: string; value: string | number | boolean | (string | number)[] }
 >(
   "admin/updateSetting",
   async ({ key, value }, { rejectWithValue }) => {

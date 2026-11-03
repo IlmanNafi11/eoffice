@@ -1,18 +1,11 @@
 /**
- * Unit test SettingsPage (modul admin — Task 7).
+ * Unit test SettingsPage (modul admin — plan Task 6 ux-fixes).
  *
- * Kontrak terkunci (SPEC-admin.md + plan Task 7):
- * - mount → `fetchSettings` (cache sekali per sesi di slice, condition);
- * - scalar (string | number | boolean) → input teks editable, display
- *   `String(value)`; structured (array/objek) → `JSON.stringify` READ-ONLY
- *   (Resolved #2);
- * - simpan per key → `updateSettingThunk` body `{value}` string (plan
- *   Acceptance: body `{value}` string; refresh cache pasca-sukses di slice);
- * - pesan 404 "Setting 'unknown_key' tidak ditemukan." dirender apa adanya
- *   dan tak lenyap saat refetch (a602c46 ditegakkan di slice — current.error);
- * - konfirmasi khusus key berawalan `password_default_*` sebelum kirim;
- * - gate `setting.manage` → input read-only + tombol "Simpan" hilang bila
- *   dipangkas (permission sintetik, bukan role name).
+ * Kontrak: tiap baris membaca `settingMeta(key)` → label Indonesia + kontrol
+ * per kind (day-checkbox, session-checkbox, TimeInput, password, text
+ * fallback). `Simpan` mengirim nilai ter-decode ke `updateSettingThunk`
+ * (array tetap array; jam `HH:mm` string). Password tetap masked + dialog
+ * konfirmasi. Key tak dikenal tetap tampil sebagai input teks berlabel key.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
@@ -46,7 +39,7 @@ const mockedUpdateSetting = adminApi.updateSetting as unknown as Mock;
 const settingsMap = {
   password_default_admin: "admin123",
   password_default_user: "user1234",
-  wfh_allowed_days: [1, 2, 3, 4, 5],
+  wfh_allowed_days: [1, 2, 3, 4, 5, 6, 7],
   wfh_sessions: ["pagi", "siang", "sore"],
   wfh_notify_start_time: "15:00",
 };
@@ -82,27 +75,31 @@ async function findRow(key: string): Promise<HTMLElement> {
   return await screen.findByTestId(`setting-row-${key}`);
 }
 
-function inputOf(row: HTMLElement): HTMLInputElement {
-  // Query by testid (bukan role): input `password_default_*` bertype
-  // `password` — TIDAK memperoleh role aksesibel `textbox` (jsdom).
-  const testid = row.getAttribute("data-testid") ?? "";
-  return within(row).getByTestId(`setting-input-${testid.replace("setting-row-", "")}`) as HTMLInputElement;
+function saveButtonOf(row: HTMLElement): HTMLButtonElement | null {
+  return within(row).queryByRole("button", {
+    name: /simpan/i,
+  }) as HTMLButtonElement | null;
 }
 
-function saveButtonOf(row: HTMLElement): HTMLButtonElement | null {
-  return within(row).queryByRole("button", { name: /simpan/i }) as HTMLButtonElement | null;
+function dayCheckbox(row: HTMLElement, label: string): HTMLElement {
+  return within(row).getByRole("checkbox", { name: label });
+}
+
+/** State Checkbox animate-ui (role=checkbox) via aria-checked. */
+function checked(el: HTMLElement): string {
+  return el.getAttribute("aria-checked") ?? "";
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedListSettings.mockResolvedValue(settingsMap);
-  mockedUpdateSetting.mockImplementation(async (key: string, value: string) => ({
+  mockedUpdateSetting.mockImplementation(async (key: string, value: unknown) => ({
     key,
     value,
   }));
 });
 
-describe("SettingsPage — render daftar & bentuk editor", () => {
+describe("SettingsPage — label & kontrol per kind", () => {
   it("mount → fetchSettings (sekali); setiap key dirender sebagai baris", async () => {
     renderPageAs(["setting.manage"]);
 
@@ -118,47 +115,71 @@ describe("SettingsPage — render daftar & bentuk editor", () => {
     expect(mockedListSettings).toHaveBeenCalledTimes(1);
   });
 
-  it("scalar string → input teks editable berisi nilai apa adanya", async () => {
+  it("label manusiawi (bukan nama key mentah) untuk semua key seeded", async () => {
     renderPageAs(["setting.manage"]);
+    await findRow("wfh_allowed_days");
 
-    const row = await findRow("wfh_notify_start_time");
-    const input = inputOf(row);
-    expect(input instanceof HTMLInputElement).toBe(true);
-    expect(input.disabled).toBe(false);
-    expect(input.value).toBe("15:00");
-  });
-
-  it("scalar number/boolean dinormalisasi String untuk display", async () => {
-    const store = makeStore();
-    store.dispatch(setUser({ ...adminUser, permissions: ["setting.manage"] }));
-    mockedListSettings.mockResolvedValue({ max_upload: 10, fitur_aktif: true });
-    render(
-      <Provider store={store}>
-        <SettingsPage />
-      </Provider>,
+    expect(rowOf("wfh_allowed_days").textContent).toContain("Hari Kerja WFH");
+    expect(rowOf("wfh_sessions").textContent).toContain("Sesi Absensi WFH");
+    expect(rowOf("wfh_notify_start_time").textContent).toContain(
+      "Jam Mulai Notifikasi WFH",
     );
-
-    const numRow = await findRow("max_upload");
-    expect(inputOf(numRow).value).toBe("10");
-
-    const boolRow = rowOf("fitur_aktif");
-    expect(inputOf(boolRow).value).toBe("true");
+    expect(rowOf("password_default_admin").textContent).toContain(
+      "Password Default Admin",
+    );
+    // Label = meta, bukan key mentah.
+    expect(rowOf("wfh_allowed_days").textContent).not.toContain("wfh_allowed_days");
   });
 
-  it("structured (array/objek) → JSON.stringify READ-ONLY tanpa tombol simpan", async () => {
+  it("wfh_allowed_days → 7 checkbox Senin..Minggu dengan state dari server", async () => {
+    renderPageAs(["setting.manage"]);
+    const row = await findRow("wfh_allowed_days");
+
+    for (const label of [
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+      "Minggu",
+    ]) {
+      expect(dayCheckbox(row, label)).toBeTruthy();
+    }
+    expect(checked(dayCheckbox(row, "Senin"))).toBe("true");
+    expect(checked(dayCheckbox(row, "Minggu"))).toBe("true");
+    // JSON string mentah tak lagi muncul sebagai nilai input.
+    expect(within(row).queryByDisplayValue("[1,2,3,4,5,6,7]")).toBeNull();
+  });
+
+  it("wfh_sessions → 3 checkbox pagi/siang/sore; state sesuai server", async () => {
+    renderPageAs(["setting.manage"]);
+    const row = await findRow("wfh_sessions");
+
+    expect(checked(within(row).getByRole("checkbox", { name: "pagi" }))).toBe("true");
+    expect(checked(within(row).getByRole("checkbox", { name: "siang" }))).toBe("true");
+    expect(checked(within(row).getByRole("checkbox", { name: "sore" }))).toBe("true");
+  });
+
+  it("wfh_notify_start_time → TimeInput non-native (tanpa input type=time)", async () => {
+    renderPageAs(["setting.manage"]);
+    const row = await findRow("wfh_notify_start_time");
+
+    expect(within(row).getByRole("button", { name: /15:00/ })).toBeTruthy();
+    // Audit: tak ada kontrol native waktu.
+    expect(row.querySelector('input[type="time"]')).toBeNull();
+    expect(document.querySelector('input[type="time"]')).toBeNull();
+  });
+
+  it("key tak dikenal → input teks berlabel key, tetap tampil & editable", async () => {
+    mockedListSettings.mockResolvedValue({ fitur_baru: "aktif" });
     renderPageAs(["setting.manage"]);
 
-    const daysRow = await findRow("wfh_allowed_days");
-    const daysInput = inputOf(daysRow);
-    expect(daysInput.value).toBe("[1,2,3,4,5]");
-    expect(daysInput.disabled).toBe(true);
-    expect(saveButtonOf(daysRow)).toBeNull();
-
-    const sessionsRow = rowOf("wfh_sessions");
-    const sessionsInput = inputOf(sessionsRow);
-    expect(sessionsInput.value).toBe('["pagi","siang","sore"]');
-    expect(sessionsInput.disabled).toBe(true);
-    expect(saveButtonOf(sessionsRow)).toBeNull();
+    const row = await findRow("fitur_baru");
+    expect(row.textContent).toContain("fitur_baru");
+    const input = within(row).getByTestId("setting-input-fitur_baru") as HTMLInputElement;
+    expect(input.value).toBe("aktif");
+    expect(input.disabled).toBe(false);
   });
 
   it("password_default_* dimask (type=password) + tombol reveal", async () => {
@@ -166,13 +187,12 @@ describe("SettingsPage — render daftar & bentuk editor", () => {
     renderPageAs(["setting.manage"]);
 
     const row = await findRow("password_default_admin");
-    const input = within(row).getByTestId("setting-input-password_default_admin") as HTMLInputElement;
+    const input = within(row).getByTestId(
+      "setting-input-password_default_admin",
+    ) as HTMLInputElement;
     expect(input.type).toBe("password");
-
-    // Nilai tetap ada di value (draft), visual dimask oleh type=password.
     expect(input.value).toBe("admin123");
 
-    // Reveal → type text; tombol kembali menyembunyikan.
     await user.click(within(row).getByRole("button", { name: /tampilkan nilai/i }));
     expect(input.type).toBe("text");
     await user.click(within(row).getByRole("button", { name: /sembunyikan nilai/i }));
@@ -188,58 +208,83 @@ describe("SettingsPage — render daftar & bentuk editor", () => {
   });
 });
 
-describe("SettingsPage — simpan per key (body {value} string)", () => {
-  it("edit scalar lalu Simpan → updateSetting(key, nilai string dari input)", async () => {
+describe("SettingsPage — simpan nilai ter-decode per kind", () => {
+  it("uncheck Sabtu+Minggu → updateSetting kirim array angka [1,2,3,4,5]", async () => {
     const user = userEvent.setup();
     renderPageAs(["setting.manage"]);
+    const row = await findRow("wfh_allowed_days");
 
-    const row = await findRow("wfh_notify_start_time");
-    await user.clear(inputOf(row));
-    await user.type(inputOf(row), "16:30");
+    await user.click(dayCheckbox(row, "Sabtu"));
+    await user.click(dayCheckbox(row, "Minggu"));
     await user.click(saveButtonOf(row)!);
 
     await waitFor(() => {
-      expect(mockedUpdateSetting).toHaveBeenCalledWith("wfh_notify_start_time", "16:30");
+      expect(mockedUpdateSetting).toHaveBeenCalledWith("wfh_allowed_days", [1, 2, 3, 4, 5]);
     });
     expect(mockedUpdateSetting).toHaveBeenCalledTimes(1);
+  });
+
+  it("uncheck sesi 'sore' → updateSetting kirim array nama subset", async () => {
+    const user = userEvent.setup();
+    renderPageAs(["setting.manage"]);
+    const row = await findRow("wfh_sessions");
+
+    await user.click(within(row).getByRole("checkbox", { name: "sore" }));
+    await user.click(saveButtonOf(row)!);
+
+    await waitFor(() => {
+      expect(mockedUpdateSetting).toHaveBeenCalledWith("wfh_sessions", ["pagi", "siang"]);
+    });
+  });
+
+  it("pilih jam via TimeInput → updateSetting kirim string HH:mm", async () => {
+    const user = userEvent.setup();
+    renderPageAs(["setting.manage"]);
+    const row = await findRow("wfh_notify_start_time");
+
+    await user.click(within(row).getByRole("button", { name: /15:00/ }));
+    await user.click(await screen.findByRole("button", { name: /^jam 08$/i }));
+    await user.click(await screen.findByRole("button", { name: /^menit 30$/i }));
+    await user.click(saveButtonOf(row)!);
+
+    await waitFor(() => {
+      expect(mockedUpdateSetting).toHaveBeenCalledWith("wfh_notify_start_time", "08:30");
+    });
   });
 
   it("pasca-sukses cache diperbarui dengan respons server (slice fulfilled)", async () => {
     const user = userEvent.setup();
     const store = renderPageAs(["setting.manage"]);
     mockedUpdateSetting.mockResolvedValue({
-      key: "wfh_notify_start_time",
-      value: "16:30",
+      key: "wfh_allowed_days",
+      value: [1, 2, 3, 4, 5],
     });
 
-    const row = await findRow("wfh_notify_start_time");
-    await user.clear(inputOf(row));
-    await user.type(inputOf(row), "16:30");
+    const row = await findRow("wfh_allowed_days");
+    await user.click(dayCheckbox(row, "Sabtu"));
     await user.click(saveButtonOf(row)!);
 
     await waitFor(() => {
       expect(store.getState().admin.current.status).toBe("succeeded");
     });
-    expect(store.getState().admin.settings.items?.wfh_notify_start_time).toBe("16:30");
+    expect(store.getState().admin.settings.items?.wfh_allowed_days).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("404 'Setting tidak ditemukan.' dirender dan tak lenyap", async () => {
     const user = userEvent.setup();
     renderPageAs(["setting.manage"]);
     mockedUpdateSetting.mockRejectedValue(
-      new Error("Setting 'wfh_notify_start_time' tidak ditemukan."),
+      new Error("Setting 'wfh_allowed_days' tidak ditemukan."),
     );
 
-    const row = await findRow("wfh_notify_start_time");
-    await user.clear(inputOf(row));
-    await user.type(inputOf(row), "16:30");
+    const row = await findRow("wfh_allowed_days");
+    await user.click(dayCheckbox(row, "Sabtu"));
     await user.click(saveButtonOf(row)!);
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain(
-      "Setting 'wfh_notify_start_time' tidak ditemukan.",
+      "Setting 'wfh_allowed_days' tidak ditemukan.",
     );
-    // Daftar setting tetap tampil — error tak menutup halaman.
     expect(screen.queryByTestId("setting-row-password_default_user")).toBeTruthy();
   });
 });
@@ -249,13 +294,12 @@ describe("SettingsPage — konfirmasi password_default_*", () => {
     const user = userEvent.setup();
     renderPageAs(["setting.manage"]);
 
-    const row = await findRow("wfh_notify_start_time");
-    await user.clear(inputOf(row));
-    await user.type(inputOf(row), "16:30");
+    const row = await findRow("wfh_allowed_days");
+    await user.click(dayCheckbox(row, "Sabtu"));
     await user.click(saveButtonOf(row)!);
 
     await waitFor(() => {
-      expect(mockedUpdateSetting).toHaveBeenCalledWith("wfh_notify_start_time", "16:30");
+      expect(mockedUpdateSetting).toHaveBeenCalled();
     });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -265,8 +309,9 @@ describe("SettingsPage — konfirmasi password_default_*", () => {
     renderPageAs(["setting.manage"]);
 
     const row = await findRow("password_default_user");
-    await user.clear(inputOf(row));
-    await user.type(inputOf(row), "rahasia123");
+    const input = within(row).getByTestId("setting-input-password_default_user");
+    await user.clear(input);
+    await user.type(input, "rahasia123");
     await user.click(saveButtonOf(row)!);
 
     const dialog = await screen.findByRole("dialog");
@@ -282,8 +327,9 @@ describe("SettingsPage — konfirmasi password_default_*", () => {
     renderPageAs(["setting.manage"]);
 
     const row = await findRow("password_default_user");
-    await user.clear(inputOf(row));
-    await user.type(inputOf(row), "rahasia123");
+    const input = within(row).getByTestId("setting-input-password_default_user");
+    await user.clear(input);
+    await user.type(input, "rahasia123");
     await user.click(saveButtonOf(row)!);
 
     const dialog = await screen.findByRole("dialog");
@@ -296,12 +342,25 @@ describe("SettingsPage — konfirmasi password_default_*", () => {
 });
 
 describe("SettingsPage — gate setting.manage", () => {
-  it("tanpa setting.manage: input read-only + tombol Simpan hilang di semua baris", async () => {
+  it("tanpa setting.manage: kontrol disabled + tombol Simpan hilang", async () => {
     renderPageAs(["user.manage"]);
 
-    const row = await findRow("wfh_notify_start_time");
-    expect(inputOf(row)).toBeTruthy();
-    expect(inputOf(row).disabled).toBe(true);
-    expect(saveButtonOf(row)).toBeNull();
+    const daysRow = await findRow("wfh_allowed_days");
+    expect((dayCheckbox(daysRow, "Senin") as HTMLButtonElement).disabled).toBe(true);
+    expect(saveButtonOf(daysRow)).toBeNull();
+
+    const timeRow = rowOf("wfh_notify_start_time");
+    expect(
+      (within(timeRow).getByRole("button", { name: /15:00/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(saveButtonOf(timeRow)).toBeNull();
+
+    const passwordRow = rowOf("password_default_user");
+    expect(
+      (within(passwordRow).getByTestId(
+        "setting-input-password_default_user",
+      ) as HTMLInputElement).disabled,
+    ).toBe(true);
+    expect(saveButtonOf(passwordRow)).toBeNull();
   });
 });

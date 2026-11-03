@@ -109,10 +109,10 @@ export async function listSettings(): Promise<SettingsMap> {
   return requireData(res.data, "listSettings");
 }
 
-/** PUT /admin/settings/{key} — `value` selalu string + `encodeURIComponent(key)`. */
+/** PUT /admin/settings/{key} — `value` scalar/array (backend menerima array). */
 export async function updateSetting(
   key: string,
-  value: string,
+  value: string | number | boolean | (string | number)[],
 ): Promise<{ key: string; value: unknown }> {
   const res = await api.put<{ key: string; value: unknown }>(
     `/admin/settings/${encodeURIComponent(key)}`,

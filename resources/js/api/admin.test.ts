@@ -319,6 +319,14 @@ describe("api/admin — settings", () => {
     expect(out).toEqual({ key: "password_default_user", value: "BaruUser123!" });
   });
 
+  it("updateSetting mengirim array apa adanya (control checkbox)", async () => {
+    ok({ success: true, data: { key: "wfh_allowed_days", value: [1, 2, 3] }, message: null, meta: null });
+
+    await updateSetting("wfh_allowed_days", [1, 2, 3]);
+
+    expect(jsonBody(0)).toEqual({ value: [1, 2, 3] });
+  });
+
   it("updateSetting meng-encode karakter khusus pada key", async () => {
     ok({ success: true, data: { key: "k/ey", value: "v" }, message: null, meta: null });
 
