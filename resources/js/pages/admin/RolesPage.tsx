@@ -44,6 +44,7 @@ import {
 } from "@/store/adminSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { can } from "@/lib/permissions";
+import { groupPermissions } from "@/lib/permissions-meta";
 import { selectUser } from "@/store/authSlice";
 import type { AdminRole } from "@/api/types";
 
@@ -98,6 +99,9 @@ export function RolesPage() {
     if (roles) return derivedPermissions(roles);
     return [];
   }, [canListPermissions, serverPermissions, roles]);
+
+  /** Kolom terkelompok per section modul, urutan stabil (kamus Task 7). */
+  const groupedColumns = useMemo(() => groupPermissions(columns), [columns]);
 
   /** Checklist efektif role: draft bila ada perubahan, else data asli. */
   function effectivePermissions(role: AdminRole): string[] {
@@ -205,16 +209,28 @@ export function RolesPage() {
                     {current.length} permission aktif
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-3 px-4 py-3">
-                  {columns.map((perm) => (
-                    <label key={perm} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        aria-label={perm}
-                        checked={current.includes(perm)}
-                        onCheckedChange={() => toggle(role, perm)}
-                      />
-                      {perm}
-                    </label>
+                <div className="flex flex-col gap-4 px-4 py-3">
+                  {groupedColumns.map((group) => (
+                    <div key={group.section} className="flex flex-col gap-2">
+                      <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        {group.section}
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {group.permissions.map((perm) => (
+                          <label
+                            key={perm.name}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <Checkbox
+                              aria-label={perm.label}
+                              checked={current.includes(perm.name)}
+                              onCheckedChange={() => toggle(role, perm.name)}
+                            />
+                            {perm.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
                 {canManageRoles ? (

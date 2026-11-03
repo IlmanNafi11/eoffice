@@ -39,6 +39,7 @@ import * as adminApi from "@/api/admin";
 import { RolesPage } from "@/pages/admin/RolesPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
+import { permissionMeta } from "@/lib/permissions-meta";
 
 const mockedListRoles = adminApi.listRoles as unknown as Mock;
 const mockedListPermissions = adminApi.listPermissions as unknown as Mock;
@@ -90,11 +91,25 @@ function rowOf(roleId: number): HTMLElement {
   return screen.getByTestId(`role-row-${roleId}`);
 }
 
-function checkboxOf(row: HTMLElement, permission: string): HTMLElement {
-  return within(row).getByRole("checkbox", { name: permission });
+/**
+ * Checkbox di-query lewat LABEL kamus (Task 7/8): UI merender label
+ * Indonesia, bukan nama permission mentah (nama mentah hanya di
+ * fallback "Lainnya").
+ */
+function labelOf(permission: string): string {
+  return permissionMeta(permission).label;
 }
 
-/** State Checkbox animate-ui (button role=checkbox) via aria-checked. */
+function checkboxOf(row: HTMLElement, permission: string): HTMLElement {
+  return within(row).getByRole("checkbox", { name: labelOf(permission) });
+}
+
+/** Query checkbox boleh-absen (label kamus; nama mentah hanya fallback). */
+function cbQuery(row: HTMLElement, permission: string): HTMLElement | null {
+  return within(row).queryByRole("checkbox", { name: labelOf(permission) });
+}
+
+/** State Checkbox animate-ui (role=checkbox) via aria-checked. */
 function checkedOf(row: HTMLElement, permission: string): string {
   return checkboxOf(row, permission).getAttribute("aria-checked") ?? "";
 }
@@ -123,8 +138,8 @@ describe("RolesPage — grid render & sumber kolom", () => {
     expect(mockedListPermissions).toHaveBeenCalledTimes(1);
     // Kolom = daftar permissions dari server; `wfh.report.reject` hanya
     // dimiliki role kepala_tim, bukan bagian cache listPermissions fixture.
-    expect(within(rowOf(3)).getByRole("checkbox", { name: "wfh.report.approve" })).toBeTruthy();
-    expect(within(rowOf(3)).queryByRole("checkbox", { name: "wfh.report.reject" })).toBeNull();
+    expect(within(rowOf(3)).getByRole("checkbox", { name: labelOf("wfh.report.approve") })).toBeTruthy();
+    expect(cbQuery(rowOf(3), "wfh.report.reject")).toBeNull();
   });
 
   it("tanpa permission.manage → fallback kolom derived distinct dari listRoles; listPermissions TIDAK dipanggil (REQuery #4)", async () => {
@@ -138,6 +153,42 @@ describe("RolesPage — grid render & sumber kolom", () => {
     expect(checkedOf(rowOf(1), "user.manage")).toBe("true");
     // checkbox kepalan_tim untuk permission yang bukan miliknya: unchecked.
     expect(checkedOf(rowOf(3), "user.manage")).toBe("false");
+  });
+
+  it("checkbox berlabel Indonesia + permission dikelompokkan per section dalam card role", async () => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    const row = rowOf(1);
+    expect(checkboxOf(row, "user.manage")).toBeTruthy();
+    expect(within(row).getByText(labelOf("user.manage"))).toBeTruthy();
+    expect(within(row).getByText(labelOf("wfh.report.approve"))).toBeTruthy();
+
+    expect(within(row).getByText("WFH")).toBeTruthy();
+    expect(within(row).getByText("Manajemen Pengguna")).toBeTruthy();
+  });
+
+  it("permission tak dikenal tampil di section 'Lainnya' dengan nama mentah dan tetap checkable", async () => {
+    const strangeRole: AdminRole = {
+      id: 9,
+      name: "audit",
+      permissions: ["legacy.tool"],
+    };
+    mockedListRoles.mockResolvedValue([strangeRole]);
+    // Tanpa permission.manage → kolom derived dari listRoles, sehingga
+    // permission tak dikenal ikut masuk kolom dan terlihat.
+    renderPageAs(["role.manage"]);
+    await waitFor(() => expect(rowOf(9)).toBeTruthy());
+
+    const row = rowOf(9);
+    expect(within(row).getByText("Lainnya")).toBeTruthy();
+    expect(within(row).getByText("legacy.tool")).toBeTruthy();
+    const box = within(row).getByRole("checkbox", { name: "legacy.tool" });
+    // Dimiliki role → checked; klik membuktikan tetap interaktif.
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    await userEvent.click(box);
+    expect(box.getAttribute("aria-checked")).toBe("false");
   });
 });
 
