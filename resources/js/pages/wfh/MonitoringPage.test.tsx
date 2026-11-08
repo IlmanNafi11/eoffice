@@ -44,8 +44,13 @@ vi.mock("@/api/wfh-team", () => ({
   listTeams: vi.fn(),
 }));
 
+vi.mock("@/api/wfh", () => ({
+  getWfhSessionConfig: vi.fn(),
+}));
+
 import * as wfhMonitoringApi from "@/api/wfh-monitoring";
 import * as wfhTeamApi from "@/api/wfh-team";
+import * as wfhApi from "@/api/wfh";
 import { MonitoringPage } from "@/pages/wfh/MonitoringPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
@@ -53,6 +58,7 @@ import { setUser } from "@/store/authSlice";
 const mockedBoard = wfhMonitoringApi.getWfhMonitoring as unknown as Mock;
 const mockedList = wfhMonitoringApi.adminListWfhReports as unknown as Mock;
 const mockedPdf = wfhMonitoringApi.exportTeamWfhPdf as unknown as Mock;
+const mockedSessionConfig = wfhApi.getWfhSessionConfig as unknown as Mock;
 const mockedListTeams = wfhTeamApi.listTeams as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 15, total: 12 };
@@ -180,6 +186,7 @@ beforeEach(() => {
   mockedBoard.mockResolvedValue(boardData);
   mockedList.mockResolvedValue({ reports: [reportA], meta });
   mockedPdf.mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" }));
+  mockedSessionConfig.mockResolvedValue({ sessions: ["pagi", "siang", "sore"], allowed_days: [1, 2, 3, 4, 5] });
   mockedListTeams.mockResolvedValue([teamResource, teamResourceLain]);
 
   URL.createObjectURL = vi.fn(() => `blob:stub-${Math.random().toString(36).slice(2)}`);
@@ -317,6 +324,11 @@ describe("MonitoringPage — Semua Laporan", () => {
 
     expect(mockedList).toHaveBeenCalledWith({});
     expect(await screen.findByTestId("wfh-report-row-10")).toBeTruthy();
+
+    // Kolom Status WFH: pill per sesi aktif tampil di tabel admin juga.
+    expect(screen.getByRole("columnheader", { name: "Status WFH" })).toBeTruthy();
+    expect(screen.getByTestId("wfh-attendance-status")).toBeTruthy();
+    expect(screen.getByLabelText("Pagi belum absen")).toBeTruthy();
 
     await userEvent.click(screen.getByTestId("wfh-report-row-10"));
     expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();

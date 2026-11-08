@@ -20,6 +20,7 @@ vi.mock("@/api/wfh", () => ({
   listWfhReports: vi.fn(),
   getWfhReport: vi.fn(),
   createWfhReport: vi.fn(),
+  getWfhSessionConfig: vi.fn(),
   submitWfhReport: vi.fn(),
   approveWfhReport: vi.fn(),
   rejectWfhReport: vi.fn(),
@@ -35,6 +36,7 @@ import { setUser } from "@/store/authSlice";
 
 const mockedList = wfhApi.listWfhReports as unknown as Mock;
 const mockedCreate = wfhApi.createWfhReport as unknown as Mock;
+const mockedSessionConfig = wfhApi.getWfhSessionConfig as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 10, total: 12 };
 
@@ -94,10 +96,16 @@ function renderPage(userOverride = user) {
   return store;
 }
 
+/** Buka dropdown filter (kontrol tanggal sekarang berada di dalamnya). */
+async function openFilter() {
+  await userEvent.click(screen.getByTestId("wfh-filter-trigger"));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockedList.mockResolvedValue({ reports: [reportA, reportB], meta });
   mockedCreate.mockResolvedValue(reportA);
+  mockedSessionConfig.mockResolvedValue({ sessions: ["pagi", "siang", "sore"], allowed_days: [1, 2, 3, 4, 5] });
 });
 
 
@@ -110,12 +118,20 @@ describe("WfhReportsPage — fetch awal & render", () => {
     });
     expect(mockedList).toHaveBeenCalledWith({});
 
-    // Baris tabel: tanggal & badge status muncul.
+    // Baris tabel: tanggal, badge status, dan ringkasan absensi muncul.
     await screen.findByText("2026-08-10");
     expect(screen.getByText("2026-08-11")).toBeTruthy();
     expect(screen.getAllByTestId("wfh-status-badge")).toHaveLength(2);
     expect(screen.getByText("Menunggu persetujuan")).toBeTruthy();
     expect(screen.getByText("Draf")).toBeTruthy();
+
+    // Kolom Status WFH: pill per sesi aktif — tanpa absensi → semua "belum absen".
+    expect(screen.getAllByTestId("wfh-attendance-status")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Pagi belum absen")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Sore belum absen")).toHaveLength(2);
+    expect(screen.getByRole("columnheader", { name: "Status WFH" })).toBeTruthy();
+    // Ikon dekoratif ganda di header halaman telah dihapus.
+    expect(screen.queryByTestId("wfh-header-icon")).toBeNull();
   });
 
   it("klik baris → navigasi ke /wfh/:reportId", async () => {
@@ -149,6 +165,7 @@ describe("WfhReportsPage — filter & paginate", () => {
     await screen.findByText("2026-08-10");
     mockedList.mockClear();
 
+    await openFilter();
     await pickDate(screen.getByLabelText("Dari tanggal"), "2026-08-01");
     await pickDate(screen.getByLabelText("Sampai tanggal"), "2026-08-31");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
@@ -167,6 +184,7 @@ describe("WfhReportsPage — filter & paginate", () => {
     await screen.findByText("2026-08-10");
     mockedList.mockClear();
 
+    await openFilter();
     await pickDate(screen.getByLabelText("Dari tanggal"), "2026-08-15");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
@@ -179,6 +197,7 @@ describe("WfhReportsPage — filter & paginate", () => {
     renderPage();
     await screen.findByText("2026-08-10");
 
+    await openFilter();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
@@ -231,6 +250,7 @@ describe("WfhReportsPage — filter & paginate", () => {
       expect(mockedList).toHaveBeenLastCalledWith({ page: 2 });
     });
 
+    await openFilter();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       // Bukan gabungan query lama ({page: 2}) — reset bersih ke halaman 1.
@@ -263,7 +283,9 @@ describe("WfhReportsPage — tombol Buat Laporan & dialog create", () => {
 
     // Dialog DateInput default hari ini: submit langsung memakai tanggal
     // berjalan (format yyyy-MM-dd lokal) — bukan input native ber-value.
-    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Buat" }),
+    );
 
 
     await waitFor(() => {
@@ -281,7 +303,7 @@ describe("WfhReportsPage — tombol Buat Laporan & dialog create", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
     await screen.findByRole("dialog");
-    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Buat" }));
 
     await waitFor(() => {
       expect(mockedCreate).toHaveBeenCalledWith({ report_date: todayIso() });

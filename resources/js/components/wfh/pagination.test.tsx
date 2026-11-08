@@ -51,4 +51,16 @@ describe("Pagination", () => {
     render(<Pagination meta={null} onPageChange={() => {}} />);
     expect(screen.queryByRole("button")).toBeNull();
   });
+
+  it("me-render rightSlot di footer (kontrol tambahan)", () => {
+    render(
+      <Pagination
+        meta={meta({ current_page: 1, last_page: 3, total: 30 })}
+        onPageChange={() => {}}
+        rightSlot={<span data-testid="pagination-right">Tambahan</span>}
+      />,
+    );
+
+    expect(screen.getByTestId("pagination-right")).toBeTruthy();
+  });
 });

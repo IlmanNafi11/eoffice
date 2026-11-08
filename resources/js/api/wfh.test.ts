@@ -118,6 +118,13 @@ describe("api/wfh — list & read", () => {
 
     expect(requests[0]?.params).toEqual({ page: 2 });
   });
+  it("listWfhReports meneruskan rentang date_from/date_to (filter personal)", async () => {
+    ok({ success: true, data: [report], message: null, meta: { current_page: 1, last_page: 1, per_page: 15, total: 1 } });
+
+    await listWfhReports({ date_from: "2025-07-01", date_to: "2025-07-31", page: 1 });
+
+    expect(requests[0]?.params).toEqual({ date_from: "2025-07-01", date_to: "2025-07-31", page: 1 });
+  });
 
   it("listWfhReports tanpa filter → filter tidak ikut dikirim sebagai param kosong", async () => {
     ok({ success: true, data: [], message: null, meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 } });

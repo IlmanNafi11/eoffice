@@ -43,6 +43,8 @@ export async function listWfhReports(query: ListWfhReportsQuery = {}): Promise<{
   const params: Record<string, unknown> = {};
   if (query.date) params.date = query.date;
   if (query.month) params.month = query.month;
+  if (query.date_from) params.date_from = query.date_from;
+  if (query.date_to) params.date_to = query.date_to;
   if (query.per_page !== undefined) params.per_page = query.per_page;
   if (query.page !== undefined) params.page = query.page;
   const res = await api.get<WfhReport[]>(

@@ -1,17 +1,22 @@
 /**
  * `pagination` — kontrol halaman generic (current/last/total), bebas domain.
  * Menerima `PaginationMeta` (dari `Unwrapped.meta` list), tidak menanamkan
- * query WFH; halaman berikutnya didorong lewat `onPageChange`.
+ * query WFH; halaman berikutnya didorong lewat `onPageChange`. `rightSlot`
+ * memuat kontrol tambahan di footer (mis. per-halaman) di kiri tombol prev/next.
  */
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import type { PaginationMeta } from "@/api/types";
 
 export function Pagination({
   meta,
   onPageChange,
+  rightSlot,
 }: {
   meta: PaginationMeta | null;
   onPageChange: (page: number) => void;
+  /** Kontrol tambahan di footer (mis. per-halaman), di kiri tombol prev/next. */
+  rightSlot?: ReactNode;
 }) {
   if (!meta) return null;
 
@@ -24,25 +29,28 @@ export function Pagination({
       <span>
         Halaman {current} dari {last} · {total} data
       </span>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onPageChange(current - 1)}
-          disabled={!hasPrev}
-          aria-label="Sebelumnya"
-          className="inline-flex size-7 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
-        >
-          <ChevronLeft aria-hidden="true" className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(current + 1)}
-          disabled={!hasNext}
-          aria-label="Berikutnya"
-          className="inline-flex size-7 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
-        >
-          <ChevronRight aria-hidden="true" className="size-4" />
-        </button>
+      <div className="flex items-center gap-2">
+        {rightSlot}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onPageChange(current - 1)}
+            disabled={!hasPrev}
+            aria-label="Sebelumnya"
+            className="inline-flex size-7 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+          >
+            <ChevronLeft aria-hidden="true" className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onPageChange(current + 1)}
+            disabled={!hasNext}
+            aria-label="Berikutnya"
+            className="inline-flex size-7 items-center justify-center rounded-lg border border-input text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+          >
+            <ChevronRight aria-hidden="true" className="size-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

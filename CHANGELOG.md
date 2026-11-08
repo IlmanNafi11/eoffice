@@ -5,6 +5,23 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Changed (frontend, 2026-11-08 — rework daftar WFH personal & monitoring)
+- `WfhReportsPage`: form filter (rentang tanggal) dipecah ke dropdown tunggal
+  di kanan atas header tabel "Daftar Laporan" (ikon `ListFilter`) — card filter
+  terpisah dihapus; kontrol "Per halaman" pindah ke footer tabel lewat slot
+  `rightSlot` komponen `Pagination`. Kolom "Status WFH" ditambahkan sebagai
+  ringkasan absensi per sesi aktif (`GET /wfh/session-config`, fallback kosong)
+  menggunakan pill "Pagi/Siang/Sore" (sudah/belum absen). Ikon dekoratif ganda
+  pada header halaman dihapus — hanya ikon pada tombol aksi yang tersisa.
+- Tabel "Semua Laporan" di `MonitoringPage` ikut memakai kolom "Status WFH"
+  (sesi dari konfigurasi yang sama), menjaga baris `WfhReportRow` satu sumber.
+
+### Fixed (frontend, 2026-11-08)
+- `listWfhReports` tidak meneruskan `date_from`/`date_to` ke query params,
+  sehingga filter rentang tanggal di `/wfh` (personal) tidak pernah sampai ke
+  backend (list selalu diambil tanpa filter). Kini diteruskan; regresi dikunci
+  di `api/wfh.test.ts`.
+
 ### Fixed (frontend+backend, 2026-11-03 — tindak lanjut ship-review #12)
 - `PUT /api/admin/settings/{key}`: `wfh_allowed_days`/`wfh_sessions`
   menerima array kosong (= WFH/sesi nonaktif, fail-closed di attendance &

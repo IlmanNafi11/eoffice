@@ -55,7 +55,8 @@ import { PdfDownloadButton } from "@/components/wfh/pdf-download";
 import { WfhReportRow } from "@/components/wfh/report-row";
 import { listTeams } from "@/api/wfh-team";
 import { exportTeamWfhPdf } from "@/api/wfh-monitoring";
-import type { MonitoringUser, TeamResource } from "@/api/types";
+import { getWfhSessionConfig } from "@/api/wfh";
+import type { MonitoringUser, TeamResource, WfhSession } from "@/api/types";
 import { can } from "@/lib/permissions";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/authSlice";
@@ -177,6 +178,22 @@ export function MonitoringPage() {
       .then((rows) => setTeams(rows))
       .catch(() => setTeams([])); // dropdown tetap tampil, pilihan kosong
   }, [listOpened, teams]);
+
+  // Sesi aktif untuk kolom Status WFH (diisi dari GET /wfh/session-config).
+  const [sessions, setSessions] = useState<WfhSession[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getWfhSessionConfig()
+      .then((c) => {
+        if (!cancelled) setSessions(c.sessions);
+      })
+      .catch(() => {
+        if (!cancelled) setSessions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /** Halaman tujuan dari pagination — filter & per_page aktif dipertahankan. */
   function fetchPage(page: number) {
@@ -509,7 +526,7 @@ export function MonitoringPage() {
                         <tr className="border-b border-border text-left text-muted-foreground">
                           <th className="py-2 pr-4 font-medium">Tanggal</th>
                           <th className="py-2 pr-4 font-medium">Status</th>
-                          <th className="py-2 text-right font-medium">Kegiatan</th>
+                          <th className="py-2 pr-4 font-medium">Status WFH</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -517,6 +534,7 @@ export function MonitoringPage() {
                           <WfhReportRow
                             key={r.id}
                             report={r}
+                            sessions={sessions}
                             onOpen={(reportId) => navigate(`/wfh/${reportId}`)}
                           />
                         ))}

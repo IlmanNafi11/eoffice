@@ -17,11 +17,18 @@
  * Task UX-fixes Task 2: tombol "Buat Laporan" (gate `wfh.report.create`)
  * → dialog DateInput default hari ini → `createWfhReport({report_date})`
  * → navigate `/wfh/{id}` (get-or-create 200/201 sama-sama navigate).
+ *
+ * UX rework (permintaan L): form filter dipindah dari card terpisah menjadi
+ * dropdown tunggal di kanan atas header tabel ("Daftar Laporan") — tampilan
+ * lebih clean; kontrol "Per halaman" pindah ke footer tabel (slot `rightSlot`
+ * `Pagination`); kolom "Status WFH" menambah ringkasan absensi per sesi
+ * (`GET /wfh/session-config` → fallback `["pagi","siang","sore"]`); ikon
+ * dekoratif ganda pada header halaman dihapus.
  */
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardList, Plus } from "lucide-react";
+import { ListFilter, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,11 +41,17 @@ import {
 } from "@/components/ui/dialog";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { DateInput, toDateString } from "@/components/ui/date-input";
 import {
@@ -60,7 +73,8 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { can } from "@/lib/permissions";
 import { selectUser } from "@/store/authSlice";
-import { createWfhReport } from "@/api/wfh";
+import { createWfhReport, getWfhSessionConfig } from "@/api/wfh";
+import type { WfhSession } from "@/api/types";
 
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
 
@@ -81,6 +95,13 @@ export function WfhReportsPage() {
   const [dateTo, setDateTo] = useState("");
   const [perPage, setPerPage] = useState<number | null>(null);
 
+  // Dropdown filter: open state dikontrol agar popover DateInput di dalamnya
+  // tidak menutup dropdown saat interaksi (toggle ganda di latar Radix).
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  // Sesi aktif dari konfigurasi WFH (fallback default 3 sesi).
+  const [sessions, setSessions] = useState<WfhSession[]>([]);
+
   // Dialog create: DateInput bersifat lokal (get-or-create 200/201 di sisi
   // server; respons apa pun di-navigate ke detail).
   const [createOpen, setCreateOpen] = useState(false);
@@ -91,6 +112,20 @@ export function WfhReportsPage() {
   useEffect(() => {
     dispatch(fetchWfhReports({}));
   }, [dispatch]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getWfhSessionConfig()
+      .then((c) => {
+        if (!cancelled) setSessions(c.sessions);
+      })
+      .catch(() => {
+        if (!cancelled) setSessions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loading = status === "loading";
 
@@ -117,6 +152,7 @@ export function WfhReportsPage() {
         page: 1,
       }),
     );
+    setFilterOpen(false);
   }
 
   /** Ganti per halaman → reset ke halaman 1, filter rentang tetap. */
@@ -132,7 +168,6 @@ export function WfhReportsPage() {
       }),
     );
   }
-
 
   /** Buka dialog → reset tanggal ke hari ini + bersihkan error. */
   function openCreate() {
@@ -157,6 +192,86 @@ export function WfhReportsPage() {
     }
   }
 
+  const perPageSelect = (
+    <Select
+      value={perPage?.toString() ?? "15"}
+      onValueChange={applyPerPage}
+    >
+      <SelectTrigger
+        aria-label="Per halaman"
+        size="sm"
+        className="w-25 text-muted-foreground"
+        data-testid="wfh-perpage-trigger"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PER_PAGE_OPTIONS.map((n) => (
+          <SelectItem key={n} value={String(n)}>
+            {n}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const filterMenu = (
+    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Filter laporan"
+          data-testid="wfh-filter-trigger"
+        >
+          <ListFilter aria-hidden="true" />
+          Filter
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-56 p-2.5"
+        onInteractOutside={(event) => {
+          // DateInput me-render kalendernya di portal terpisah (`data-slot="popover-content"`),
+          // jadi klik tanggal akan dianggap "outside" oleh Radix dan menutup dropdown.
+          // Abaikan interaksi di dalam popover kalender agar dropdown tetap terbuka.
+          const target = event.target as HTMLElement | null;
+          if (target?.closest('[data-slot="popover-content"]')) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            applyFilter(e);
+          }}
+        >
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="wfh-filter-date-from">Dari tanggal</FieldLabel>
+            <DateInput
+              id="wfh-filter-date-from"
+              value={dateFrom}
+              onChange={setDateFrom}
+            />
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="wfh-filter-date-to">Sampai tanggal</FieldLabel>
+            <DateInput
+              id="wfh-filter-date-to"
+              value={dateTo}
+              onChange={setDateTo}
+            />
+          </Field>
+          <Button type="submit" className="mt-1 w-full">
+            Terapkan
+          </Button>
+        </form>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -166,67 +281,19 @@ export function WfhReportsPage() {
             Daftar laporan kerja dari rumah Anda.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {canCreate ? (
-            <Button type="button" onClick={openCreate}>
-              <Plus aria-hidden="true" className="size-4" />
-              Buat Laporan
-            </Button>
-          ) : null}
-          <ClipboardList aria-hidden="true" className="size-5 text-muted-foreground" />
-        </div>
+        {canCreate ? (
+          <Button type="button" onClick={openCreate}>
+            <Plus aria-hidden="true" className="size-4" />
+            Buat Laporan
+          </Button>
+        ) : null}
       </div>
-
-      <Card size="sm">
-        <CardContent>
-          <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
-            <Field className="w-44" orientation="vertical">
-              <FieldLabel htmlFor="wfh-filter-date-from">Dari tanggal</FieldLabel>
-              <DateInput
-                id="wfh-filter-date-from"
-                value={dateFrom}
-                onChange={setDateFrom}
-              />
-            </Field>
-            <Field className="w-44" orientation="vertical">
-              <FieldLabel htmlFor="wfh-filter-date-to">Sampai tanggal</FieldLabel>
-              <DateInput
-                id="wfh-filter-date-to"
-                value={dateTo}
-                onChange={setDateTo}
-              />
-            </Field>
-            <Field className="w-36" orientation="vertical">
-              <FieldLabel htmlFor="wfh-filter-perpage">Per halaman</FieldLabel>
-              <Select
-                value={perPage?.toString() ?? "15"}
-                onValueChange={applyPerPage}
-              >
-                <SelectTrigger
-                  id="wfh-filter-perpage"
-                  aria-label="Per halaman"
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PER_PAGE_OPTIONS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Button type="submit">Terapkan</Button>
-          </form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Daftar Laporan</CardTitle>
           <CardDescription>Total {meta?.total ?? 0} laporan</CardDescription>
+          <CardAction>{filterMenu}</CardAction>
         </CardHeader>
         <CardContent>
           {loading && items.length === 0 ? (
@@ -252,6 +319,7 @@ export function WfhReportsPage() {
                     <tr className="border-b border-border text-left text-muted-foreground">
                       <th className="py-2 pr-4 font-medium">Tanggal</th>
                       <th className="py-2 pr-4 font-medium">Status</th>
+                      <th className="py-2 pr-4 font-medium">Status WFH</th>
                       <th className="py-2 text-right font-medium">Kegiatan</th>
                     </tr>
                   </thead>
@@ -260,6 +328,7 @@ export function WfhReportsPage() {
                       <WfhReportRow
                         key={r.id}
                         report={r}
+                        sessions={sessions}
                         onOpen={(reportId) => navigate(`/wfh/${reportId}`)}
                       />
                     ))}
@@ -267,7 +336,7 @@ export function WfhReportsPage() {
                 </table>
               </div>
               <div className="mt-4">
-                <Pagination meta={meta} onPageChange={fetchPage} />
+                <Pagination meta={meta} onPageChange={fetchPage} rightSlot={perPageSelect} />
               </div>
             </>
           )}
