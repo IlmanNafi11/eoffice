@@ -107,6 +107,28 @@ describe("AttendanceUploadList", () => {
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith(45));
   });
 
+  it("proporsi: Hapus dan Unggah foto berbagi grid sel sama (bukan flex content-box)", () => {
+    render(
+      <AttendanceUploadList
+        sessions={["pagi"]}
+        attendances={[attendance({ id: 45, session: "pagi", checked_in: true, photo_url: null })]}
+        canEdit
+        onUpload={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    // Bar aksi HARUS grid auto-fit 1fr: flex-1 membagi content box lalu
+    // menambahkan padding/border tombol di atasnya → lebar tak proporsional.
+    const bar = screen.getByRole("button", { name: /hapus/i })
+      .parentElement as HTMLElement;
+    expect(bar.className).toContain("grid");
+    expect(bar.className).toContain("auto-fit");
+    expect(bar.className).toContain("1fr");
+    // Kedua aksi mengisi sel penuh — tidak ada kelas distribusi flex.
+    expect(bar.className).not.toMatch(/\bflex\b/);
+  });
+
   it("tanpa canEdit → tak ada tombol Hapus / input upload", () => {
     render(
       <AttendanceUploadList

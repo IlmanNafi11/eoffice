@@ -5,6 +5,11 @@
  * polos TIDAK membawa header `Authorization` (regresi Phase 1 0d51f6f6), maka
  * bytes diambil lewat `httpClient` lalu dijadikan object URL — pola persis
  * `fetchSignatureObjectUrl` di `api/profile.ts`.
+ *
+ * Layout: kartu sesi mengalir HORIZONTAL (`→`, gaya `|Pagi|Siang|Sore|`) dan
+ * membungkus ke baris berikutnya saat ruang habis. Label sesi berada di ATAS
+ * avatar circle (`rounded-full`), dan bar aksi di bawahnya memakai grid
+ * `auto-fit` supaya Hapus & Unggah foto selalu berbagi lebar yang sama.
  */
 import * as React from "react";
 import { ImageOff, Trash2, Loader2 } from "lucide-react";
@@ -52,9 +57,8 @@ export function AttendanceUploadList({
   const [deleting, setDeleting] = React.useState<number | null>(null);
 
   const mapped = bySession(attendances);
-
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-wrap items-stretch gap-3">
       {sessions.map((session) => {
         const att = mapped[session];
         return (
@@ -155,26 +159,33 @@ function AttendanceRow({
     if (!file || uploading) return;
     await onUpload(file);
   }
+  /**
+   * Bar aksi: grid `auto-fit minmax(8rem,1fr)` — tiap sel dapat lebar SAMA
+   * (border box, termasuk padding tombol Hapus), dan otomatis turun ke baris
+   * sendiri saat kartu menyempit. `flex-1` TIDAK dipakai: flex membagi
+   * content box, lalu padding 10px tombol ditambahkan di atasnya sehingga
+   * Hapus tampil 22px lebih lebar dari Unggah foto.
+   */
+  const actionBarCls = "grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2";
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3">
-      <div className="w-24 shrink-0 text-sm font-medium">{label}</div>
-      <div className="flex-1">
+    <div className="flex min-w-56 flex-1 flex-col gap-2 rounded-lg border p-3">
+      <div className="text-center text-sm font-medium">{label}</div>
+      <div className="flex justify-center">
         {previewUrl ? (
           <img
             src={previewUrl}
             alt={`Absensi sesi ${label.toLowerCase()}`}
-            className="h-24 w-auto rounded border bg-white object-contain"
+            className="size-24 shrink-0 rounded-full border bg-white object-cover"
           />
         ) : (
-          <div className="flex h-24 items-center justify-center gap-2 rounded border border-dashed text-sm text-muted-foreground">
-            <ImageOff aria-hidden="true" className="size-4" />
-            Belum ada foto
+          <div className="flex size-24 shrink-0 items-center justify-center rounded-full border border-dashed bg-muted/30 text-muted-foreground">
+            <ImageOff aria-hidden="true" className="size-5" />
           </div>
         )}
       </div>
       {canEdit ? (
-        <div className="flex shrink-0 flex-col gap-2">
+        <div className={actionBarCls}>
           {attendance?.photo_url || attendance?.checked_in ? (
             <Button
               type="button"
@@ -182,6 +193,7 @@ function AttendanceRow({
               size="sm"
               onClick={onDelete}
               disabled={deleting}
+              className="w-full"
             >
               {deleting ? (
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" />
@@ -198,6 +210,7 @@ function AttendanceRow({
             onFileChange={(f) => void handleFileChange(f)}
             disabled={uploading}
             size="sm"
+            className="w-full"
           />
         </div>
       ) : null}

@@ -320,28 +320,6 @@ export function WfhReportDetailPage() {
         </div>
       ) : null}
 
-      {canSubmit ? (
-        <div>
-          <Button
-            disabled={pendingMutation}
-            onClick={() => void runMutation(dispatch(submitWfhReport(report.id)))}
-          >
-            Ajukan untuk disetujui
-          </Button>
-        </div>
-      ) : null}
-
-      {canRevise ? (
-        <div>
-          <Button
-            disabled={pendingMutation}
-            onClick={() => void runMutation(dispatch(reviseWfhReport(report.id)))}
-          >
-            Revisi laporan
-          </Button>
-        </div>
-      ) : null}
-
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
@@ -356,7 +334,7 @@ export function WfhReportDetailPage() {
           </CardHeader>
           <CardContent>
             <form
-              className="flex items-end gap-2"
+              className="flex flex-wrap items-end gap-x-3 gap-y-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!dateDraft || dateDraft === report.report_date) return;
@@ -367,7 +345,7 @@ export function WfhReportDetailPage() {
                 );
               }}
             >
-              <Field className="w-48" orientation="vertical">
+              <Field className="w-fit" orientation="vertical">
                 <FieldLabel htmlFor="wfh-detail-date">Tanggal laporan</FieldLabel>
                 <DateInput
                   id="wfh-detail-date"
@@ -375,7 +353,12 @@ export function WfhReportDetailPage() {
                   onChange={setDateDraft}
                 />
               </Field>
-              <Button type="submit" variant="outline" disabled={!dateDraft}>
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={!dateDraft}
+                className="whitespace-nowrap"
+              >
                 <Save aria-hidden="true" className="size-4" />
                 Simpan tanggal
               </Button>
@@ -383,22 +366,6 @@ export function WfhReportDetailPage() {
           </CardContent>
         </Card>
       ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Kegiatan</CardTitle>
-          <CardDescription>
-            Total {report.activities?.length ?? 0} kegiatan tercatat.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActivitiesEditor
-            activities={report.activities ?? []}
-            canEdit={canCreateActivity}
-            onChange={(next) => void persistActivities(next)}
-          />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -421,6 +388,44 @@ export function WfhReportDetailPage() {
           />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Kegiatan</CardTitle>
+          <CardDescription>
+            Total {report.activities?.length ?? 0} kegiatan tercatat.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActivitiesEditor
+            activities={report.activities ?? []}
+            canEdit={canCreateActivity}
+            onChange={(next) => void persistActivities(next)}
+          />
+        </CardContent>
+      </Card>
+
+      {canSubmit ? (
+        <div>
+          <Button
+            disabled={pendingMutation}
+            onClick={() => void runMutation(dispatch(submitWfhReport(report.id)))}
+          >
+            Ajukan untuk disetujui
+          </Button>
+        </div>
+      ) : null}
+
+      {canRevise ? (
+        <div>
+          <Button
+            disabled={pendingMutation}
+            onClick={() => void runMutation(dispatch(reviseWfhReport(report.id)))}
+          >
+            Revisi laporan
+          </Button>
+        </div>
+      ) : null}
 
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent>
