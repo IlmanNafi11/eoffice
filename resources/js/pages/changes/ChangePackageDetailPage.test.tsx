@@ -231,8 +231,8 @@ describe("ChangePackageDetailPage — render dua kartu + lampiran", () => {
     // Kartu Implementasi + jenis perubahan + lampiran.
     expect(screen.getByText("Network")).toBeTruthy();
     expect(screen.getByText("Uji migrasi di staging")).toBeTruthy();
-    // Lampiran dirender sebagai baris bernama, bukan link /storage telanjang.
-    expect(screen.getByTestId("change-package-attachment-15")).toBeTruthy();
+    // Lampiran dirender via AttachmentList (testid per lampiran).
+    expect(screen.getByTestId("attachment-item-15")).toBeTruthy();
   });
 });
 
@@ -499,5 +499,42 @@ describe("ChangePackageDetailPage — regresi error pasca-refetch (a602c46)", ()
     expect(screen.getByTestId("change-package-detail-error").textContent).toContain(
       "Inisiator tidak dapat menolak paketnya sendiri.",
     );
+  });
+});
+
+describe("ChangePackageDetailPage — UX lampiran & penempatan aksi", () => {
+  it("deskripsi kartu Lampiran bebas detail teknis bearer//storage", async () => {
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    expect(screen.queryByText(/endpoint ber-otorisasi/i)).toBeNull();
+    expect(screen.queryByText(/\/storage/i)).toBeNull();
+    // Informasi yang tetap user-friendly untuk user:
+    expect(screen.getByText(/dari maksimal 10 berkas/i)).toBeTruthy();
+  });
+
+  it("tombol aksi draft dirender SETELAH kartu Lampiran (posisi bawah)", async () => {
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const edit = screen.getByRole("link", { name: /ubah draft/i });
+    const lampiranItem = screen.getByTestId("attachment-item-15");
+    // compareDocumentPosition: edit MENGIKUTI lampiran (documents order).
+    expect(
+      lampiranItem.compareDocumentPosition(edit) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("Setujui/Tolak juga dirender setelah kartu Lampiran", async () => {
+    renderDetail(kepalaTim, pendingPkg());
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const setujui = screen.getByRole("button", { name: /setujui/i });
+    const lampiranCard = screen.getByTestId("attachment-item-15");
+    expect(
+      lampiranCard.compareDocumentPosition(setujui) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

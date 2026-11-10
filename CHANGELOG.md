@@ -5,6 +5,16 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+
+### Changed (frontend, 2026-11-10 — preview gambar lampiran & penataan detail paket)
+- `ChangePackageDetailPage`: lampiran kini dirender `AttachmentList` baru — gambar
+  ditampilkan sebagai thumbnail proporsional (`object-contain`) dengan lightbox
+  zoom/swipe di seluruh lampiran (library `react-photo-view`, kompatibel React 19);
+  berkas non-gambar tetap berlabel "Berkas" + tombol Unduh ber-bearer. Deskripsi
+  kartu Lampiran tidak lagi memuat detail teknis "endpoint ber-otorisasi (bearer)
+  — bukan tautan /storage". Tombol aksi (Ubah Draft/Submit/Unggah/Hapus serta
+  Setujui/Tolak) dipindah ke bawah kartu Lampiran.
+
 ### Changed (frontend, 2026-11-10 — paritas UX header tabel + tombol aksi)
 - `UsersPage`: tombol "Buat User" pindah ke kanan-atas header halaman
   (sejajar judul, `space-between`) dengan ikon di dalam tombol; input import

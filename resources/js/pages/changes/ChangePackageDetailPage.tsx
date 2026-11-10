@@ -6,10 +6,11 @@
  * - mount → `fetchPackage(id)` (show; relasi change_types/attachments di-load
  *   server); dua kartu: Inisiasi (doc_number, bidang, inisiator, tanggal
  *   dibutuhkan, deskripsi, alasan, badge status) + Implementasi + lampiran;
- * - unduh lampiran lewat `httpClient` ber-bearer dari `attachment.url` (route
- *   `attachments.download`) → objectURL → anchor → revoke — BUKAN `<a href>`
- *   telanjang (ship review S2: endpoint wajib bearer; pola
- *   `fetchAttendanceObjectUrl`);
+ * - lampiran dirender `AttachmentList` (components/changes): gambar → preview
+ *   proporsional (`object-contain`) + lightbox zoom (react-photo-view),
+ *   non-gambar → label "Berkas", unduh via `httpClient` ber-bearer — BUKAN
+ *   `<a href>` /storage telanjang (ship review S2); tombol aksi dipindah ke
+ *   BAWAH kartu Lampiran;
  * - matriks aksi digate `can()` × ownership (`initiation.initiator_id ===
  *   user.id`) × status dari data resource; server tetap otoritas
  *   (`ChangePackageDecision`, urutan guard 422→403→403):
@@ -32,9 +33,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Paperclip, Pencil, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Pencil, Send, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { AttachmentList } from "@/components/changes/attachment-list";
 import {
   Card,
   CardContent,
@@ -74,7 +76,6 @@ import { selectUser } from "@/store/authSlice";
 import { can } from "@/lib/permissions";
 import type {
   ChangePackage,
-  PackageAttachment,
   PackageSubmitInput,
 } from "@/api/types";
 
@@ -296,6 +297,89 @@ export function ChangePackageDetailPage() {
         </p>
       ) : null}
 
+
+      {/* ── Kartu Inisiasi ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Inisiasi</CardTitle>
+          <CardDescription>Identitas dan kebutuhan paket perubahan.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <InfoRow label="No. Dokumen" value={pkg.initiation.doc_number} />
+            <InfoRow label="Bidang" value={pkg.initiation.field?.name} />
+            <InfoRow label="Tanggal dibutuhkan" value={pkg.initiation.needed_by_date} />
+            <InfoRow label="Tanggal inisiasi" value={pkg.initiation.initiation_date} />
+            <div className="col-span-2">
+              <InfoRow label="Deskripsi" value={pkg.initiation.description} />
+            </div>
+            <div className="col-span-2">
+              <InfoRow label="Alasan" value={pkg.initiation.reason} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Kartu Implementasi ── */}
+      {impl ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Implementasi</CardTitle>
+            <CardDescription>Rencana teknis pelaksanaan perubahan.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <InfoRow label="Prioritas" value={impl.priority} />
+              <InfoRow label="Dampak" value={impl.impact} />
+              <div className="col-span-2 flex flex-col gap-0.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Jenis perubahan
+                </span>
+                <span className="text-sm">
+                  {impl.change_types?.map((t) => t.name).join(", ") || "-"}
+                </span>
+              </div>
+              <InfoRow label="Rencana pengujian" value={impl.test_plan} />
+              <InfoRow label="Tanggal eksekusi" value={impl.execution_date} />
+              <InfoRow label="Tanggal rilis" value={impl.release_date} />
+              <InfoRow label="Hasil implementasi" value={impl.implementation_result} />
+              <InfoRow label="Dampak produksi" value={impl.production_impact} />
+              <InfoRow label="Effort" value={impl.required_effort} />
+              <InfoRow label="Sumber daya" value={impl.resources} />
+              <InfoRow
+                label="Biaya"
+                value={
+                  impl.cost_needed
+                    ? `Rp ${impl.cost_amount ?? "-"}`
+                    : "Tidak perlu biaya"
+                }
+              />
+              <InfoRow label="Status implementasi" value={impl.status} />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ── Lampiran ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lampiran</CardTitle>
+          <CardDescription>
+            {impl?.attachments?.length ?? 0} dari maksimal {MAX_ATTACHMENTS} berkas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(impl?.attachments?.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada lampiran.</p>
+          ) : (
+            <AttachmentList
+              attachments={impl?.attachments ?? []}
+              onDownload={(attachment) => void downloadAttachmentObjectUrl(attachment.url)}
+            />
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Aksi draft (inisiator) ── */}
       {canEdit || canDoSubmit || canUpload || canDelete ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -402,105 +486,6 @@ export function ChangePackageDetailPage() {
           ) : null}
         </div>
       ) : null}
-
-      {/* ── Kartu Inisiasi ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Inisiasi</CardTitle>
-          <CardDescription>Identitas dan kebutuhan paket perubahan.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <InfoRow label="No. Dokumen" value={pkg.initiation.doc_number} />
-            <InfoRow label="Bidang" value={pkg.initiation.field?.name} />
-            <InfoRow label="Tanggal dibutuhkan" value={pkg.initiation.needed_by_date} />
-            <InfoRow label="Tanggal inisiasi" value={pkg.initiation.initiation_date} />
-            <div className="col-span-2">
-              <InfoRow label="Deskripsi" value={pkg.initiation.description} />
-            </div>
-            <div className="col-span-2">
-              <InfoRow label="Alasan" value={pkg.initiation.reason} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Kartu Implementasi ── */}
-      {impl ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Implementasi</CardTitle>
-            <CardDescription>Rencana teknis pelaksanaan perubahan.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <InfoRow label="Prioritas" value={impl.priority} />
-              <InfoRow label="Dampak" value={impl.impact} />
-              <div className="col-span-2 flex flex-col gap-0.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Jenis perubahan
-                </span>
-                <span className="text-sm">
-                  {impl.change_types?.map((t) => t.name).join(", ") || "-"}
-                </span>
-              </div>
-              <InfoRow label="Rencana pengujian" value={impl.test_plan} />
-              <InfoRow label="Tanggal eksekusi" value={impl.execution_date} />
-              <InfoRow label="Tanggal rilis" value={impl.release_date} />
-              <InfoRow label="Hasil implementasi" value={impl.implementation_result} />
-              <InfoRow label="Dampak produksi" value={impl.production_impact} />
-              <InfoRow label="Effort" value={impl.required_effort} />
-              <InfoRow label="Sumber daya" value={impl.resources} />
-              <InfoRow
-                label="Biaya"
-                value={
-                  impl.cost_needed
-                    ? `Rp ${impl.cost_amount ?? "-"}`
-                    : "Tidak perlu biaya"
-                }
-              />
-              <InfoRow label="Status implementasi" value={impl.status} />
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* ── Lampiran ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lampiran</CardTitle>
-          <CardDescription>
-            {impl?.attachments?.length ?? 0} dari maksimal {MAX_ATTACHMENTS} berkas.
-            Unduhan lewat endpoint ber-otorisasi (bearer) — bukan tautan /storage.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {(impl?.attachments?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada lampiran.</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {impl?.attachments?.map((attachment: PackageAttachment) => (
-                <li
-                  key={attachment.id}
-                  data-testid={`change-package-attachment-${attachment.id}`}
-                  className="flex items-center gap-2 text-sm"
-                >
-                  <Paperclip aria-hidden="true" className="size-4 text-muted-foreground" />
-                  <span>Lampiran #{attachment.id}</span>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => void downloadAttachmentObjectUrl(attachment.url)}
-                  >
-                    Unduh
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
       {/* ── Dialog konfirmasi hapus ── */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
