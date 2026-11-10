@@ -30,16 +30,23 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Monitor } from "lucide-react";
+import { ListFilter, Monitor } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { DateInput } from "@/components/ui/date-input";
 import {
@@ -114,12 +121,6 @@ function groupByTeam(data: {
   return groups;
 }
 
-/** Teks cakupan papan dari scope server (`team_id`/`field_id` nullable). */
-function scopeText(teamId: number | null, fieldId: number | null): string {
-  if (teamId !== null) return "Cakupan: Tim saya";
-  if (fieldId !== null) return "Cakupan: Bidang saya";
-  return "Cakupan: Semua user";
-}
 
 type TabId = "board" | "reports";
 
@@ -152,6 +153,9 @@ export function MonitoringPage() {
 
   // ── Semua Laporan ─────────────────────────────────────────────────
   // Filter lokal sampai "Terapkan" (pola WfhReportsPage).
+  // Dropdown filter dikontrol agar popover kalender/Select di dalamnya tidak
+  // menutup dropdown saat interaksi (portal terpisah dianggap "outside").
+  const [filterOpen, setFilterOpen] = useState(false);
   const [status, setStatus] = useState("");
   const [teamId, setTeamId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -217,6 +221,7 @@ export function MonitoringPage() {
   function applyFilter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPerPage(null);
+    setFilterOpen(false);
 
     dispatch(
       fetchAdminReports({
@@ -244,6 +249,125 @@ export function MonitoringPage() {
       }),
     );
   }
+
+
+  const perPageSelect = (
+    <Select value={perPage?.toString() ?? "15"} onValueChange={applyPerPage}>
+      <SelectTrigger
+        aria-label="Per halaman"
+        size="sm"
+        className="w-25 text-muted-foreground"
+        data-testid="monitoring-perpage-trigger"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PER_PAGE_OPTIONS.map((n) => (
+          <SelectItem key={n} value={String(n)}>
+            {n}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const filterMenu = (
+    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Filter laporan"
+          data-testid="monitoring-filter-trigger"
+        >
+          <ListFilter aria-hidden="true" />
+          Filter
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-56 p-2.5"
+        onInteractOutside={(event) => {
+          // Kalender DateInput & opsi Select me-render portal terpisah, jadi
+          // klik di sana dianggap "outside" oleh Radix — biarkan dropdown tetap
+          // terbuka agar pemilihan filter tidak terputus.
+          const target = event.target as HTMLElement | null;
+          if (target?.closest('[data-slot="popover-content"], [data-slot="select-content"]')) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <form className="flex flex-col gap-3" onSubmit={applyFilter}>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="monitoring-filter-status">Status</FieldLabel>
+            <Select
+              value={status === "" ? undefined : status}
+              onValueChange={(v) => setStatus(v ?? "")}
+            >
+              <SelectTrigger
+                id="monitoring-filter-status"
+                aria-label="Status"
+                className="w-full"
+              >
+                <SelectValue placeholder="Semua status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Semua status</SelectItem>
+                {WFH_REPORT_STATUSES.map((st) => (
+                  <SelectItem key={st} value={st}>
+                    {st}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="monitoring-filter-team">Tim</FieldLabel>
+            <Select
+              value={teamId === "" ? undefined : teamId}
+              onValueChange={(v) => setTeamId(v ?? "")}
+            >
+              <SelectTrigger
+                id="monitoring-filter-team"
+                aria-label="Tim"
+                className="w-full"
+              >
+                <SelectValue placeholder="Semua tim" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Semua tim</SelectItem>
+                {(teams ?? []).map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="monitoring-filter-date-from">Dari tanggal</FieldLabel>
+            <DateInput
+              id="monitoring-filter-date-from"
+              value={dateFrom}
+              onChange={setDateFrom}
+            />
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="monitoring-filter-date-to">Sampai tanggal</FieldLabel>
+            <DateInput
+              id="monitoring-filter-date-to"
+              value={dateTo}
+              onChange={setDateTo}
+            />
+          </Field>
+          <Button type="submit" className="mt-1 w-full">
+            Terapkan
+          </Button>
+        </form>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   const loadingList = list.status === "loading";
 
@@ -303,12 +427,6 @@ export function MonitoringPage() {
                   onChange={changeBoardDate}
                 />
               </Field>
-              {board.data && (
-                <p className="text-sm text-muted-foreground">
-                  {scopeText(board.data.team_id, board.data.field_id)} · Tanggal efektif{" "}
-                  {board.data.date}
-                </p>
-              )}
             </CardContent>
           </Card>
 
@@ -400,98 +518,6 @@ export function MonitoringPage() {
 
       {tab === "reports" && (
         <section aria-label="Semua Laporan" className="flex flex-col gap-4">
-          <Card size="sm">
-            <CardContent>
-              <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
-                <Field className="w-40" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-status">Status</FieldLabel>
-                  <Select
-                    value={status === "" ? undefined : status}
-                    onValueChange={(v) => setStatus(v ?? "")}
-                  >
-                    <SelectTrigger
-                      id="monitoring-filter-status"
-                      aria-label="Status"
-                      className="w-full"
-                    >
-                      <SelectValue placeholder="Semua status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Semua status</SelectItem>
-                      {WFH_REPORT_STATUSES.map((st) => (
-                        <SelectItem key={st} value={st}>
-                          {st}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field className="w-48" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-team">Tim</FieldLabel>
-                  <Select
-                    value={teamId === "" ? undefined : teamId}
-                    onValueChange={(v) => setTeamId(v ?? "")}
-                  >
-                    <SelectTrigger
-                      id="monitoring-filter-team"
-                      aria-label="Tim"
-                      className="w-full"
-                    >
-                      <SelectValue placeholder="Semua tim" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Semua tim</SelectItem>
-                      {(teams ?? []).map((t) => (
-                        <SelectItem key={t.id} value={String(t.id)}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field className="w-40" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-date-from">Dari tanggal</FieldLabel>
-                  <DateInput
-                    id="monitoring-filter-date-from"
-                    value={dateFrom}
-                    onChange={setDateFrom}
-                  />
-                </Field>
-                <Field className="w-40" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-date-to">Sampai tanggal</FieldLabel>
-                  <DateInput
-                    id="monitoring-filter-date-to"
-                    value={dateTo}
-                    onChange={setDateTo}
-                  />
-                </Field>
-                <Field className="w-36" orientation="vertical">
-                  <FieldLabel htmlFor="monitoring-filter-perpage">Per halaman</FieldLabel>
-                  <Select
-                    value={perPage?.toString() ?? "15"}
-                    onValueChange={applyPerPage}
-                  >
-                    <SelectTrigger
-                      id="monitoring-filter-perpage"
-                      aria-label="Per halaman"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PER_PAGE_OPTIONS.map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Button type="submit">Terapkan</Button>
-              </form>
-            </CardContent>
-          </Card>
-
           {list.error && (
             <p
               className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -506,6 +532,7 @@ export function MonitoringPage() {
             <CardHeader>
               <CardTitle>Daftar Laporan WFH</CardTitle>
               <CardDescription>Total {list.meta?.total ?? 0} laporan</CardDescription>
+              <CardAction>{filterMenu}</CardAction>
             </CardHeader>
             <CardContent>
               {loadingList && list.items.length === 0 ? (
@@ -542,7 +569,11 @@ export function MonitoringPage() {
                     </table>
                   </div>
                   <div className="mt-4">
-                    <Pagination meta={list.meta} onPageChange={fetchPage} />
+                    <Pagination
+                      meta={list.meta}
+                      onPageChange={fetchPage}
+                      rightSlot={perPageSelect}
+                    />
                   </div>
                 </>
               )}

@@ -3,17 +3,16 @@
  * Kontrak yang dijaga:
  * - pemilik `wfh.monitoring.view` melihat dua tab (Papan Harian, Semua Laporan);
  * - mount → `fetchWfhBoard` dengan tanggal hari ini (lokal); pindah tanggal →
- *   refetch; tanggal efektif dari respons ditampilkan;
+ *   refetch;
  * - board dikelompokkan per tim; grup "Tanpa Tim" tanpa tombol PDF;
  * - tombol PDF per grup tim hanya untuk pemilik `wfh.report.export_pdf`
  *   (user sintetik view-only → tombol hilang); klik → `exportTeamWfhPdf`
  *   dengan `{date}` = tanggal efektif board;
- * - scope tercermin dari respons: `team_id` → "Tim saya", `field_id` →
- *   "Bidang", keduanya null → "Semua user";
- * - tab Semua Laporan: dibuka → `fetchAdminReports({})`; "Terapkan" → query
- *   terkombinasi + halaman 1; `date` menang atas `month`; `date_from`/`date_to`
- *   hanya dikirim berpasangan; `per_page` default (15) tidak dikirim;
- *   pagination mempertahankan filter aktif;
+ * - tab Semua Laporan: dibuka → `fetchAdminReports({})`; filter (status, tim,
+ *   rentang tanggal) berada di dropdown "Filter" pada header kartu tabel dan
+ *   baru dikirim saat "Terapkan" (reset ke halaman 1); `per_page` default
+ *   (15) tidak dikirim; pagination mempertahankan filter aktif; per-page
+ *   dikendalikan dari footer (rightSlot pagination);
  * - klik baris → `/wfh/:reportId`;
  * - gagal fetch (403/422) → pesan server tampil dan TIDAK lenyap saat pindah
  *   tab / refetch (regresi a602c46).
@@ -21,10 +20,10 @@
  * pdf-download.test.tsx (dipakai jalur unduh PDF tim).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Mock } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { ApiError } from "@/api/client";
 import { userEvent, pickDate, pickSelect } from "@/test/portal";
+import type { Mock } from "vitest";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type {
@@ -173,14 +172,6 @@ function renderPageAs(user: typeof userAdmin = userAdmin) {
   return store;
 }
 
-/** Buka tab "Semua Laporan" dan tunggu fetch pertama selesai. */
-async function openReportsTab() {
-  await userEvent.click(screen.getByTestId("monitoring-tab-reports"));
-  await waitFor(() => {
-    expect(mockedList).toHaveBeenCalledTimes(1);
-  });
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   mockedBoard.mockResolvedValue(boardData);
@@ -193,6 +184,18 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 });
+
+/** Buka tab "Semua Laporan" dan tunggu fetch pertama selesai. */
+async function openReportsTab() {
+  await userEvent.click(screen.getByTestId("monitoring-tab-reports"));
+  await waitFor(() => {
+    expect(mockedList).toHaveBeenCalledTimes(1);
+  });
+}
+/** Buka dropdown filter (kontrol status/tim/tanggal berada di dalamnya). */
+async function openFilter() {
+  await userEvent.click(screen.getByTestId("monitoring-filter-trigger"));
+}
 
 /** Kosongkan DateInput lewat tombol hapus (no-op bila memang sudah kosong).
  * Clear button adalah sibling trigger (bukan nested), ship review #12. */
@@ -242,26 +245,6 @@ describe("MonitoringPage — tab & papan harian", () => {
     expect(within(groupTanpaTim).getByText("Tanpa Tim")).toBeTruthy();
     expect(within(groupTanpaTim).getByText("Budi Santoso")).toBeTruthy();
 
-    // Tanggal efektif dari respons ditampilkan.
-    expect(screen.getByText(/2026-07-10/)).toBeTruthy();
-  });
-
-  it("board: scope tercermin dari respons — admin 'Semua user', bidang 'Bidang', tim 'Tim saya'", async () => {
-    // Admin: team_id & field_id null.
-    renderPageAs();
-    expect(await screen.findByText(/cakupan: semua user/i)).toBeTruthy();
-    cleanup();
-
-    // Kepala bidang: field_id terisi.
-    mockedBoard.mockResolvedValue({ ...boardData, team_id: null, field_id: 1 });
-    renderPageAs(userViewOnly);
-    expect(await screen.findByText(/cakupan: bidang saya/i)).toBeTruthy();
-    cleanup();
-
-    // Kepala tim: team_id terisi.
-    mockedBoard.mockResolvedValue({ ...boardData, team_id: 3, field_id: null });
-    renderPageAs(userViewOnly);
-    expect(await screen.findByText(/cakupan: tim saya/i)).toBeTruthy();
   });
 
   it("board: pindah tanggal → refetch dengan tanggal baru", async () => {
@@ -337,6 +320,7 @@ describe("MonitoringPage — Semua Laporan", () => {
   it("Terapkan: status + tim + pasangan tanggal → satu query + halaman 1", async () => {
     renderPageAs();
     await openReportsTab();
+    await openFilter();
 
     await pickSelect("Status", "approved");
     await pickSelect("Tim", "Tim Aplikasi");
@@ -361,6 +345,7 @@ describe("MonitoringPage — Semua Laporan", () => {
     await openReportsTab();
 
     // from tanpa to → date_from saja terkirim.
+    await openFilter();
     await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
@@ -368,6 +353,7 @@ describe("MonitoringPage — Semua Laporan", () => {
     });
 
     // from dikosongkan → tidak ada filter tanggal terkirim.
+    await openFilter();
     await clearDate("Dari tanggal");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
@@ -378,19 +364,20 @@ describe("MonitoringPage — Semua Laporan", () => {
   it("pagination mempertahankan filter aktif; Terapkan mengembalikan ke halaman 1", async () => {
     renderPageAs();
     await openReportsTab();
+    await openFilter();
 
     await pickSelect("Status", "pending");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
     });
-
     await userEvent.click(pageButton("Berikutnya"));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 2 });
     });
 
     // Terapkan lagi → reset ke halaman 1.
+    await openFilter();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
@@ -400,6 +387,8 @@ describe("MonitoringPage — Semua Laporan", () => {
   it("regresi H1: filter rentang dikosongkan tidak bocor ke pagination berikutnya", async () => {
     renderPageAs();
     await openReportsTab();
+
+    await openFilter();
 
     // 1. terapkan filter rentang…
     await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
@@ -414,6 +403,7 @@ describe("MonitoringPage — Semua Laporan", () => {
     });
 
     // 2. kosongkan rentang, terapkan ulang…
+    await openFilter();
     await clearDate("Dari tanggal");
     await clearDate("Sampai tanggal");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
@@ -431,6 +421,7 @@ describe("MonitoringPage — Semua Laporan", () => {
   it("M2 regresi: opsi Semua status & Semua tim mengembalikan filter ke semua", async () => {
     renderPageAs();
     await openReportsTab();
+    await openFilter();
 
     // Set filter aktif…
     await pickSelect("Status", "approved");
@@ -445,6 +436,7 @@ describe("MonitoringPage — Semua Laporan", () => {
     });
 
     // …lalu reset keduanya lewat opsi "Semua" dan terapkan ulang.
+    await openFilter();
     await pickSelect("Status", "Semua status");
     await pickSelect("Tim", "Semua tim");
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
@@ -465,8 +457,8 @@ describe("MonitoringPage — Semua Laporan", () => {
   it("dropdown tim memakai listTeams pinjaman (bukan duplikasi)", async () => {
     renderPageAs();
     await openReportsTab();
-
     expect(mockedListTeams).toHaveBeenCalledTimes(1);
+    await openFilter();
     await userEvent.click(screen.getByLabelText("Tim"));
     expect(await screen.findByRole("option", { name: "Tim Aplikasi" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "Tim Jaringan" })).toBeTruthy();

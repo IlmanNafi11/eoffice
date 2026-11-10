@@ -5,6 +5,16 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Changed (frontend, 2026-11-09 — paritas UX tabel "Semua Laporan" monitoring)
+- Tab "Semua Laporan" di `MonitoringPage` diselaraskan dengan `WfhReportsPage`:
+  form filter (status, tim, rentang tanggal) dipecah ke dropdown tunggal
+  "Filter" di header kartu tabel "Daftar Laporan WFH" (ikon `ListFilter`);
+  card filter terpisah dihapus; kontrol "Per halaman" pindah ke footer tabel
+  lewat slot `rightSlot` komponen `Pagination`. Dropdown bersifat controlled
+  dengan guard `onInteractOutside` agar popover kalender `DateInput` dan opsi
+  `Select` (portal Radix terpisah) tidak menutup dropdown saat dipakai.
+- Label "Cakupan: … · Tanggal efektif …" pada kartu Papan Harian dihapus.
+
 ### Changed (frontend, 2026-11-08 — rework daftar WFH personal & monitoring)
 - `WfhReportsPage`: form filter (rentang tanggal) dipecah ke dropdown tunggal
   di kanan atas header tabel "Daftar Laporan" (ikon `ListFilter`) — card filter
