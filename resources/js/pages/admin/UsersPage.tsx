@@ -21,6 +21,7 @@ import { UserPlus } from "lucide-react";
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -134,22 +135,11 @@ export function UsersPage() {
             Daftar user, import spreadsheet, dan hapus akun.
           </p>
         </div>
-        <UserPlus aria-hidden="true" className="size-5 text-muted-foreground" />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
         {canCreate && (
-          <Button onClick={() => navigate("/admin/users/new")}>Buat User</Button>
-        )}
-        {canImport && (
-          <FileInput
-            id="admin-import-file"
-            aria-label="Pilih file import"
-            accept=".xlsx,.xls,.csv"
-            placeholder="Pilih file import (xlsx/xls/csv)"
-            onFileChange={(f) => {
-              if (f) void submitImport(f);
-            }}
-          />
+          <Button type="button" onClick={() => navigate("/admin/users/new")}>
+            <UserPlus aria-hidden="true" className="size-4" />
+            Buat User
+          </Button>
         )}
       </div>
 
@@ -195,6 +185,19 @@ export function UsersPage() {
         <CardHeader>
           <CardTitle>Daftar User</CardTitle>
           <CardDescription>Total {meta?.total ?? 0} user</CardDescription>
+          <CardAction>
+            {canImport && (
+              <FileInput
+                id="admin-import-file"
+                inputLabel="Pilih file import"
+                accept=".xlsx,.xls,.csv"
+                placeholder="Import file"
+                onFileChange={(f) => {
+                  if (f) void submitImport(f);
+                }}
+              />
+            )}
+          </CardAction>
         </CardHeader>
         <CardContent>
           {loading && items.length === 0 ? (

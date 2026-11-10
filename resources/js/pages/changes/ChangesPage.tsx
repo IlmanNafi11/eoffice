@@ -22,16 +22,22 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { GitBranch } from "lucide-react";
+import { GitBranch, ListFilter } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Select,
@@ -59,7 +65,7 @@ export function ChangesPage() {
   const navigate = useNavigate();
 
   const user = useAppSelector(selectUser);
-  const { statusFilter, page, perPage, status, error } =
+  const { statusFilter, perPage, status, error } =
     useAppSelector(selectChangePackageList);
   const items = useAppSelector(selectChangePackageListItems);
   const meta = useAppSelector(selectChangePackageListMeta);
@@ -68,7 +74,9 @@ export function ChangesPage() {
   // What-initialized dari slice supaya mount ulang menunjukkan filter aktif.
   const [statusSelect, setStatusSelect] = useState<ChangePackageStatus | "">("");
   // `perPage` null = pakai default backend 15 (tidak dikirim).
-  const [perPageSelect, setPerPageSelect] = useState<number | null>(null);
+  const [perPageValue, setPerPageValue] = useState<number | null>(null);
+  // Status filter di-dropdown header tabel (buka/tutup controlled).
+  const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
     dispatch(fetchPackages({}));
@@ -90,7 +98,7 @@ export function ChangesPage() {
   /** Terapkan filter lokal → selalu kembali ke halaman 1, reset per_page. */
   function applyFilter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPerPageSelect(null);
+    setFilterOpen(false);
     dispatch(
       fetchPackages({
         ...(statusSelect ? { status: statusSelect } : {}),
@@ -103,7 +111,7 @@ export function ChangesPage() {
   function applyPerPage(value: string) {
     const n = Number.parseInt(value, 10);
     const next = Number.isFinite(n) ? n : null;
-    setPerPageSelect(next);
+    setPerPageValue(next);
     setStatusSelect(statusFilter ?? "");
     dispatch(
       fetchPackages({
@@ -118,6 +126,90 @@ export function ChangesPage() {
   // pada form). Tanpa itu tombol disembunyikan — admin punya jalur view/decide.
   const canCreate = can(user, "change.initiation.create") && Boolean(user?.team?.field);
 
+  const perPageSelect = (
+    <Select
+      value={perPageValue?.toString() ?? "15"}
+      onValueChange={applyPerPage}
+    >
+      <SelectTrigger
+        aria-label="Per halaman"
+        size="sm"
+        className="w-25 text-muted-foreground"
+        data-testid="changes-perpage-trigger"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {[10, 15, 25, 50, 100].map((n) => (
+          <SelectItem key={n} value={String(n)}>
+            {n}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const filterMenu = (
+    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Filter paket"
+          data-testid="changes-filter-trigger"
+        >
+          <ListFilter aria-hidden="true" />
+          Filter
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-56 p-2.5"
+        onInteractOutside={(event) => {
+          // Select me-render opsinya di portal terpisah
+          // (`data-slot="select-content"`) — abaikan interaksi di dalamnya
+          // agar dropdown tidak tertutup saat memilih status.
+          const target = event.target as HTMLElement | null;
+          if (target?.closest('[data-slot="select-content"]')) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <form className="flex flex-col gap-3" onSubmit={applyFilter}>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="changes-filter-status">Status</FieldLabel>
+            <Select
+              value={statusSelect === "" ? undefined : statusSelect}
+              onValueChange={(v) =>
+                setStatusSelect((v ?? "") as ChangePackageStatus | "")
+              }
+            >
+              <SelectTrigger
+                id="changes-filter-status"
+                aria-label="Status"
+                className="w-full"
+              >
+                <SelectValue placeholder="Semua status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Semua status</SelectItem>
+                <SelectItem value="draft">Draf</SelectItem>
+                <SelectItem value="pending">Menunggu persetujuan</SelectItem>
+                <SelectItem value="approved">Disetujui</SelectItem>
+                <SelectItem value="rejected">Ditolak</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Button type="submit" className="mt-1 w-full">
+            Terapkan
+          </Button>
+        </form>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -127,72 +219,19 @@ export function ChangesPage() {
             Daftar paket perubahan beserta status persetujuannya.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {canCreate && (
-            <Button onClick={() => navigate("/changes/new")}>Buat Paket</Button>
-          )}
-          <GitBranch aria-hidden="true" className="size-5 text-muted-foreground" />
-        </div>
+        {canCreate && (
+          <Button type="button" onClick={() => navigate("/changes/new")}>
+            <GitBranch aria-hidden="true" className="size-4" />
+            Buat Paket
+          </Button>
+        )}
       </div>
-
-      <Card size="sm">
-        <CardContent>
-          <form className="flex flex-wrap items-end gap-3" onSubmit={applyFilter}>
-            <Field className="w-52" orientation="vertical">
-              <FieldLabel htmlFor="changes-filter-status">Status</FieldLabel>
-              <Select
-                value={statusSelect === "" ? undefined : statusSelect}
-                onValueChange={(v) =>
-                  setStatusSelect((v ?? "") as ChangePackageStatus | "")
-                }
-              >
-                <SelectTrigger
-                  id="changes-filter-status"
-                  aria-label="Status"
-                  className="w-full"
-                >
-                  <SelectValue placeholder="Semua status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Semua status</SelectItem>
-                  <SelectItem value="draft">Draf</SelectItem>
-                  <SelectItem value="pending">Menunggu persetujuan</SelectItem>
-                  <SelectItem value="approved">Disetujui</SelectItem>
-                  <SelectItem value="rejected">Ditolak</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field className="w-36" orientation="vertical">
-              <FieldLabel htmlFor="changes-filter-perpage">Per halaman</FieldLabel>
-              <Select
-                value={perPageSelect?.toString() ?? "15"}
-                onValueChange={applyPerPage}
-              >
-                <SelectTrigger
-                  id="changes-filter-perpage"
-                  aria-label="Per halaman"
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[10, 15, 25, 50, 100].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Button type="submit">Terapkan</Button>
-          </form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Daftar Paket</CardTitle>
           <CardDescription>Total {meta?.total ?? 0} paket perubahan</CardDescription>
+          <CardAction>{filterMenu}</CardAction>
         </CardHeader>
         <CardContent>
           {loading && items.length === 0 ? (
@@ -243,11 +282,8 @@ export function ChangesPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">
-                  Halaman {page} · {perPage ?? 15} per halaman
-                </span>
-                <Pagination meta={meta} onPageChange={fetchPage} />
+              <div className="mt-4">
+                <Pagination meta={meta} onPageChange={fetchPage} rightSlot={perPageSelect} />
               </div>
             </>
           )}

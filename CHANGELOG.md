@@ -5,6 +5,21 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Changed (frontend, 2026-11-10 — paritas UX header tabel + tombol aksi)
+- `UsersPage`: tombol "Buat User" pindah ke kanan-atas header halaman
+  (sejajar judul, `space-between`) dengan ikon di dalam tombol; input import
+  spreadsheet dipindah ke `CardAction` header kartu "Daftar User" dengan label
+  ringkas "Import file" (input `aria-label`/`inputLabel` "Pilih file import"
+  dipertahankan untuk aksesibilitas & test).
+- `ChangesPage`: filter status menjadi dropdown tunggal "Filter" di
+  `CardAction` header kartu "Daftar Paket" (pola `WfhReportsPage`/`Monitoring`;
+  guard `onInteractOutside` untuk portal `Select`); kontrol "Per halaman"
+  pindah ke footer tabel (`Pagination.rightSlot`); ikon `GitBranch` masuk ke
+  dalam tombol "Buat Paket"; card filter terpisah dan span duplikat
+  "Halaman N · per halaman" di footer dihapus (footer kini identik halaman WFH).
+- `TeamReportsPage`: kontrol "Per halaman" pindah dari card filter terpisah
+  ke footer tabel (`Pagination.rightSlot`); card filter dihapus.
+
 ### Changed (frontend, 2026-11-09 — paritas UX tabel "Semua Laporan" monitoring)
 - Tab "Semua Laporan" di `MonitoringPage` diselaraskan dengan `WfhReportsPage`:
   form filter (status, tim, rentang tanggal) dipecah ke dropdown tunggal

@@ -197,6 +197,27 @@ export function TeamReportsPage() {
     );
   }
 
+  const perPageSelect = (
+    <Select value={perPage?.toString() ?? "15"} onValueChange={applyPerPage}>
+      <SelectTrigger
+        aria-label="Per halaman"
+        size="sm"
+        className="w-25 text-muted-foreground"
+        data-testid="team-reports-perpage-trigger"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PER_PAGE_OPTIONS.map((n) => (
+          <SelectItem key={n} value={String(n)}>
+            {n}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -209,34 +230,6 @@ export function TeamReportsPage() {
         <UsersRound aria-hidden="true" className="size-5 text-muted-foreground" />
       </div>
 
-      <Card size="sm">
-        <CardContent>
-          <form className="flex flex-wrap items-end gap-3">
-            <Field className="w-36" orientation="vertical">
-              <FieldLabel htmlFor="team-reports-perpage">Per halaman</FieldLabel>
-              <Select
-                value={perPage?.toString() ?? "15"}
-                onValueChange={applyPerPage}
-              >
-                <SelectTrigger
-                  id="team-reports-perpage"
-                  aria-label="Per halaman"
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PER_PAGE_OPTIONS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </form>
-        </CardContent>
-      </Card>
 
       {canCreate && (
         <Card size="sm">
@@ -373,7 +366,7 @@ export function TeamReportsPage() {
                 </table>
               </div>
               <div className="mt-4">
-                <Pagination meta={meta} onPageChange={fetchPage} />
+                <Pagination meta={meta} onPageChange={fetchPage} rightSlot={perPageSelect} />
               </div>
             </>
           )}

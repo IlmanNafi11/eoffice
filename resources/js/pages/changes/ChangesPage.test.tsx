@@ -121,8 +121,14 @@ beforeEach(() => {
   mockedList.mockResolvedValue({ packages: [pkgA, pkgB], meta });
 });
 
-/** Buka Select status, pilih opsi, settle portal (helper test kit). */
+/** Buka dropdown filter header (kontennya unmount saat tertutup). */
+async function openFilter() {
+  await userEvent.click(screen.getByTestId("changes-filter-trigger"));
+}
+
+/** Buka dropdown filter, pilih opsi status, settle portal. */
 async function pickStatus(label: string) {
+  await openFilter();
   await userEvent.click(screen.getByLabelText("Status"));
   const items = await screen.findAllByRole("option", { name: label });
   const item = items.find((el) => el.getAttribute("data-slot") === "select-item") ?? items[items.length - 1]!;
@@ -229,6 +235,7 @@ describe("ChangesPage — filter & paginate", () => {
     renderPage();
     await screen.findByText("001/9/1.1/114/2025");
 
+    await openFilter();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
 
     await waitFor(() => {
@@ -254,6 +261,7 @@ describe("ChangesPage — filter & paginate", () => {
     });
 
     // 3. Terapkan lagi → reset ke halaman 1.
+    await openFilter();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
@@ -286,6 +294,7 @@ describe("ChangesPage — filter & paginate", () => {
       expect(mockedList).toHaveBeenLastCalledWith({ page: 2 });
     });
 
+    await openFilter();
     await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
     await waitFor(() => {
       // Bukan gabungan query lama ({page: 2}) — reset bersih ke halaman 1.
