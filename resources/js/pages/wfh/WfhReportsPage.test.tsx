@@ -157,7 +157,20 @@ describe("WfhReportsPage — fetch awal & render", () => {
 
     expect(await screen.findByText("Server sibuk")).toBeTruthy();
   });
+  it("session-config gagal → fallback tiga sesi default tetap tampil", async () => {
+    mockedSessionConfig.mockRejectedValueOnce(new Error("gagal"));
+    renderPage();
+
+    await screen.findByText("2026-08-10");
+
+    expect(screen.getAllByTestId("wfh-attendance-status")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Pagi belum absen")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Sore belum absen")).toHaveLength(2);
+  });
+
 });
+
+
 
 describe("WfhReportsPage — filter & paginate", () => {
   it("filter rentang (from + to) → fetch dengan date_from + date_to", async () => {

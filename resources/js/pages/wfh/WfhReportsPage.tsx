@@ -25,6 +25,7 @@
  * (`GET /wfh/session-config` → fallback `["pagi","siang","sore"]`); ikon
  * dekoratif ganda pada header halaman dihapus.
  */
+
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -76,6 +77,9 @@ import { selectUser } from "@/store/authSlice";
 import { createWfhReport, getWfhSessionConfig } from "@/api/wfh";
 import type { WfhSession } from "@/api/types";
 
+/** Fallback sesi bila `GET /wfh/session-config` gagal (default 3 sesi). */
+const DEFAULT_SESSIONS: WfhSession[] = ["pagi", "siang", "sore"];
+
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
 
 export function WfhReportsPage() {
@@ -120,7 +124,7 @@ export function WfhReportsPage() {
         if (!cancelled) setSessions(c.sessions);
       })
       .catch(() => {
-        if (!cancelled) setSessions([]);
+        if (!cancelled) setSessions(DEFAULT_SESSIONS);
       });
     return () => {
       cancelled = true;
