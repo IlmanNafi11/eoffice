@@ -22,17 +22,15 @@
             padding-bottom: 8px;
             border-bottom: 3px solid #000;
         }
-        .logo {
-            width: 80px;
-            height: 85px;
-            border: 1px dashed #999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            color: #999;
+        .kop-logo {
+            width: 74px;
             flex-shrink: 0;
-            margin-right: 15px;
+            margin-right: 14px;
+        }
+        .kop-logo img {
+            width: 74px;
+            height: auto;
+            display: block;
         }
         .kop-text { text-align: center; flex-grow: 1; }
         .kop-text h3 { margin: 0; font-size: 16px; text-transform: uppercase; font-weight: bold; }
@@ -74,15 +72,6 @@
         }
         table.staff td.no { text-align: center; width: 30px; }
         table.staff td.links { font-size: 9px; color: #333; line-height: 1.3; }
-
-        /* === KLAUSA LEGAL === */
-        .legal {
-            font-size: 8px;
-            text-align: justify;
-            line-height: 1.3;
-            margin: 10px 0 15px 0;
-            color: #333;
-        }
 
         /* === BLOK TANDA TANGAN === */
         .signature-area { position: relative; margin-top: 20px; }
@@ -131,7 +120,7 @@
 
     {{-- KOP SURAT --}}
     <div class="kop-surat">
-        <div class="logo">LOGO<br>(80x85)</div>
+        <img class="kop-logo" src="{{ $logoDoc }}" alt="Logo Jawa Timur">
         <div class="kop-text">
             <h3>PEMERINTAH PROVINSI JAWA TIMUR</h3>
             <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
@@ -181,11 +170,6 @@
             @endforelse
         </tbody>
     </table>
-
-    {{-- KLAUSA LEGAL --}}
-    <div class="legal">
-        Sesuai dengan ketentuan perundang-undangan yang berlaku, surat ini telah ditandatangani secara elektronik menggunakan sertifikat elektronik yang diterbitkan oleh Balai Besar Sertifikasi Elektronik Badan Siber dan Sandi Negara (BSrE-BSSN). Legalitas berkas secara digital diatur oleh Dinas Komunikasi dan Informatika Provinsi Jawa Timur.
-    </div>
 
     {{-- FOOTER: TANGGAL --}}
     <div class="footer-bar">

@@ -8,6 +8,7 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Pdf\PdfImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
@@ -255,6 +256,7 @@ class TeamReportPdfTest extends TestCase
             'makerNip' => '789',
             'supervisorName' => 'KB',
             'supervisorNip' => '012',
+            'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ])->render();
 
         // Page 1: '-' for empty links
@@ -269,6 +271,30 @@ class TeamReportPdfTest extends TestCase
 
         // '-' for missing photos
         $this->assertStringContainsString('USER B', $html);
+    }
+
+    public function test_team_template_renders_logo_and_no_legal_paragraph(): void
+    {
+        $html = view('pdf.wfh-report-admin', [
+            'namaTim' => 'Tim Test',
+            'unitKerja' => 'Bidang Test',
+            'tanggalPelaksanaan' => '25 Juli 2026',
+            'staff' => [['name' => 'USER A', 'nip' => '1', 'links' => []]],
+            'sessions' => ['pagi' => [], 'siang' => [], 'sore' => []],
+            'isApproved' => false,
+            'signatureMakerPath' => null,
+            'signatureSupervisorPath' => null,
+            'makerName' => 'ADMIN',
+            'makerNip' => '789',
+            'supervisorName' => 'KB',
+            'supervisorNip' => '012',
+            'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
+        ])->render();
+
+        $this->assertStringContainsString('data:image/webp;base64,', $html);
+        $this->assertStringContainsString('DINAS KOMUNIKASI DAN INFORMATIKA', $html);
+        $this->assertStringNotContainsString('ditandatangani secara elektronik', $html);
+        $this->assertStringNotContainsString('LOGO<br>', $html);
     }
 
     public function test_team_pdf_sessions_all_keys_present_with_multiple_attendance(): void
