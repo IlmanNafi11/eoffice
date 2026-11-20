@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 50px; size: A4; }
+        @page { margin: 35px 40px; size: A4; }
         * { box-sizing: border-box; }
         body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.5; margin: 0; padding: 0; }
 

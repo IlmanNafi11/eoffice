@@ -3,6 +3,7 @@
 namespace Tests\Feature\ChangeManagement;
 
 use App\Support\Pdf\PdfImage;
+use App\Support\Pdf\PdfRendererService;
 use Tests\TestCase;
 
 class ChangeFormPdfTemplateTest extends TestCase
@@ -103,5 +104,12 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertStringContainsString('page-break-before', $html);
         $this->assertStringNotContainsString('ditandatangani secara elektronik', $html);
         $this->assertStringNotContainsString('BSrE-BSSN', $html);
+    }
+
+    public function test_implementation_pdf_renders_exactly_two_pages(): void
+    {
+        $pdf = app(PdfRendererService::class)->render('pdf.change-implementation', $this->implementationData());
+
+        $this->assertSame(2, preg_match_all('/\/Type\s*\/Page\b(?!s)/', $pdf));
     }
 }
