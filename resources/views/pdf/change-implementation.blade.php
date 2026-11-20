@@ -31,23 +31,14 @@
         .info-table { width: 100%; border-collapse: collapse; }
         .info-table td { border: 1px solid #000; padding: 2px 5px; vertical-align: top; }
         .info-table td.label { font-weight: bold; background-color: #f0f0f0; width: 150px; }
-        .info-table td.signature { width: 80px; text-align: center; vertical-align: middle; }
+        .info-table td.signature { width: 110px; text-align: center; vertical-align: middle; }
+        .info-table td.signature img { height: 42px; width: auto; max-width: 100%; }
 
         .check { white-space: nowrap; }
 
         .identity { width: 100%; border-collapse: collapse; }
         .identity td { border: none; padding: 0 3px; vertical-align: top; }
         .identity td.k { width: 48px; font-weight: bold; }
-
-        .signature-block { margin-top: 8px; }
-        .sig-table { width: 100%; border-collapse: collapse; }
-        .sig-table td { width: 33%; text-align: center; vertical-align: top; padding: 0 5px; }
-        .sig-role { font-weight: bold; margin-bottom: 25px; font-size: 9px; }
-        .sig-box { position: relative; height: 40px; margin: 0 auto 2px; width: 130px; }
-        .sig-box img { position: absolute; top: -35px; left: 0; height: 42px; width: auto; }
-        .sig-name { font-weight: bold; border-top: 1px solid #000; padding-top: 1px; font-size: 9px; }
-        .sig-nip { font-size: 8px; }
-        .sig-position { font-size: 8px; }
 
         .page-break { page-break-before: always; }
     </style>
@@ -167,7 +158,9 @@
                         <tr><td class="k">Jabatan</td><td>: {{ $evaluatorPosition }}</td></tr>
                     </table>
                 </td>
-                <td class="signature">Tanda Tangan</td>
+                <td class="signature">
+                    <img src="{{ $evaluatorSig }}" alt="Tanda Tangan">
+                </td>
             </tr>
         </table>
     </div>
@@ -205,7 +198,9 @@
                         <tr><td class="k">Jabatan</td><td>: {{ $reviewerPosition }}</td></tr>
                     </table>
                 </td>
-                <td class="signature">Tanda Tangan</td>
+                <td class="signature">
+                    <img src="{{ $reviewerSig }}" alt="Tanda Tangan">
+                </td>
             </tr>
         </table>
     </div>
@@ -244,35 +239,8 @@
                         <tr><td class="k">Jabatan</td><td>: {{ $responsiblePosition }}</td></tr>
                     </table>
                 </td>
-                <td class="signature">Tanda Tangan</td>
-            </tr>
-        </table>
-    </div>
-
-    {{-- TANDA TANGAN --}}
-    <div class="signature-block">
-        <table class="sig-table">
-            <tr>
-                <td>
-                    <div class="sig-role">Dievaluasi Oleh</div>
-                    <div class="sig-box"><img src="{{ $evaluatorSig }}" alt="sig"></div>
-                    <div class="sig-name">{{ $evaluatorName }}</div>
-                    <div class="sig-nip">NIP. {{ $evaluatorNip }}</div>
-                    <div class="sig-position">{{ $evaluatorPosition }}</div>
-                </td>
-                <td>
-                    <div class="sig-role">Ditinjau Oleh</div>
-                    <div class="sig-box"><img src="{{ $reviewerSig }}" alt="sig"></div>
-                    <div class="sig-name">{{ $reviewerName }}</div>
-                    <div class="sig-nip">NIP. {{ $reviewerNip }}</div>
-                    <div class="sig-position">{{ $reviewerPosition }}</div>
-                </td>
-                <td>
-                    <div class="sig-role">Penanggungjawab</div>
-                    <div class="sig-box"><img src="{{ $responsibleSig }}" alt="sig"></div>
-                    <div class="sig-name">{{ $responsibleName }}</div>
-                    <div class="sig-nip">NIP. {{ $responsibleNip }}</div>
-                    <div class="sig-position">{{ $responsiblePosition }}</div>
+                <td class="signature">
+                    <img src="{{ $responsibleSig }}" alt="Tanda Tangan">
                 </td>
             </tr>
         </table>

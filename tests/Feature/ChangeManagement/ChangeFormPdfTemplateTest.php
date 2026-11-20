@@ -165,6 +165,19 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertSame(3, substr_count($html, 'Tanda Tangan'));
     }
 
+    public function test_implementation_template_embeds_signature_image_in_each_identity_row(): void
+    {
+        $html = view('pdf.change-implementation', $this->implementationData())->render();
+
+        // Each signing identity row (Dievaluasi/Ditinjau/Penanggungjawab) must
+        // embed its own signature image once. There is no separate horizontal
+        // signature strip below the tables.
+        $this->assertSame(3, substr_count($html, 'data:image/png;base64,AAAA'));
+        $this->assertStringNotContainsString('signature-block', $html);
+        $this->assertStringNotContainsString('sig-table', $html);
+        $this->assertStringNotContainsString('sig-role', $html);
+    }
+
     public function test_implementation_template_renders_production_impact_not_description(): void
     {
         $html = view('pdf.change-implementation', $this->implementationData())->render();
