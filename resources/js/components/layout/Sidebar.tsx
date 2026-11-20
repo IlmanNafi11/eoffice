@@ -37,7 +37,14 @@ export function Sidebar() {
       <SidebarRoot collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-1.5">
-            <span className="text-lg font-bold tracking-tight">eOffice</span>
+            <img
+              src="/images/logo-app.webp"
+              alt="eOffice"
+              className="h-8 w-8 shrink-0 rounded-sm object-contain group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8"
+            />
+            <span className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">
+              eOffice
+            </span>
           </div>
         </SidebarHeader>
         <SidebarContent>

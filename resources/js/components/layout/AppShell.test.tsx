@@ -136,6 +136,13 @@ describe("AppShell — Sidebar dinamis dari NAV_REGISTRY", () => {
     expect(screen.queryByRole("link", { name: /^wfh$/i })).toBeNull();
     expect(screen.getByRole("link", { name: /profil saya/i })).toBeTruthy();
   });
+
+  it("menampilkan logo aplikasi di header sidebar", () => {
+    renderShell(userWith(["staf"], STAF_PERMISSIONS));
+
+    const logo = screen.getByRole("img", { name: /eoffice/i });
+    expect(logo.getAttribute("src")).toBe("/images/logo-app.webp");
+  });
 });
 
 describe("AppShell — Header", () => {
