@@ -6,6 +6,16 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 ## [Unreleased]
 
 
+
+### Fixed (backend, 2026-11-20 — dukungan WebP pada GD container)
+- Gambar logo dokumen (`logo-doc.webp`) disematkan sebagai data URI `image/webp`
+  ke PDF; runtime `eoffice-app` sebelumnya membangun ekstensi GD **tanpa** WebP,
+  sehingga DOMPDF melempar `Dompdf\Exception: Function imagecreatefromwebp() not
+  found` dan export PDF gagal (HTTP 500). `Dockerfile` kini memasang `libwebp-dev`
+  dan mengonfigurasi GD dengan `--with-webp` (paritas dengan dukungan JPEG/FreeType
+  yang sudah ada). Regresi dikunci di `PdfImageTest::test_webp_logo_renders_as_an_embedded_pdf_image`
+  (merender logo ke PDF dan menegaskan image XObject benar-benar tertanam).
+
 ### Changed (frontend, 2026-11-10 — preview gambar lampiran & penataan detail paket)
 - `ChangePackageDetailPage`: lampiran kini dirender `AttachmentList` baru — gambar
   ditampilkan sebagai thumbnail proporsional (`object-contain`) dengan lightbox
