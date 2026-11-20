@@ -5,21 +5,34 @@
     <style>
         @page { margin: 50px; size: A4; }
         * { box-sizing: border-box; }
-        body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10px; color: #000; line-height: 1.4; margin: 0; padding: 0; }
+        body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.5; margin: 0; padding: 0; }
 
-        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-        .header-table td { padding: 2px 5px; }
-        .doc-header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 12px; }
-        .doc-title { text-align: center; font-weight: bold; font-size: 13px; text-transform: uppercase; margin-bottom: 5px; }
+        .kop-surat { width: 100%; border-collapse: collapse; border-bottom: 3px solid #000; margin-bottom: 12px; }
+        .kop-surat td { vertical-align: middle; padding-bottom: 8px; }
+        .kop-logo { width: 80px; }
+        .kop-logo img { width: 74px; height: auto; display: block; }
+        .kop-text { text-align: center; }
+        .kop-text h3 { margin: 0; font-size: 13px; text-transform: uppercase; font-weight: bold; }
+        .kop-text h2 { margin: 2px 0; font-size: 17px; text-transform: uppercase; font-weight: bold; }
+        .kop-text p { margin: 3px 0 0; font-size: 8px; }
+
+        .form-header { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .form-header td { border: 1px solid #000; padding: 6px 8px; vertical-align: top; }
+        .form-header td.meta { width: 32%; }
+        .form-header td.title { text-align: center; vertical-align: middle; }
+        .form-title { font-size: 14px; font-weight: bold; text-transform: uppercase; }
+
+        .ref-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .ref-table td { padding: 2px 8px; }
 
         .section { margin-bottom: 12px; }
-        .section-title { font-weight: bold; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid #999; padding-bottom: 2px; margin-bottom: 5px; }
+        .section-title { font-weight: bold; text-transform: uppercase; font-size: 11px; border: 1px solid #000; padding: 4px 8px; margin-bottom: 0; background-color: #f0f0f0; }
 
         .info-table { width: 100%; border-collapse: collapse; }
         .info-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
-        .info-table td.label { font-weight: bold; background-color: #f0f0f0; width: 160px; }
+        .info-table td.label { font-weight: bold; background-color: #f0f0f0; width: 180px; }
 
-        .legal { font-size: 8px; text-align: justify; line-height: 1.3; margin: 10px 0; color: #333; }
+        .check { white-space: nowrap; }
 
         .signature-block { margin-top: 15px; }
         .sig-table { width: 100%; border-collapse: collapse; }
@@ -31,29 +44,57 @@
         .sig-nip { font-size: 9px; }
         .sig-position { font-size: 9px; }
 
-        .status-box { display: inline-block; border: 1px solid #000; padding: 2px 8px; font-weight: bold; margin: 2px; }
-        .status-active { background-color: #d4edda; }
+        .page-break { page-break-before: always; }
     </style>
-    <title>Form Implementasi Perubahan</title>
+    <title>Form Persetujuan Perubahan</title>
 </head>
 <body>
 
-    <div class="doc-header">
-        <table class="header-table">
-            <tr>
-                <td><strong>Nomor</strong></td>
-                <td>: {{ $docNumber }}</td>
-            </tr>
-            <tr>
-                <td><strong>Tanggal</strong></td>
-                <td>: {{ $tanggal }}</td>
-            </tr>
-        </table>
-    </div>
+    {{-- KOP SURAT --}}
+    <table class="kop-surat">
+        <tr>
+            <td class="kop-logo"><img src="{{ $logoDoc }}" alt="Logo Jawa Timur"></td>
+            <td class="kop-text">
+                <h3>PEMERINTAH PROVINSI JAWA TIMUR</h3>
+                <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
+                <p>Jalan Ahmad Yani Nomor 242-244, Gayungan, Surabaya, Jawa Timur 60235<br>
+                Tlp. (031) 8294608, Fak. (031) 8294517, Laman kominfo.jatimprov.go.id, Pos-el kominfo@jatimprov.go.id</p>
+            </td>
+        </tr>
+    </table>
+
+    {{-- HEADER FORMULIR --}}
+    <table class="form-header">
+        <tr>
+            <td class="meta">
+                <div><strong>No.</strong> : {{ $docNumber }}</div>
+                <div><strong>Tanggal</strong> : {{ $tanggal }}</div>
+                <div><strong>Halaman</strong> : 1</div>
+            </td>
+            <td class="title">
+                <div class="form-title">FORMULIR PERSETUJUAN PERUBAHAN</div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="ref-table">
+        <tr>
+            <td style="width: 120px;"><strong>Berdasarkan Inisiasi Bidang</strong> : {{ $bidang }}</td>
+        </tr>
+        <tr>
+            <td><strong>Nomor</strong> : {{ $docNumber }}</td>
+        </tr>
+        <tr>
+            <td><strong>Tanggal</strong> : {{ $tanggal }}</td>
+        </tr>
+        <tr>
+            <td><strong>Halaman</strong> : 1</td>
+        </tr>
+    </table>
 
     {{-- EVALUASI DAMPAK PERUBAHAN --}}
     <div class="section">
-        <div class="section-title">Evaluasi Dampak Perubahan</div>
+        <div class="section-title">EVALUASI DAMPAK PERUBAHAN</div>
         <table class="info-table">
             <tr>
                 <td class="label">Tipe Perubahan</td>
@@ -61,30 +102,38 @@
             </tr>
             <tr>
                 <td class="label">Prioritas Perubahan</td>
-                <td>{{ strtoupper($priority) }}</td>
+                <td>
+                    <span class="check">[{{ $isNormalPriority ? 'v' : ' ' }}] Normal</span>
+                    &nbsp;&nbsp;
+                    <span class="check">[{{ $isEmergencyPriority ? 'v' : ' ' }}] Emergency</span>
+                </td>
             </tr>
             <tr>
                 <td class="label">Dampak Perubahan</td>
-                <td>{{ strtoupper($impact) }}</td>
+                <td>
+                    <span class="check">[{{ $isMinorImpact ? 'v' : ' ' }}] Minor</span>
+                    &nbsp;&nbsp;
+                    <span class="check">[{{ $isMayorImpact ? 'v' : ' ' }}] Mayor</span>
+                </td>
             </tr>
             <tr>
-                <td class="label">Dampak terhadap Lingkungan</td>
-                <td>{{ $productionImpact }}</td>
+                <td class="label">Dampak Terhadap Lingkungan Produksi</td>
+                <td>{{ $description }}</td>
             </tr>
             <tr>
-                <td class="label">Upaya / Tindakan</td>
+                <td class="label">Upaya / Tindakan yang diperlukan</td>
                 <td>{{ $requiredEffort }}</td>
             </tr>
             <tr>
                 <td class="label">Kebutuhan Biaya</td>
-                <td>{{ $costNeeded }} — {{ $costAmount }}</td>
+                <td>{{ $costNeeded }} @if($costAmount !== '-') — {{ $costAmount }} @endif</td>
             </tr>
             <tr>
-                <td class="label">Kebutuhan Sumber Daya</td>
+                <td class="label">Kebutuhan Sumber Daya (Personil, H/W, S/W)</td>
                 <td>{{ $resources }}</td>
             </tr>
             <tr>
-                <td class="label">Rencana Pengujian</td>
+                <td class="label">Penjelasan Rencana Pengujian</td>
                 <td>{{ $testPlan }}</td>
             </tr>
             <tr>
@@ -96,18 +145,14 @@
 
     {{-- TINJAUAN PERUBAHAN --}}
     <div class="section">
-        <div class="section-title">Tinjauan Perubahan</div>
+        <div class="section-title">TINJAUAN PERUBAHAN</div>
         <table class="info-table">
             <tr>
-                <td class="label">Status Permintaan</td>
+                <td class="label">Status Permintaan Perubahan</td>
                 <td>
-                    @if($reviewStatus === 'diterima')
-                        <span class="status-box status-active">DITERIMA</span>
-                    @elseif($reviewStatus === 'ditolak')
-                        <span class="status-box">DITOLAK</span>
-                    @else
-                        <span class="status-box">{{ strtoupper($reviewStatus) }}</span>
-                    @endif
+                    <span class="check">[{{ $isAccepted ? 'v' : ' ' }}] DITERIMA</span>
+                    &nbsp;&nbsp;
+                    <span class="check">[{{ $isRejected ? 'v' : ' ' }}] DITOLAK</span>
                 </td>
             </tr>
             <tr>
@@ -115,7 +160,7 @@
                 <td>{{ $reviewResponse }}</td>
             </tr>
             <tr>
-                <td class="label">Tanggal Pelaksanaan</td>
+                <td class="label">Tanggal Pelaksanaan Perubahan</td>
                 <td>{{ $executionDate }}</td>
             </tr>
             <tr>
@@ -129,9 +174,12 @@
         </table>
     </div>
 
+    {{-- HALAMAN 2 --}}
+    <div class="page-break"></div>
+
     {{-- IMPLEMENTASI PERUBAHAN --}}
     <div class="section">
-        <div class="section-title">Implementasi Perubahan</div>
+        <div class="section-title">IMPLEMENTASI PERUBAHAN</div>
         <table class="info-table">
             <tr>
                 <td class="label">Hasil Tanggapan Perubahan</td>
@@ -154,10 +202,6 @@
         </table>
     </div>
 
-    <div class="legal">
-        Sesuai dengan ketentuan perundang-undangan yang berlaku, surat ini telah ditandatangani secara elektronik menggunakan sertifikat elektronik yang diterbitkan oleh Balai Besar Sertifikasi Elektronik Badan Siber dan Sandi Negara (BSrE-BSSN).
-    </div>
-
     {{-- TANDA TANGAN --}}
     <div class="signature-block">
         <table class="sig-table">
@@ -167,18 +211,21 @@
                     <div class="sig-box"><img src="{{ $evaluatorSig }}" alt="sig"></div>
                     <div class="sig-name">{{ $evaluatorName }}</div>
                     <div class="sig-nip">NIP. {{ $evaluatorNip }}</div>
+                    <div class="sig-position">{{ $evaluatorPosition }}</div>
                 </td>
                 <td>
                     <div class="sig-role">Ditinjau Oleh</div>
                     <div class="sig-box"><img src="{{ $reviewerSig }}" alt="sig"></div>
                     <div class="sig-name">{{ $reviewerName }}</div>
                     <div class="sig-nip">NIP. {{ $reviewerNip }}</div>
+                    <div class="sig-position">{{ $reviewerPosition }}</div>
                 </td>
                 <td>
                     <div class="sig-role">Penanggungjawab</div>
                     <div class="sig-box"><img src="{{ $responsibleSig }}" alt="sig"></div>
                     <div class="sig-name">{{ $responsibleName }}</div>
                     <div class="sig-nip">NIP. {{ $responsibleNip }}</div>
+                    <div class="sig-position">{{ $responsiblePosition }}</div>
                 </td>
             </tr>
         </table>
