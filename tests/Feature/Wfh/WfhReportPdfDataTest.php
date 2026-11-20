@@ -171,6 +171,44 @@ class WfhReportPdfDataTest extends TestCase
         $this->assertSame(['pagi', 'siang', 'sore'], array_keys($data['sessions']));
     }
 
+    public function test_report_builder_exposes_the_document_logo(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $staf = User::factory()->create(['team_id' => $team->id]);
+        $staf->assignRole('staf');
+        $this->setUserSignature($staf);
+
+        $report = WfhReport::factory()->create(['user_id' => $staf->id, 'status' => 'pending']);
+
+        $data = app(WfhReportPdfData::class)->forReport(
+            $report->load(['activities.links', 'user.team', 'supervisor'])
+        );
+
+        $this->assertStringStartsWith('data:image/webp;base64,', $data['logoDoc']);
+    }
+
+    public function test_team_builder_exposes_the_document_logo(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+
+        $admin = User::factory()->create(['team_id' => $team->id]);
+        $admin->assignRole('admin');
+        $this->setUserSignature($admin);
+
+        $data = app(WfhReportPdfData::class)->forTeam(
+            team: $team,
+            admin: $admin,
+            head: null,
+            date: now()->toDateString(),
+            isApproved: false,
+        );
+
+        $this->assertStringStartsWith('data:image/webp;base64,', $data['logoDoc']);
+    }
+
     /**
      * @return array<int, string>
      */
@@ -192,6 +230,7 @@ class WfhReportPdfDataTest extends TestCase
             'supervisorName',
             'supervisorNip',
             'qrSvg',
+            'logoDoc',
         ];
     }
 
@@ -213,6 +252,7 @@ class WfhReportPdfDataTest extends TestCase
             'makerNip',
             'supervisorName',
             'supervisorNip',
+            'logoDoc',
         ];
     }
 

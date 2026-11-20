@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\Media\PrivateMediaPath;
+use App\Support\Pdf\PdfImage;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 use Illuminate\Support\Carbon;
@@ -71,6 +72,7 @@ class WfhReportPdfData
             'supervisorName' => $supervisor ? strtoupper($supervisor->name) : '-',
             'supervisorNip' => $supervisor?->nip ?? '-',
             'qrSvg' => $qrSvg,
+            'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }
 
@@ -131,6 +133,7 @@ class WfhReportPdfData
             'makerNip' => $admin->nip,
             'supervisorName' => $head ? strtoupper($head->name) : '-',
             'supervisorNip' => $head?->nip ?? '-',
+            'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }
 }
