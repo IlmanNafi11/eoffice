@@ -118,7 +118,7 @@
             </tr>
             <tr>
                 <td class="label">Dampak Terhadap Lingkungan Produksi</td>
-                <td>{{ $description }}</td>
+                <td>{{ $productionImpact }}</td>
             </tr>
             <tr>
                 <td class="label">Upaya / Tindakan yang diperlukan</td>

@@ -106,6 +106,16 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertStringNotContainsString('BSrE-BSSN', $html);
     }
 
+    public function test_implementation_template_renders_production_impact_not_description(): void
+    {
+        $html = view('pdf.change-implementation', $this->implementationData())->render();
+
+        // "Dampak Terhadap Lingkungan Produksi" must show production_impact,
+        // not the initiation description.
+        $this->assertStringContainsString('Lingkungan produksi', $html);
+        $this->assertStringNotContainsString('Integrasi modul Mudik Gratis', $html);
+    }
+
     public function test_implementation_pdf_renders_exactly_two_pages(): void
     {
         $pdf = app(PdfRendererService::class)->render('pdf.change-implementation', $this->implementationData());
