@@ -310,6 +310,7 @@ describe("MonitoringPage — Semua Laporan", () => {
 
     // Kolom Status WFH: pill per sesi aktif tampil di tabel admin juga.
     expect(screen.getByRole("columnheader", { name: "Status WFH" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Kegiatan" })).toBeTruthy();
     expect(screen.getByTestId("wfh-attendance-status")).toBeTruthy();
     expect(screen.getByLabelText("Pagi belum absen")).toBeTruthy();
 
@@ -465,6 +466,34 @@ describe("MonitoringPage — Semua Laporan", () => {
     await userEvent.keyboard("{Escape}");
 
   });
+
+  it("Per halaman → fetch dengan per_page baru, filter aktif tetap, halaman 1", async () => {
+    renderPageAs();
+    await openReportsTab();
+    await openFilter();
+
+    await pickSelect("Status", "approved");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "approved", page: 1 });
+    });
+
+    // Paginasi ke halaman 2 dulu, lalu ubah per_page — harus balik ke halaman 1.
+    await userEvent.click(pageButton("Berikutnya"));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "approved", page: 2 });
+    });
+
+    await pickSelect("Per halaman", "25");
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({
+        status: "approved",
+        per_page: 25,
+        page: 1,
+      });
+    });
+  });
+
 });
 
 describe("MonitoringPage — regresi visibilitas error (a602c46)", () => {

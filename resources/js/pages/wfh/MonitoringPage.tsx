@@ -554,6 +554,7 @@ export function MonitoringPage() {
                           <th className="py-2 pr-4 font-medium">Tanggal</th>
                           <th className="py-2 pr-4 font-medium">Status</th>
                           <th className="py-2 pr-4 font-medium">Status WFH</th>
+                          <th className="py-2 text-right font-medium">Kegiatan</th>
                         </tr>
                       </thead>
                       <tbody>
