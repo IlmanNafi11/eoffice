@@ -59,7 +59,7 @@ class ChangeFormPdfTemplateTest extends TestCase
             'costAmount' => '-',
             'resources' => '2 personil',
             'testPlan' => 'Uji tampilan',
-            'changeTypes' => 'Aplikasi',
+            'changeTypes' => ['Aplikasi'],
             'reviewStatus' => 'diterima',
             'reviewResponse' => 'Disetujui',
             'executionDate' => '08 Maret 2026',
@@ -104,6 +104,65 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertStringContainsString('page-break-before', $html);
         $this->assertStringNotContainsString('ditandatangani secara elektronik', $html);
         $this->assertStringNotContainsString('BSrE-BSSN', $html);
+    }
+
+    public function test_implementation_template_has_single_meta_block_after_initiation_reference(): void
+    {
+        $html = view('pdf.change-implementation', $this->implementationData())->render();
+
+        // The number/date/page block belongs to the bordered form header beside
+        // the title; the reference table below "Berdasarkan Inisiasi Bidang"
+        $this->assertSame(1, substr_count($html, '<strong>No.</strong>'));
+        $this->assertSame(0, substr_count($html, '<strong>Nomor</strong>'));
+        $this->assertSame(1, substr_count($html, '<strong>Tanggal</strong>'));
+        $this->assertSame(1, substr_count($html, '<strong>Halaman</strong>'));
+        $this->assertSame(1, substr_count($html, 'Berdasarkan Inisiasi Bidang'));
+    }
+
+    public function test_implementation_template_checks_selected_change_types_only(): void
+    {
+        $data = $this->implementationData();
+        $data['changeTypes'] = ['Aplikasi', 'Network'];
+
+        $html = view('pdf.change-implementation', $data)->render();
+
+        foreach (['Hardware', 'Network', 'Software', 'Utilities', 'Aplikasi', 'Prosedur', 'Operating System', 'Personil'] as $type) {
+            $this->assertStringContainsString($type, $html);
+        }
+
+        $this->assertStringContainsString('data-option="Aplikasi">[v]</td>', $html);
+        $this->assertStringContainsString('data-option="Network">[v]</td>', $html);
+        foreach (['Hardware', 'Software', 'Utilities', 'Prosedur', 'Operating System', 'Personil'] as $type) {
+            $this->assertStringContainsString('data-option="'.$type.'">[ ]</td>', $html);
+        }
+    }
+
+    public function test_implementation_template_renders_priority_and_impact_as_checkbox_grids(): void
+    {
+        $html = view('pdf.change-implementation', $this->implementationData())->render();
+
+        $this->assertStringContainsString('data-option="Normal">[ ]</td>', $html);
+        $this->assertStringContainsString('data-option="Emergency">[v]</td>', $html);
+        $this->assertStringContainsString('data-option="Minor">[ ]</td>', $html);
+        $this->assertStringContainsString('data-option="Mayor">[v]</td>', $html);
+    }
+
+    public function test_implementation_template_renders_signing_identity_in_three_column_rows(): void
+    {
+        $html = view('pdf.change-implementation', $this->implementationData())->render();
+
+        foreach (['Dievaluasi Oleh', 'Ditinjau Oleh', 'Penanggungjawab Pelaksana Perubahan'] as $section) {
+            $this->assertStringContainsString($section, $html);
+        }
+
+        foreach (['Nama', 'Bidang', 'Jabatan', 'Tanda Tangan'] as $label) {
+            $this->assertStringContainsString($label, $html);
+        }
+
+        $this->assertStringContainsString('EVALUATOR', $html);
+        $this->assertStringContainsString('REVIEWER', $html);
+        $this->assertStringContainsString('PENANGGUNG', $html);
+        $this->assertSame(3, substr_count($html, 'Tanda Tangan'));
     }
 
     public function test_implementation_template_renders_production_impact_not_description(): void

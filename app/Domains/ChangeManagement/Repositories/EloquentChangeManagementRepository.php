@@ -36,9 +36,9 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
         'field',
         'initiator.team',
         'reviewer',
-        'implementation.evaluator',
-        'implementation.reviewer.team',
-        'implementation.responsible',
+        'implementation.evaluator.team.field',
+        'implementation.reviewer.team.field',
+        'implementation.responsible.team.field',
         'implementation.changeTypes',
         'implementation.attachments',
     ];
