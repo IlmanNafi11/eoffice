@@ -5,6 +5,7 @@ namespace App\Domains\ChangeManagement\Services;
 use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Support\Media\PrivateMediaPath;
+use App\Support\Pdf\PdfImage;
 use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 
@@ -45,6 +46,7 @@ class ChangePackagePdfData
             'qrSvg' => $this->qrCodeService->generate(
                 $this->qrCodeService->generateVerificationUrl($package->verification_token)
             ),
+            'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }
 
@@ -89,6 +91,13 @@ class ChangePackagePdfData
             'responsibleNip' => $impl->responsible?->nip ?? '-',
             'responsiblePosition' => $impl->responsible?->position ?? '-',
             'responsibleSig' => $this->resolveSignature($impl->responsible?->signature_path),
+            'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
+            'isNormalPriority' => strtolower((string) $impl->priority) === 'normal',
+            'isEmergencyPriority' => strtolower((string) $impl->priority) === 'emergency',
+            'isMinorImpact' => strtolower((string) $impl->impact) === 'minor',
+            'isMayorImpact' => strtolower((string) $impl->impact) === 'mayor',
+            'isAccepted' => strtolower((string) $impl->review_status) === 'diterima',
+            'isRejected' => strtolower((string) $impl->review_status) === 'ditolak',
         ];
     }
 

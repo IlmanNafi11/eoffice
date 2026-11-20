@@ -88,6 +88,26 @@ class ChangeManagementPdfDataTest extends TestCase
         $this->assertIsArray($data['attachmentImages']);
     }
 
+    public function test_implementation_builder_exposes_logo_and_derived_flags(): void
+    {
+        $this->setUserSignature($this->staf);
+        $this->setUserSignature($this->kepalaTim);
+
+        $package = app(ChangeManagementRepositoryInterface::class)->findPackage(
+            $this->createApprovedPackage()
+        );
+
+        $data = app(ChangePackagePdfData::class)->forImplementation($package);
+
+        $this->assertStringStartsWith('data:image/webp;base64,', $data['logoDoc']);
+        $this->assertTrue($data['isEmergencyPriority']);
+        $this->assertFalse($data['isNormalPriority']);
+        $this->assertTrue($data['isMayorImpact']);
+        $this->assertFalse($data['isMinorImpact']);
+        $this->assertTrue($data['isAccepted']);
+        $this->assertFalse($data['isRejected']);
+    }
+
     public function test_initiation_pdf_view_data_has_exact_keys(): void
     {
         $this->setUserSignature($this->staf);
@@ -137,6 +157,7 @@ class ChangeManagementPdfDataTest extends TestCase
             'reviewerPosition',
             'reviewerSig',
             'qrSvg',
+            'logoDoc',
         ];
     }
 
@@ -178,6 +199,13 @@ class ChangeManagementPdfDataTest extends TestCase
             'responsibleNip',
             'responsiblePosition',
             'responsibleSig',
+            'logoDoc',
+            'isNormalPriority',
+            'isEmergencyPriority',
+            'isMinorImpact',
+            'isMayorImpact',
+            'isAccepted',
+            'isRejected',
         ];
     }
 
