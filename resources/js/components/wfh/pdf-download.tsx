@@ -5,6 +5,8 @@
  * `getError?: (error: unknown) => string` opsional — pemanggil yang tahu bentuk
  * error domainnya (mis. ApiError 422/403 dari PDF tim) memetakan pesan server;
  * tanpa prop ini perilaku lama (pesan generik) tetap.
+ * `onError?: (error: unknown) => void` opsional — pemberitahuan tambahan untuk
+ * pemanggil (mis. toast dari halaman); komponen tetap yang memutuskan banner inline.
  */
 import * as React from "react";
 import { Download, Loader2 } from "lucide-react";
@@ -31,12 +33,15 @@ export function PdfDownloadButton({
   filename,
   children,
   getError,
+  onError,
 }: {
   getBlob: () => Promise<Blob>;
   filename: string;
   children: ReactNode;
   /** Opsional: petakan error domain → pesan siap tampil (default pesan generik). */
   getError?: (error: unknown) => string;
+  /** Opsional: dipanggil sekali per kegagalan, setelah pesan inline diset. */
+  onError?: (error: unknown) => void;
 }) {
   const [downloading, setDownloading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -49,6 +54,7 @@ export function PdfDownloadButton({
       downloadBlob(blob, filename);
     } catch (e) {
       setError(getError ? getError(e) : "Gagal mengunduh PDF. Coba lagi.");
+      onError?.(e);
     } finally {
       setDownloading(false);
     }

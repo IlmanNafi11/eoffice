@@ -388,6 +388,29 @@ describe("api/wfh — PDF & session config", () => {
     expect(blob.type).toBe("application/pdf");
   });
 
+  it("exportWfhReportPdf 4xx blob → error berpesan server, bukan teks axios (S5)", async () => {
+    queue.push({
+      status: 422,
+      body: new Blob(
+        [
+          JSON.stringify({
+            success: false,
+            message: "Anda belum mengatur tanda tangan. Atur tanda tangan terlebih dahulu sebelum mengekspor PDF.",
+          }),
+        ],
+        { type: "application/json" },
+      ),
+    });
+
+    const err = await exportWfhReportPdf(23).catch((e: unknown) => e);
+
+    expect(err).toMatchObject({
+      status: 422,
+      message: "Anda belum mengatur tanda tangan. Atur tanda tangan terlebih dahulu sebelum mengekspor PDF.",
+    });
+    expect(err instanceof Error && err.message).not.toMatch(/Request failed/);
+  });
+
   it("getWfhSessionConfig GET → requireData {sessions, allowed_days}", async () => {
     ok({ success: true, data: { sessions: ["pagi", "siang", "sore"], allowed_days: [1, 2, 3, 4, 5] }, message: null });
 

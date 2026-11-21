@@ -22,6 +22,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 import { ArrowLeft, Save } from "lucide-react";
 
 import { WfhStatusBadge } from "@/components/wfh/status-badge";
@@ -301,6 +303,7 @@ export function WfhReportDetailPage() {
           <PdfDownloadButton
             getBlob={() => exportWfhReportPdf(report.id)}
             filename={`WFH-${report.id}-${report.report_date}.pdf`}
+            onError={(e) => toast.error(toUiError(e).message)}
           >
             Unduh PDF
           </PdfDownloadButton>

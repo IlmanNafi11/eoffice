@@ -17,6 +17,8 @@ import { userEvent, pickDate } from "@/test/portal";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { AuthUser, WfhReport, WfhSessionConfig } from "@/api/types";
+import { ApiError } from "@/api/client";
+import { Toaster } from "@/components/ui/sonner";
 
 vi.mock("@/api/wfh", () => ({
   listWfhReports: vi.fn(),
@@ -51,6 +53,7 @@ const mockedApprove = wfhApi.approveWfhReport as unknown as Mock;
 const mockedDeleteActivity = wfhApi.deleteReportActivity as unknown as Mock;
 const mockedAddActivity = wfhApi.addReportActivity as unknown as Mock;
 const mockedUpdateMetadata = wfhApi.updateWfhReportMetadata as unknown as Mock;
+const mockedPdf = wfhApi.exportWfhReportPdf as unknown as Mock;
 const config: WfhSessionConfig = {
   sessions: ["pagi", "siang", "sore"],
   allowed_days: [1, 2, 3, 4, 5],
@@ -105,14 +108,18 @@ function renderDetail(role: Role = "staf", detailOverride?: WfhReport) {
   mockedSessionConfig.mockResolvedValue(config);
 
   render(
-    <Provider store={store}>
-      <MemoryRouter initialEntries={["/wfh/1"]}>
-        <Routes>
-          <Route path="/wfh/:reportId" element={<WfhReportDetailPage />} />
-          <Route path="/wfh" element={<div>wfh-list-stub</div>} />
-        </Routes>
-      </MemoryRouter>
-    </Provider>,
+    <>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
+      <Provider store={store}>
+        <MemoryRouter initialEntries={["/wfh/1"]}>
+          <Routes>
+            <Route path="/wfh/:reportId" element={<WfhReportDetailPage />} />
+            <Route path="/wfh" element={<div>wfh-list-stub</div>} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>
+    </>,
   );
   return store;
 }
@@ -464,6 +471,32 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     const getsBeforeFailure = mockedGet.mock.calls.length;
     await new Promise((r) => setTimeout(r, 20));
     expect(mockedGet.mock.calls.length).toBe(getsBeforeFailure);
+  });
+});
+
+describe("WfhReportDetailPage — unduh PDF gagal (pdf-signature S6)", () => {
+  it("gagal download → toast berisi pesan server + inline error tetap dirender", async () => {
+    mockedPdf.mockRejectedValue(
+      new ApiError(
+        "validation",
+        "Anda belum mengatur tanda tangan. Atur tanda tangan terlebih dahulu sebelum mengekspor PDF.",
+        { status: 422 },
+      ),
+    );
+    renderDetail("staf", detail("pending"));
+
+    await userEvent.click(await screen.findByRole("button", { name: /unduh pdf/i }));
+
+    // Toast error berisi pesan server (bukan copy generik).
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Anda belum mengatur tanda tangan");
+    });
+    // Banner inline dari PdfDownloadButton tetap dirender.
+    expect(
+      await screen.findByText(/anda belum mengatur tanda tangan/i),
+    ).toBeTruthy();
   });
 });
 
