@@ -49,6 +49,7 @@ vi.mock("@/api/users", () => ({
 }));
 
 import * as changePackageApi from "@/api/change-package";
+import { Toaster } from "@/components/ui/sonner";
 import * as usersApi from "@/api/users";
 import { ChangePackageFormPage } from "@/pages/changes/ChangePackageFormPage";
 import { makeStore } from "@/store";
@@ -140,6 +141,8 @@ function renderForm(route: string, overrides?: Partial<typeof staf>) {
 
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={[route]}>
         <Routes>
           <Route path="/changes/new" element={<ChangePackageFormPage />} />
@@ -563,5 +566,56 @@ describe("ChangePackageFormPage — gate tombol (permission sintetik × status �
 
     expect(screen.queryByRole("button", { name: /simpan draft/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /submit/i })).toBeNull();
+  });
+});
+
+describe("ChangePackageFormPage — spinner pending + toast (T7a)", () => {
+  it("Simpan Draft sukses → toast sukses teks server + navigasi detail", async () => {
+    mockedCreate.mockResolvedValueOnce({ ...editPkg, message: "Draft paket dibuat." });
+    renderForm("/changes/new");
+    await waitFor(() => expect(mockedChangeTypes).toHaveBeenCalled());
+
+    await fillInitiation();
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Draft paket dibuat.");
+    });
+    expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
+  it("Submit gagal → toast pesan server + banner inline tetap", async () => {
+    mockedSubmit.mockRejectedValueOnce(new Error("Paket sudah diproses."));
+    renderForm("/changes/12/edit");
+    await waitFor(() => expect(mockedShow).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Paket sudah diproses.");
+    });
+    expect(screen.getByTestId("change-package-form-error").textContent).toContain(
+      "Paket sudah diproses.",
+    );
+  });
+
+  it("Submit in-flight → tombol Submit & Simpan Draft aria-busy (mock never-resolves)", async () => {
+    mockedSubmit.mockImplementation(() => new Promise(() => {}));
+    renderForm("/changes/12/edit");
+    await waitFor(() => expect(mockedShow).toHaveBeenCalled());
+
+    const submit = screen.getByRole("button", { name: /submit/i });
+    const draft = screen.getByRole("button", { name: /simpan draft/i });
+    await userEvent.click(submit);
+
+    await waitFor(() => {
+      expect(submit.getAttribute("aria-busy")).toBe("true");
+    });
+    expect(draft.getAttribute("aria-busy")).toBe("true");
+    expect((draft as HTMLButtonElement).disabled).toBe(true);
   });
 });

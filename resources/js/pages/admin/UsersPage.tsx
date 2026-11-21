@@ -18,6 +18,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 
 import {
   Card,
@@ -109,16 +111,19 @@ export function UsersPage() {
     }
   }
 
-  /** Hapus user setelah confirm; sukses → list refresh page aktif. */
+  /** Hapus user setelah confirm; sukses → toast + list refresh page aktif. */
   async function submitDelete() {
     if (!deleteTarget || deleting) return;
     setDeleting(true);
     try {
-      await dispatch(deleteUserThunk(deleteTarget.id)).unwrap();
+      const message = await dispatch(deleteUserThunk(deleteTarget.id)).unwrap();
       dispatch(fetchUsers(activeQuery()));
       setDeleteTarget(null);
-    } catch {
-      // error diset reducer; dialog tetap terbuka, pesan server tampil.
+      toast.success(message);
+    } catch (err) {
+      // `unwrap()` melempar payload slice (string `messageOf`) — non-string
+      // tetap lewat seam. Dialog tetap terbuka, banner inline tetap dirender.
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setDeleting(false);
     }
@@ -310,7 +315,7 @@ export function UsersPage() {
             <Button
               type="button"
               variant="destructive"
-              disabled={deleting}
+              pending={deleting}
               onClick={() => void submitDelete()}
             >
               Hapus

@@ -33,6 +33,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 import { ArrowLeft, Check, Pencil, Send, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -148,6 +150,7 @@ export function ChangePackageDetailPage() {
   const pkg = useAppSelector(selectChangePackageCurrentData);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingPackage, setDeletingPackage] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Guard double-submit (pola WFH detail #4): ref sinkron menolak dua klik
   // beruntun; state men-disable tombol selama in-flight. DIDEKLARASIKAN
@@ -226,11 +229,14 @@ export function ChangePackageDetailPage() {
     busyRef.current = true;
     setPendingMutation(true);
     try {
-      await action.unwrap();
+      const res = (await action.unwrap()) as { message?: string };
       if (Number.isFinite(id)) dispatch(fetchPackage(id));
-    } catch {
-      // Pesan error sudah disimpan slice → tampil di halaman. Jangan refetch:
-      // error mutasi tak boleh lenyap (a602c46).
+      toast.success(res.message ?? "");
+    } catch (err) {
+      // Pesan error sudah disimpan slice → banner tetap; toast menambah
+      // notifikasi sesaat. Jangan refetch: error mutasi tak boleh lenyap
+      // (a602c46).
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       busyRef.current = false;
       setPendingMutation(false);
@@ -393,7 +399,7 @@ export function ChangePackageDetailPage() {
           ) : null}
           {canDoSubmit ? (
             <Button
-              disabled={pendingMutation}
+              pending={pendingMutation}
               onClick={() =>
                 void runMutation(
                   dispatch(
@@ -444,7 +450,7 @@ export function ChangePackageDetailPage() {
           {canDelete ? (
             <Button
               variant="destructive"
-              disabled={pendingMutation}
+              pending={pendingMutation}
               onClick={() => setDeleteOpen(true)}
             >
               <Trash2 aria-hidden="true" className="size-4" />
@@ -459,7 +465,7 @@ export function ChangePackageDetailPage() {
         <div className="flex items-center gap-2">
           {canApprove ? (
             <Button
-              disabled={pendingMutation}
+              pending={pendingMutation}
               onClick={() =>
                 void runMutation(
                   dispatch(decidePackageThunk({ packageId: id, approve: true })),
@@ -473,7 +479,7 @@ export function ChangePackageDetailPage() {
           {canReject ? (
             <Button
               variant="destructive"
-              disabled={pendingMutation}
+              pending={pendingMutation}
               onClick={() =>
                 void runMutation(
                   dispatch(decidePackageThunk({ packageId: id, approve: false })),
@@ -502,14 +508,20 @@ export function ChangePackageDetailPage() {
             <Button
               type="button"
               variant="destructive"
+              pending={deletingPackage}
               onClick={() => {
                 setDeleteOpen(false);
                 void (async () => {
+                  setDeletingPackage(true);
                   try {
-                    await dispatch(deletePackageThunk(id)).unwrap();
+                    const message = await dispatch(deletePackageThunk(id)).unwrap();
                     navigate("/changes");
-                  } catch {
+                    toast.success(message);
+                  } catch (err) {
                     // Pesan error disimpan slice → tampil di halaman.
+                    toast.error(typeof err === "string" && err ? err : toUiError(err).message);
+                  } finally {
+                    setDeletingPackage(false);
                   }
                 })();
               }}

@@ -33,6 +33,8 @@
  */
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 import { ArrowLeft, FilePlus2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -309,11 +311,12 @@ export function ChangePackageFormPage() {
       const result = isEdit
         ? await dispatch(updatePackageThunk({ packageId: id, input })).unwrap()
         : await dispatch(createPackageThunk(input)).unwrap();
+      toast.success(result.message);
       navigate(`/changes/${result.initiation.id}`);
-    } catch {
-      // Pesan error sudah di slice (current.error) → tampil di halaman.
-    } finally {
-      setBusy(false);
+    } catch (err) {
+      // Pesan error sudah di slice (current.error) → banner tetap; toast
+      // menambah notifikasi sesaat (payload slice string `messageOf`).
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     }
   }
 
@@ -343,12 +346,15 @@ export function ChangePackageFormPage() {
         ).unwrap();
         targetId = created.initiation.id;
       }
-      await dispatch(
+      const submitted = await dispatch(
         submitPackageThunk({ packageId: targetId, input: buildSubmitInput() }),
       ).unwrap();
+      toast.success(submitted.message);
       navigate(`/changes/${targetId}`);
-    } catch {
-      // Pesan error sudah di slice (current.error) → tampil di halaman.
+    } catch (err) {
+      // Pesan error sudah di slice (current.error) → banner tetap; toast
+      // menambah notifikasi sesaat (payload slice string `messageOf`).
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setBusy(false);
     }
@@ -684,13 +690,13 @@ export function ChangePackageFormPage() {
 
       <div className="flex items-center gap-2">
         {canDraft ? (
-          <Button variant="outline" disabled={busy} onClick={() => void handleSaveDraft()}>
+          <Button variant="outline" pending={busy} onClick={() => void handleSaveDraft()}>
             <Save aria-hidden="true" className="size-4" />
             Simpan Draft
           </Button>
         ) : null}
         {canDoSubmit ? (
-          <Button disabled={busy} onClick={() => void handleSubmit()}>
+          <Button pending={busy} onClick={() => void handleSubmit()}>
             <FilePlus2 aria-hidden="true" className="size-4" />
             Submit
           </Button>

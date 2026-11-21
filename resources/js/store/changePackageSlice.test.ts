@@ -347,6 +347,28 @@ describe("changePackageSlice — mutations", () => {
     expect(selectChangePackageCurrentData(store.getState())?.initiation.status).toBe("rejected");
   });
 
+  it("mutasi create/submit/decide membawa message envelope untuk toast (T7a)", async () => {
+    mockedCreate.mockResolvedValueOnce({ ...pkg, message: "Draft paket dibuat." });
+    mockedSubmit.mockResolvedValueOnce({ ...submittedPkg, message: "Paket berhasil diajukan." });
+    mockedApprove.mockResolvedValueOnce({
+      ...submittedPkg,
+      message: "Paket disetujui.",
+    });
+    const store = makeStore();
+
+    const created = await store.dispatch(createPackageThunk(draftInput)).unwrap();
+    const submitted = await store.dispatch(
+      submitPackageThunk({ packageId: 12, input: submitInput }),
+    ).unwrap();
+    const approved = await store.dispatch(
+      decidePackageThunk({ packageId: 12, approve: true }),
+    ).unwrap();
+
+    expect(created.message).toBe("Draft paket dibuat.");
+    expect(submitted.message).toBe("Paket berhasil diajukan.");
+    expect(approved.message).toBe("Paket disetujui.");
+  });
+
   it("mutasi gagal menyimpan error siap tampil", async () => {
     mockedSubmit.mockRejectedValueOnce(new Error("This action is unauthorized."));
     const store = makeStore();

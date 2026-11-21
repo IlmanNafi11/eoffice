@@ -26,6 +26,7 @@ import type {
   PackageSubmitInput,
   PaginationMeta,
 } from "@/api/types";
+import type { Messaged } from "@/api/client";
 
 export type ChangePackageFetchStatus = "idle" | "loading" | "succeeded" | "failed";
 
@@ -143,8 +144,8 @@ export const fetchChangeTypes = createAsyncThunk<
 
 // ── Mutasi: hasilnya resource ChangePackage → update current + baris list ──
 
-/** POST /changes — buat draft. */
-export const createPackageThunk = createAsyncThunk<ChangePackage, PackageDraftInput>(
+/** POST /changes — buat draft; payload membawa `message` untuk toast. */
+export const createPackageThunk = createAsyncThunk<Messaged<ChangePackage>, PackageDraftInput>(
   "changePackage/createPackage",
   async (input, { rejectWithValue }) => {
     try {
@@ -155,9 +156,9 @@ export const createPackageThunk = createAsyncThunk<ChangePackage, PackageDraftIn
   },
 );
 
-/** PUT /changes/{id} — perbarui draft. */
+/** PUT /changes/{id} — perbarui draft; payload membawa `message`. */
 export const updatePackageThunk = createAsyncThunk<
-  ChangePackage,
+  Messaged<ChangePackage>,
   { packageId: number; input: PackageDraftInput }
 >(
   "changePackage/updatePackage",
@@ -182,9 +183,9 @@ export const deletePackageThunk = createAsyncThunk<string, number>(
   },
 );
 
-/** POST /changes/{id}/submit — full-payload, status pending. */
+/** POST /changes/{id}/submit — full-payload, status pending; payload `message`. */
 export const submitPackageThunk = createAsyncThunk<
-  ChangePackage,
+  Messaged<ChangePackage>,
   { packageId: number; input: PackageSubmitInput }
 >(
   "changePackage/submitPackage",
@@ -197,9 +198,9 @@ export const submitPackageThunk = createAsyncThunk<
   },
 );
 
-/** POST /changes/{id}/approve|reject — `approve` pilih op; body kosong. */
+/** POST /changes/{id}/approve|reject — `approve` pilih op; payload `message`. */
 export const decidePackageThunk = createAsyncThunk<
-  ChangePackage,
+  Messaged<ChangePackage>,
   { packageId: number; approve: boolean }
 >(
   "changePackage/decidePackage",
@@ -344,15 +345,17 @@ const slice = createSlice({
       })
       // ── Mutasi ChangePackage: update current + baris list yang cocok ──
       .addMatcher(
-        (action): action is { type: string; payload: ChangePackage } =>
+        (action): action is { type: string; payload: Messaged<ChangePackage> } =>
           CHANGE_PACKAGE_MUTATION_FULFILLED.test(action.type),
         (state, action) => {
+          // `message` milik envelope toast — jangan bocor ke cache resource.
+          const { message: _message, ...resource } = action.payload;
           state.current.status = "succeeded";
-          state.current.data = action.payload;
+          state.current.data = resource;
           state.current.error = null;
-          const id = action.payload.initiation.id;
+          const id = resource.initiation.id;
           const idx = state.list.items.findIndex((p) => p.initiation.id === id);
-          if (idx !== -1) state.list.items[idx] = action.payload;
+          if (idx !== -1) state.list.items[idx] = resource;
         },
       )
       .addMatcher(

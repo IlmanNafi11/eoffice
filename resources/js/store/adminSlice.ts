@@ -35,6 +35,7 @@ import type {
   PaginationMeta,
   SettingsMap,
 } from "@/api/types";
+import type { Messaged } from "@/api/client";
 import { toUiError } from "@/lib/ui-errors";
 
 export type AdminFetchStatus = "idle" | "loading" | "succeeded" | "failed";
@@ -211,9 +212,9 @@ export const importUsersThunk = createAsyncThunk<ImportResult, File>(
   },
 );
 
-/** PUT /admin/roles/{id}/permissions — sync penuh. */
+/** PUT /admin/roles/{id}/permissions — sync penuh; payload membawa `message`. */
 export const syncRolePermissionsThunk = createAsyncThunk<
-  AdminRole,
+  Messaged<AdminRole>,
   { roleId: number; permissions: string[] }
 >(
   "admin/syncRolePermissions",

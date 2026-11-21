@@ -16,6 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import userEvent from "@testing-library/user-event";
+import type { UserEvent } from "@testing-library/user-event";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Provider } from "react-redux";
@@ -45,6 +46,7 @@ import { UsersPage } from "@/pages/admin/UsersPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
 import { ApiError } from "@/api/client";
+import { Toaster } from "@/components/ui/sonner";
 
 const mockedListUsers = adminApi.listUsers as unknown as Mock;
 const mockedDelete = adminApi.deleteUser as unknown as Mock;
@@ -90,6 +92,8 @@ function renderPageAs(permissions: string[]) {
   mockNavigate.mockClear();
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={["/admin/users"]}>
         <Routes>
           <Route path="/admin/users" element={<UsersPage />} />
@@ -291,6 +295,69 @@ describe("UsersPage — hapus user", () => {
 
     expect(screen.getByText("Ukuran file melebihi 10 MB.")).toBeTruthy();
     expect(mockedImport).not.toHaveBeenCalled();
+  });
+});
+
+describe("UsersPage — spinner pending + toast hapus (T7a)", () => {
+  function openDeleteDialog(u: UserEvent) {
+    return (async () => {
+      await u.click(screen.getByTestId("delete-user-13"));
+      return await screen.findByRole("dialog");
+    })();
+  }
+
+  it("sukses hapus → toast sukses teks server + dialog tertutup", async () => {
+    const u = userEvent.setup();
+    mockedDelete.mockResolvedValueOnce("User berhasil dihapus.");
+    renderPageAs(["user.manage", "user.delete"]);
+    await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
+
+    const dialog = await openDeleteDialog(u);
+    await u.click(within(dialog).getByRole("button", { name: /hapus/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("User berhasil dihapus.");
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("gagal hapus → toast pesan server + banner inline DI DALAM dialog tetap", async () => {
+    const u = userEvent.setup();
+    mockedDelete.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
+    renderPageAs(["user.manage", "user.delete"]);
+    await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
+
+    const dialog = await openDeleteDialog(u);
+    await u.click(within(dialog).getByRole("button", { name: /hapus/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("This action is unauthorized.");
+    });
+    // Banner inline di dalam dialog tetap dirender.
+    expect(within(dialog).getByTestId("delete-error").textContent).toContain(
+      "This action is unauthorized.",
+    );
+  });
+
+  it("tombol Hapus aria-busy selama deleteUser in-flight (mock never-resolves)", async () => {
+    const u = userEvent.setup();
+    mockedDelete.mockImplementation(() => new Promise(() => {}));
+    renderPageAs(["user.manage", "user.delete"]);
+    await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
+
+    const dialog = await openDeleteDialog(u);
+    const hapus = within(dialog).getByRole("button", { name: /hapus/i });
+    await u.click(hapus);
+
+    await waitFor(() => {
+      expect(hapus.getAttribute("aria-busy")).toBe("true");
+    });
   });
 });
 

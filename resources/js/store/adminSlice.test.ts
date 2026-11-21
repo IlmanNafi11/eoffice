@@ -442,6 +442,23 @@ describe("adminSlice — mutasi", () => {
     expect(mockedSyncRoles).toHaveBeenCalledWith(2, ["wfh.report.approve"]);
   });
 
+  it("syncRolePermissionsThunk fulfilled membawa message envelope untuk toast (T7a)", async () => {
+    mockedListRoles.mockResolvedValueOnce([role]);
+    const store = makeStore();
+    await store.dispatch(fetchRoles());
+
+    mockedSyncRoles.mockResolvedValueOnce({
+      ...role,
+      message: "Permission role berhasil diperbarui.",
+    });
+
+    const res = await store.dispatch(
+      syncRolePermissionsThunk({ roleId: 2, permissions: ["wfh.report.approve"] }),
+    ).unwrap();
+
+    expect(res.message).toBe("Permission role berhasil diperbarui.");
+  });
+
   it("updateSettingThunk fulfilled → update map cache settings", async () => {
     mockedListSettings.mockResolvedValueOnce(settingsMap);
     const store = makeStore();

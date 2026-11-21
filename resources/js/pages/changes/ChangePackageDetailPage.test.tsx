@@ -46,6 +46,7 @@ import * as changePackageApi from "@/api/change-package";
 import { httpClient } from "@/api/client";
 import { ChangePackageDetailPage } from "@/pages/changes/ChangePackageDetailPage";
 import { makeStore } from "@/store";
+import { Toaster } from "@/components/ui/sonner";
 import { setUser } from "@/store/authSlice";
 
 const mockedShow = changePackageApi.showPackage as unknown as Mock;
@@ -173,6 +174,8 @@ function renderDetail(user: typeof staf = staf, pkg: ChangePackage = draftPkg) {
 
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={["/changes/12"]}>
         <Routes>
           <Route path="/changes/:packageId" element={<ChangePackageDetailPage />} />
@@ -536,5 +539,58 @@ describe("ChangePackageDetailPage — UX lampiran & penempatan aksi", () => {
       lampiranCard.compareDocumentPosition(setujui) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+});
+
+describe("ChangePackageDetailPage — spinner pending + toast (T7a)", () => {
+  it("Setujui sukses → toast sukses teks server", async () => {
+    mockedApprove.mockResolvedValueOnce({
+      ...pendingPkg(),
+      message: "Paket disetujui.",
+    });
+    renderDetail(kepalaTim, pendingPkg());
+    await screen.findByText("001/9/1.1/114/2025");
+
+    await userEvent.click(screen.getByRole("button", { name: /setujui/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Paket disetujui.");
+    });
+  });
+
+  it("Tolak gagal → toast pesan server + banner inline tetap", async () => {
+    mockedReject.mockRejectedValueOnce(
+      new Error("Inisiator tidak dapat menolak paketnya sendiri."),
+    );
+    renderDetail(kepalaTim, pendingPkg());
+    await screen.findByText("001/9/1.1/114/2025");
+
+    await userEvent.click(screen.getByRole("button", { name: /tolak/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain(
+        "Inisiator tidak dapat menolak paketnya sendiri.",
+      );
+    });
+    expect(screen.getByTestId("change-package-detail-error").textContent).toContain(
+      "Inisiator tidak dapat menolak paketnya sendiri.",
+    );
+  });
+
+  it("Ajukan Submit in-flight → tombol aria-busy (mock never-resolves)", async () => {
+    mockedSubmit.mockImplementation(() => new Promise(() => {}));
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const submit = screen.getByRole("button", { name: /ajukan submit/i });
+    await userEvent.click(submit);
+
+    await waitFor(() => {
+      expect(submit.getAttribute("aria-busy")).toBe("true");
+    });
   });
 });

@@ -25,6 +25,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -273,11 +275,10 @@ export function UserFormPage() {
     setMessage(null);
 
     try {
-      if (isEdit) {
-        await updateUser(id, buildUpdateInput());
-      } else {
-        await createUser(buildCreateInput());
-      }
+      const res = isEdit
+        ? await updateUser(id, buildUpdateInput())
+        : await createUser(buildCreateInput());
+      toast.success(res.message);
       navigate("/admin/users");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -285,8 +286,11 @@ export function UserFormPage() {
         if (!err.errors || Object.keys(err.errors).length === 0) {
           setMessage(err.message);
         }
+        // Pesan server (bukan teks axios) ke toast; field error tetap inline.
+        toast.error(toUiError(err).message);
       } else {
         setMessage("Gagal menyimpan user.");
+        toast.error(toUiError(err).message);
       }
     } finally {
       setBusy(false);
@@ -533,7 +537,7 @@ export function UserFormPage() {
 
               {canSave ? (
                 <div className="flex items-center gap-2">
-                  <Button type="submit" disabled={busy}>
+                  <Button type="submit" pending={busy}>
                     <Save aria-hidden="true" className="size-4" />
                     Simpan
                   </Button>

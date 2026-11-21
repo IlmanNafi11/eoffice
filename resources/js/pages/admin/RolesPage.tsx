@@ -21,6 +21,8 @@
  *   (permission sintetik, bukan role name).
  */
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 import { Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -148,7 +150,7 @@ export function RolesPage() {
     if (!isRoleDirty(role) || savingId !== null) return;
     setSavingId(role.id);
     try {
-      await dispatch(
+      const res = await dispatch(
         syncRolePermissionsThunk({
           roleId: role.id,
           permissions: effectivePermissions(role),
@@ -159,8 +161,11 @@ export function RolesPage() {
         delete next[role.id];
         return next;
       });
-    } catch {
-      // error diset reducer (current.error) — pesan server tampil apa adanya.
+      toast.success(res.message);
+    } catch (err) {
+      // `unwrap()` melempar payload slice (string `messageOf`) — non-string
+      // tetap lewat seam. Banner inline (`roles-error`) tetap dirender.
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setSavingId(null);
     }
@@ -237,6 +242,7 @@ export function RolesPage() {
                   <div className="px-4 py-3">
                     <Button
                       size="sm"
+                      pending={savingId === role.id}
                       disabled={!isRoleDirty(role) || savingId !== null}
                       onClick={() => void saveRole(role)}
                     >

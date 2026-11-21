@@ -49,6 +49,7 @@ vi.mock("@/api/wfh-team", () => ({
 }));
 
 import * as adminApi from "@/api/admin";
+import { Toaster } from "@/components/ui/sonner";
 import { listTeams } from "@/api/wfh-team";
 import { UserFormPage } from "@/pages/admin/UserFormPage";
 import { makeStore } from "@/store";
@@ -103,6 +104,8 @@ function renderForm(route: string, overrides?: Partial<typeof adminPersona>) {
 
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={[route]}>
         <Routes>
           <Route path="/admin/users/new" element={<UserFormPage />} />
@@ -532,5 +535,64 @@ describe("UserFormPage — navigasi pasca-sukses", () => {
     await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
     await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
     expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+  });
+});
+
+describe("UserFormPage — spinner pending + toast (T7a)", () => {
+  it("sukses submit → toast sukses teks server + navigate", async () => {
+    mockedCreate.mockResolvedValueOnce({
+      ...existingUser,
+      message: "User berhasil dibuat.",
+    });
+    renderForm("/admin/users/new");
+    await waitFor(() => expect(mockedListTeams).toHaveBeenCalled());
+
+    await fillRequired();
+    await pickTeam("3");
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("User berhasil dibuat.");
+    });
+    expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+  });
+
+  it("gagal submit → toast pesan server + banner inline tetap", async () => {
+    mockedCreate.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
+    renderForm("/admin/users/new");
+    await waitFor(() => expect(mockedListTeams).toHaveBeenCalled());
+
+    await fillRequired();
+    await pickTeam("3");
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("This action is unauthorized.");
+    });
+    // Banner inline tetap dirender — pesan server apa adanya (tanpa field errors).
+    expect(screen.getByTestId("user-form-error").textContent).toContain(
+      "This action is unauthorized.",
+    );
+  });
+
+  it("tombol Simpan aria-busy selama createUser in-flight (mock never-resolves)", async () => {
+    mockedCreate.mockImplementation(() => new Promise(() => {}));
+    renderForm("/admin/users/new");
+    await waitFor(() => expect(mockedListTeams).toHaveBeenCalled());
+
+    await fillRequired();
+    await pickTeam("3");
+    const save = screen.getByRole("button", { name: /simpan/i });
+    await userEvent.click(save);
+
+    await waitFor(() => {
+      expect(save.getAttribute("aria-busy")).toBe("true");
+    });
   });
 });

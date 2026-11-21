@@ -41,6 +41,7 @@ import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
 import { permissionMeta } from "@/lib/permissions-meta";
 import { ApiError } from "@/api/client";
+import { Toaster } from "@/components/ui/sonner";
 
 const mockedListRoles = adminApi.listRoles as unknown as Mock;
 const mockedListPermissions = adminApi.listPermissions as unknown as Mock;
@@ -82,6 +83,8 @@ function renderPageAs(permissions: string[]) {
   store.dispatch(setUser({ ...adminUser, permissions }));
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <RolesPage />
     </Provider>,
   );
@@ -247,9 +250,9 @@ describe("RolesPage — simpan per role (sync penuh)", () => {
     await userEvent.click(within(rowOf(1)).getByRole("button", { name: /simpan/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText("Role 'admin' tidak boleh kehilangan permission kritis: user.manage."),
-      ).toBeTruthy(),
+      expect(screen.getByTestId("roles-error").textContent).toContain(
+        "Role 'admin' tidak boleh kehilangan permission kritis: user.manage.",
+      ),
     );
     expect(mockedSyncRoles).toHaveBeenCalledTimes(1);
   });
@@ -328,5 +331,70 @@ describe("RolesPage — gate role.manage", () => {
     await waitFor(() =>
       expect(screen.getByText("This action is unauthorized.")).toBeTruthy(),
     );
+  });
+});
+
+describe("RolesPage — spinner pending + toast (T7a)", () => {
+  beforeEach(() => {
+    mockedListRoles.mockResolvedValue([adminRole, timRole]);
+  });
+
+  it("sukses simpan → toast sukses teks server", async () => {
+    mockedSyncRoles.mockResolvedValueOnce({
+      ...timRole,
+      permissions: ["wfh.report.reject"],
+      message: "Permission role berhasil diperbarui.",
+    });
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+
+    await userEvent.click(checkboxOf(rowOf(3), "wfh.report.approve"));
+    await userEvent.click(within(rowOf(3)).getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Permission role berhasil diperbarui.");
+    });
+  });
+
+  it("gagal simpan → toast pesan server + banner inline tetap", async () => {
+    mockedSyncRoles.mockRejectedValueOnce(
+      new ApiError(
+        "validation",
+        "Role 'admin' tidak boleh kehilangan permission kritis: user.manage.",
+        { status: 422 },
+      ),
+    );
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(1)).toBeTruthy());
+
+    await userEvent.click(checkboxOf(rowOf(1), "user.create"));
+    await userEvent.click(within(rowOf(1)).getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain(
+        "Role 'admin' tidak boleh kehilangan permission kritis: user.manage.",
+      );
+    });
+    expect(screen.getByTestId("roles-error").textContent).toContain(
+      "Role 'admin' tidak boleh kehilangan permission kritis: user.manage.",
+    );
+  });
+
+  it("tombol Simpan aria-busy selama sync in-flight (mock never-resolves)", async () => {
+    mockedSyncRoles.mockImplementation(() => new Promise(() => {}));
+    renderPageAs(["role.manage", "permission.manage"]);
+    await waitFor(() => expect(rowOf(3)).toBeTruthy());
+
+    await userEvent.click(checkboxOf(rowOf(3), "wfh.report.approve"));
+    const save = within(rowOf(3)).getByRole("button", { name: /simpan/i });
+    await userEvent.click(save);
+
+    await waitFor(() => {
+      expect(save.getAttribute("aria-busy")).toBe("true");
+    });
   });
 });
