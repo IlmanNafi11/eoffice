@@ -46,7 +46,13 @@ class WfhReportPdfTemplateTest extends TestCase
 
         $this->assertStringContainsString('<table class="kop-surat">', $html);
         $this->assertMatchesRegularExpression('/\.kop-surat td\s*\{\s*vertical-align:\s*middle;/', $html);
-        $this->assertStringNotContainsString('display: flex', $html);
+        // Guard 0baf1ea: kop surat harus table-based, bukan flex (unreliable
+        // di DOMPDF). Cakupan pada blok CSS .kop-surat saja — signature-box
+        // (T8) memakai flex tersendiri.
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.kop-surat\s*\{[^}]*flex/',
+            $html,
+        );
     }
 
     public function test_signature_date_sits_directly_above_supervisor_column(): void
@@ -67,5 +73,41 @@ class WfhReportPdfTemplateTest extends TestCase
 
         $this->assertStringNotContainsString('ditandatangani secara elektronik', $html);
         $this->assertStringNotContainsString('BSrE-BSSN', $html);
+    }
+
+    private function assertSignatureImageSitsInsideTheBox(string $html): void
+    {
+        $this->assertStringNotContainsString('top:-55px', $html);
+        $this->assertStringNotContainsString('top: -55px', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.signature-box\s+img\s*\{[^}]*position:\s*absolute/',
+            $html,
+            'Signature image must not be absolutely positioned out of the box.',
+        );
+        $this->assertMatchesRegularExpression('/\.signature-box\s*\{[^}]*display:\s*flex/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-box\s*\{[^}]*align-items:\s*flex-end/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-box\s*\{[^}]*justify-content:\s*center/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-box\s+img\s*\{[^}]*max-height:\s*65px/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-role\s*\{[^}]*margin-bottom:\s*8px/', $html);
+        // img berada di dalam .signature-box (regresi M1).
+        $this->assertMatchesRegularExpression('/signature-box">\s*<img src="/', $html);
+    }
+
+    public function test_signature_image_renders_inside_the_box_without_negative_offset(): void
+    {
+        $html = view('pdf.wfh-report', $this->data())->render();
+
+        $this->assertSignatureImageSitsInsideTheBox($html);
+    }
+
+    public function test_admin_signature_image_renders_inside_the_box_without_negative_offset(): void
+    {
+        $html = view('pdf.wfh-report-admin', array_merge($this->data(), [
+            'namaTim' => 'Tim Test',
+            'staff' => [['name' => 'USER A', 'nip' => '1', 'links' => []]],
+            'sessions' => ['pagi' => [], 'siang' => [], 'sore' => []],
+        ]))->render();
+
+        $this->assertSignatureImageSitsInsideTheBox($html);
     }
 }

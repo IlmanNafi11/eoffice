@@ -77,9 +77,9 @@
         .signature-area { position: relative; margin-top: 20px; }
         .signature-table { width: 100%; border-collapse: collapse; }
         .signature-table td { width: 50%; text-align: center; vertical-align: top; padding: 0 10px; }
-        .signature-role { font-weight: bold; margin-bottom: 50px; }
-        .signature-box { position: relative; height: 70px; margin: 0 auto 5px; width: 200px; }
-        .signature-box img { position: absolute; top: -55px; left: 0; height: 65px; width: auto; }
+        .signature-role { font-weight: bold; margin-bottom: 8px; }
+        .signature-box { height: 70px; margin: 0 auto 5px; width: 200px; display: flex; align-items: flex-end; justify-content: center; }
+        .signature-box img { max-height: 65px; max-width: 100%; width: auto; }
         .signature-name { font-weight: bold; border-top: 1px solid #000; padding-top: 3px; margin-top: 2px; }
         .signature-nip { font-size: 10px; margin-top: 1px; }
         .footer-bar { position: relative; margin-top: 10px; }

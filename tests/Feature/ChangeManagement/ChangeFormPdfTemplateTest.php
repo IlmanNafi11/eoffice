@@ -44,6 +44,25 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertStringNotContainsString('BSrE-BSSN', $html);
     }
 
+    public function test_initiation_signature_image_renders_inside_the_box_without_negative_offset(): void
+    {
+        $html = view('pdf.change-initiation', $this->initiationData())->render();
+
+        $this->assertStringNotContainsString('top:-55px', $html);
+        $this->assertStringNotContainsString('top: -55px', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.signature-box\s+img\s*\{[^}]*position:\s*absolute/',
+            $html,
+            'Signature image must not be absolutely positioned out of the box.',
+        );
+        $this->assertMatchesRegularExpression('/\.signature-box\s*\{[^}]*display:\s*flex/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-box\s*\{[^}]*align-items:\s*flex-end/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-box\s*\{[^}]*justify-content:\s*center/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-box\s+img\s*\{[^}]*max-height:\s*65px/', $html);
+        $this->assertMatchesRegularExpression('/\.signature-role\s*\{[^}]*margin-bottom:\s*8px/', $html);
+        $this->assertMatchesRegularExpression('/signature-box">\s*<img src="/', $html);
+    }
+
     private function implementationData(): array
     {
         return [

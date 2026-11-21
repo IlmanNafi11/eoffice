@@ -128,20 +128,19 @@
         }
         .signature-role {
             font-weight: bold;
-            margin-bottom: 50px;
+            margin-bottom: 8px;
         }
         .signature-box {
-            /* Signature image rendered via relative position to test M1 precision */
-            position: relative;
             height: 70px;
             margin: 0 auto 5px;
             width: 200px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
         }
         .signature-box img {
-            position: absolute;
-            top: -55px;
-            left: 0;
-            height: 65px;
+            max-height: 65px;
+            max-width: 100%;
             width: auto;
         }
         .signature-name {
