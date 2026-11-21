@@ -27,6 +27,7 @@ class AppendAttendanceRequest extends FormRequest
         return [
             'photo.required' => 'Foto bukti kehadiran wajib diunggah.',
             'photo.image' => 'File harus berupa gambar.',
+            'photo.mimes' => 'Format foto harus JPG, JPEG, atau PNG.',
             'photo.max' => 'Ukuran foto maksimal 2MB.',
             'session.required' => 'Sesi absensi wajib diisi.',
             'session.in' => 'Sesi absensi tidak valid.',

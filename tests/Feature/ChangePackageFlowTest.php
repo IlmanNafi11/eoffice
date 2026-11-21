@@ -305,6 +305,35 @@ class ChangePackageFlowTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['files.0']);
     }
 
+    public function test_attachment_wrong_type_gets_indonesian_messages(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->staf);
+        $pkg = $this->postJson('/api/changes', $this->validDraftPayload())->json('data.initiation');
+
+        // PDF → files.*.mimes; 11 file → files.max; array non-file → files.*.file.
+        $this->postJson("/api/changes/{$pkg['id']}/attachments", [
+            'files' => [UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf')],
+        ])->assertStatus(422)->assertJson([
+            'errors' => ['files.0' => ['Format file harus JPG, JPEG, atau PNG.']],
+        ]);
+
+        $this->postJson("/api/changes/{$pkg['id']}/attachments", [
+            'files' => array_map(
+                fn ($i) => UploadedFile::fake()->image("f{$i}.png"),
+                range(0, 10),
+            ),
+        ])->assertStatus(422)->assertJson([
+            'errors' => ['files' => ['Maksimal 10 lampiran.']],
+        ]);
+
+        $this->postJson("/api/changes/{$pkg['id']}/attachments", [
+            'files' => ['bukan-file'],
+        ])->assertStatus(422)->assertJson([
+            'errors' => ['files.0' => ['File tidak valid.']],
+        ]);
+    }
+
     public function test_cannot_upload_to_non_draft(): void
     {
         Storage::fake('public');

@@ -172,6 +172,27 @@ class ReportAttendanceSubResourceTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_attendance_photo_wrong_extension_gets_indonesian_message(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-28'));
+
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user, '2026-07-28');
+
+        // GIF adalah gambar valid, jadi `image` lolos dan `mimes` yang menolak
+        // (spec upload-errors S8: pesan Indonesia, bukan default Inggris).
+        $response = $this->postJson("/api/wfh/reports/{$report->id}/attendances", [
+            'photo' => UploadedFile::fake()->image('foto.gif'),
+            'session' => 'pagi',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('errors.photo.0', 'Format foto harus JPG, JPEG, atau PNG.');
+    }
+
     // === DELETE ===
 
     public function test_delete_attendance_on_draft_report(): void
