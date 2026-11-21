@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Mock } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -222,5 +222,51 @@ describe("AppShell — Header", () => {
     mockedLogout.mockResolvedValueOnce(undefined);
     await userEvent.click(keluar);
     expect(mockedLogout).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AppShell — Header logout spinner (T7b)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("item Keluar menampilkan status pending selama logout in-flight (mock never-resolves)", async () => {
+    mockedLogout.mockImplementation(() => new Promise(() => {}));
+    renderShell(userWith(["staf"], STAF_PERMISSIONS));
+
+    await userEvent.click(screen.getByTestId("user-menu"));
+    const keluar = screen.getByRole("menuitem", { name: /keluar/i });
+    await userEvent.click(keluar);
+
+    await waitFor(() => {
+      expect(keluar.getAttribute("aria-busy")).toBe("true");
+    });
+    expect(keluar.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  });
+
+  it("tombol Keluar placeholder (user null) pending selama logout", async () => {
+    mockedLogout.mockImplementation(() => new Promise(() => {}));
+    const store = makeStore();
+    store.dispatch(setToken("tok-shell"));
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<div>halaman outlet</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    const keluar = screen.getByRole("button", { name: /keluar/i });
+    await userEvent.click(keluar);
+
+    await waitFor(() => {
+      expect(keluar.getAttribute("aria-busy")).toBe("true");
+    });
   });
 });

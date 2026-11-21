@@ -9,7 +9,7 @@
  * (`{success, data[], meta}`; meta = paginator), create/approve/reject +
  * listTeams = envelope `{data}` lewat `requireData`.
  */
-import { api, requireData } from "@/api/client";
+import { api, requireData, Messaged } from "@/api/client";
 import {
   CreateTeamReportInput,
   ListTeamReportsQuery,
@@ -50,24 +50,28 @@ export async function listWfhTeamReports(
 }
 
 /** POST /admin/wfh/team-reports — server memaksa `status=pending` + `created_by`. */
-export async function createWfhTeamReport(input: CreateTeamReportInput): Promise<WfhTeamReport> {
+export async function createWfhTeamReport(
+  input: CreateTeamReportInput,
+): Promise<Messaged<WfhTeamReport>> {
   const res = await api.post<WfhTeamReport>("/admin/wfh/team-reports", input);
-  return requireData(res.data, "createWfhTeamReport");
+  return { ...requireData(res.data, "createWfhTeamReport"), message: res.message ?? "" };
 }
 
 /** POST /admin/wfh/team-reports/{id}/approve — payload kosong. */
-export async function approveWfhTeamReport(teamReportId: number): Promise<WfhTeamReport> {
+export async function approveWfhTeamReport(
+  teamReportId: number,
+): Promise<Messaged<WfhTeamReport>> {
   const res = await api.post<WfhTeamReport>(`/admin/wfh/team-reports/${teamReportId}/approve`);
-  return requireData(res.data, "approveWfhTeamReport");
+  return { ...requireData(res.data, "approveWfhTeamReport"), message: res.message ?? "" };
 }
 
 /** POST …/reject — alasan wajib (kontrak `RejectTeamReportRequest`). */
 export async function rejectWfhTeamReport(
   teamReportId: number,
   input: RejectTeamReportInput,
-): Promise<WfhTeamReport> {
+): Promise<Messaged<WfhTeamReport>> {
   const res = await api.post<WfhTeamReport>(`/admin/wfh/team-reports/${teamReportId}/reject`, input);
-  return requireData(res.data, "rejectWfhTeamReport");
+  return { ...requireData(res.data, "rejectWfhTeamReport"), message: res.message ?? "" };
 }
 
 /**

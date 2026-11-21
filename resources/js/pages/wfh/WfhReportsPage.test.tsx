@@ -10,8 +10,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
 import { userEvent, pickDate, pickSelect } from "@/test/portal";
+import { render, screen, waitFor } from "@testing-library/react";
+import { Toaster } from "@/components/ui/sonner";
+import { ApiError } from "@/api/client";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { PaginationMeta, WfhReport } from "@/api/types";
@@ -84,6 +86,8 @@ function renderPage(userOverride = user) {
 
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={["/wfh"]}>
         <Routes>
           <Route path="/wfh" element={<WfhReportsPage />} />
@@ -322,5 +326,61 @@ describe("WfhReportsPage — tombol Buat Laporan & dialog create", () => {
       expect(mockedCreate).toHaveBeenCalledWith({ report_date: todayIso() });
     });
     expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
+  });
+});
+
+describe("WfhReportsPage — spinner pending + toast create (T7b)", () => {
+  it("create sukses → toast sukses teks server sebelum navigate", async () => {
+    mockedCreate.mockResolvedValueOnce({ ...reportA, message: "Laporan WFH berhasil dibuat." });
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Buat" }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan WFH berhasil dibuat.");
+    });
+    expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
+  });
+
+  it("create gagal → toast error pesan server + banner inline di dialog tetap", async () => {
+    mockedCreate.mockRejectedValueOnce(
+      new ApiError("http", "Tanggal di luar hari kerja.", { status: 422 }),
+    );
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Buat" }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Tanggal di luar hari kerja.");
+    });
+    // Banner inline di dalam dialog tetap dirender.
+    expect(screen.getByTestId("wfh-create-error")).toBeTruthy();
+  });
+
+  it("tombol Buat aria-busy selama create in-flight (mock never-resolves)", async () => {
+    mockedCreate.mockImplementation(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    await screen.findByRole("dialog");
+    const buat = screen.getByRole("button", { name: "Buat" });
+    await userEvent.click(buat);
+
+    await waitFor(() => {
+      expect(buat.getAttribute("aria-busy")).toBe("true");
+    });
+    expect((buat as HTMLButtonElement).disabled).toBe(true);
+    expect(buat.querySelector('[data-slot="spinner"]')).toBeTruthy();
   });
 });

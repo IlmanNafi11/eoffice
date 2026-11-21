@@ -30,6 +30,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListFilter, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -187,10 +189,14 @@ export function WfhReportsPage() {
     setCreateError(null);
     try {
       const created = await createWfhReport({ report_date: createDate });
+      toast.success(created.message);
       setCreateOpen(false);
       navigate(`/wfh/${created.id}`);
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : "Gagal membuat laporan.");
+    } catch (err) {
+      // Banner inline di dalam dialog tetap dirender; toast menambah
+      // notifikasi sesaat melalui seam abstraksi error (T7b).
+      setCreateError(toUiError(err).message);
+      toast.error(toUiError(err).message);
     } finally {
       setCreating(false);
     }
@@ -384,7 +390,8 @@ export function WfhReportsPage() {
             </Button>
             <Button
               type="button"
-              disabled={creating || createDate === ""}
+              pending={creating}
+              disabled={createDate === ""}
               onClick={() => void submitCreate()}
             >
               Buat

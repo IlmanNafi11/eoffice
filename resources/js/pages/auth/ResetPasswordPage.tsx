@@ -7,7 +7,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -116,17 +115,10 @@ export function ResetPasswordPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={submitting}
+                pending={submitting}
                 data-testid="reset-submit"
               >
-                {submitting ? (
-                  <>
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                    Menyimpan…
-                  </>
-                ) : (
-                  "Simpan password"
-                )}
+                Simpan password
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">

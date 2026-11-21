@@ -13,7 +13,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
@@ -25,6 +25,8 @@ vi.mock("@/api/profile", () => ({
   fetchSignatureObjectUrl: vi.fn(),
 }));
 
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import * as profileApi from "@/api/profile";
 import { ApiError } from "@/api/client";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
@@ -71,6 +73,8 @@ function renderProfile() {
 
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={["/profile"]}>
         <ProfilePage />
       </MemoryRouter>
@@ -84,6 +88,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
   mockedFetchUrl.mockResolvedValue("blob:preview-1");
+  // Sonner menyimpan toast di store modul-level; bersihkan antar test agar
+  // asersi "tanpa toast" tidak melihat toast dari test sebelumnya.
+  toast.dismiss();
 });
 
 /** Input file tersembunyi milik `FileInput` (data-testid ada di tombol). */
@@ -215,5 +222,96 @@ describe("ProfilePage — rehidrasi", () => {
     );
 
     expect(screen.getByText(/memuat profil/i)).toBeTruthy();
+  });
+});
+
+describe("ProfilePage — spinner pending + toast (T7b)", () => {
+  it("save sukses → toast sukses; elemen sukses inline role=status DIHAPUS", async () => {
+    mockedUpdate.mockResolvedValueOnce({ ...user, message: "Profil berhasil diperbarui." });
+    renderProfile();
+
+    await userEvent.click(screen.getByTestId("profile-save"));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Profil berhasil diperbarui.");
+    });
+    expect(within(screen.getByTestId("profile-save").closest("form")!).queryByRole("status")).toBeNull();
+  });
+
+  it("save gagal non-validation → toast error pesan server", async () => {
+    mockedUpdate.mockRejectedValueOnce(new ApiError("http", "Sesi berakhir.", { status: 401 }));
+    renderProfile();
+
+    await userEvent.click(screen.getByTestId("profile-save"));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Sesi berakhir, silakan masuk kembali.");
+    });
+  });
+
+  it("save gagal 422 per-field → field error inline, TANPA toast", async () => {
+    mockedUpdate.mockRejectedValueOnce(
+      new ApiError("validation", "Gagal validasi.", {
+        status: 422,
+        errors: { phone: ["Format telepon tidak valid."] },
+      }),
+    );
+    renderProfile();
+
+    await userEvent.click(screen.getByTestId("profile-save"));
+
+    await waitFor(() => expect(screen.getByText(/format telepon tidak valid/i)).toBeTruthy());
+    expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+  });
+
+  it("tombol Simpan profil aria-busy selama updateProfile in-flight", async () => {
+    mockedUpdate.mockImplementation(() => new Promise(() => {}));
+    renderProfile();
+
+    const save = screen.getByTestId("profile-save");
+    await userEvent.click(save);
+
+    await waitFor(() => expect(save.getAttribute("aria-busy")).toBe("true"));
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    expect(save.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  });
+
+  it("upload sukses → toast sukses; spinner manual 'Mengunggah…' DIHAPUS", async () => {
+    mockedUpload.mockResolvedValueOnce({
+      signature_url: "/api/signatures/1",
+      message: "Tanda tangan berhasil diunggah.",
+    });
+    mockedFetchUrl.mockResolvedValueOnce("blob:new-signature");
+    renderProfile();
+
+    const file = new File(["png-bytes"], "ttd.png", { type: "image/png" });
+    await userEvent.upload(signatureInput(), file);
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Tanda tangan berhasil diunggah.");
+    });
+    expect(screen.queryByText(/mengunggah…/i)).toBeNull();
+  });
+
+  it("upload gagal non-validation → toast error pesan server", async () => {
+    mockedUpload.mockRejectedValueOnce(
+      new ApiError("http", "Ukuran file maksimal 2MB.", { status: 422 }),
+    );
+    renderProfile();
+
+    const file = new File(["png-bytes"], "ttd.png", { type: "image/png" });
+    await userEvent.upload(signatureInput(), file);
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Ukuran file maksimal 2MB.");
+    });
   });
 });

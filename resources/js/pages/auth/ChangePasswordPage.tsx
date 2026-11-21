@@ -7,7 +7,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -112,17 +111,10 @@ export function ChangePasswordPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={submitting}
+                pending={submitting}
                 data-testid="change-password-submit"
               >
-                {submitting ? (
-                  <>
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                    Menyimpan…
-                  </>
-                ) : (
-                  "Ubah password"
-                )}
+                Ubah password
               </Button>
             </div>
           </form>

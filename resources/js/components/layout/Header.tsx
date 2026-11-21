@@ -6,7 +6,8 @@
  * header menampilkan placeholder — tanpa asumsi role.
  */
 
-import { LogOut } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
+import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,15 @@ function initials(name: string): string {
 export function Header() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
+  // Logout in-flight: item menu / tombol placeholder pending (aria-busy +
+  // spinner) sampai thunk settle — auth tidak memakai toast (konvensi T7b).
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  function runLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    void dispatch(logout()).finally(() => setLoggingOut(false));
+  }
 
   return (
     <header className="flex h-14 items-center gap-2 border-b px-4">
@@ -69,14 +79,18 @@ export function Header() {
                 <div className="text-xs text-muted-foreground">{user.email}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => void dispatch(logout())}>
-                <LogOut aria-hidden="true" />
+              <DropdownMenuItem onSelect={runLogout} aria-busy={loggingOut || undefined}>
+                {loggingOut ? (
+                  <Loader2 data-slot="spinner" aria-hidden="true" className="animate-spin" />
+                ) : (
+                  <LogOut aria-hidden="true" />
+                )}
                 Keluar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button variant="ghost" onClick={() => void dispatch(logout())}>
+          <Button variant="ghost" pending={loggingOut} onClick={runLogout}>
             <LogOut aria-hidden="true" />
             Keluar
           </Button>

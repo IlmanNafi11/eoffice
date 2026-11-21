@@ -138,20 +138,30 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     await store.dispatch(fetchWfhTeamReports({ page: 2, per_page: 10 }));
 
     const approved: WfhTeamReport = { ...reportPending, status: "approved" };
-    mockedApprove.mockResolvedValueOnce(approved);
+    // T7b: API mutasi mengembalikan `message` envelope untuk toast sukses.
+    mockedApprove.mockResolvedValueOnce({
+      ...approved,
+      message: "Laporan tim berhasil disetujui.",
+    });
     // Refetch pasca-mutasi membalas daftar baru dari server.
     mockedList.mockResolvedValueOnce({
       reports: [approved, reportSecond],
       meta: { ...meta, current_page: 2 },
     });
 
-    await store.dispatch(approveWfhTeamReport(1));
+    const result = await store.dispatch(approveWfhTeamReport(1));
 
     expect(mockedApprove).toHaveBeenCalledWith(1);
     // Refetch dipanggil dengan query aktif (page 2), bukan reset ke halaman 1.
     expect(mockedList).toHaveBeenLastCalledWith({ page: 2, per_page: 10 });
     const items = selectWfhTeamListItems(store.getState());
     expect(items.find((r) => r.id === 1)?.status).toBe("approved");
+    // `message` tidak bocor ke cache resource, tetapi tetap diteruskan thunk.
+    expect(items.find((r) => r.id === 1)).toEqual(approved);
+    expect(result.payload).toEqual({
+      ...approved,
+      message: "Laporan tim berhasil disetujui.",
+    });
   });
 
   it("reject fulfilled mengirim alasan dan meng-update baris", async () => {
@@ -164,7 +174,7 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
       status: "rejected",
       reject_reason: "Data tidak lengkap",
     };
-    mockedReject.mockResolvedValueOnce(rejected);
+    mockedReject.mockResolvedValueOnce({ ...rejected, message: "Laporan tim ditolak." });
     mockedList.mockResolvedValueOnce({ reports: [rejected], meta });
 
     await store.dispatch(rejectWfhTeamReport({ teamReportId: 1, reason: "Data tidak lengkap" }));
@@ -179,7 +189,7 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     await store.dispatch(fetchWfhTeamReports({}));
 
     const created: WfhTeamReport = { ...reportPending, id: 9 };
-    mockedCreate.mockResolvedValueOnce(created);
+    mockedCreate.mockResolvedValueOnce({ ...created, message: "Laporan tim berhasil dibuat." });
     mockedList.mockResolvedValueOnce({ reports: [created], meta });
 
     await store.dispatch(createWfhTeamReport({ team_id: 3, report_date: "2025-07-11" }));

@@ -8,7 +8,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -77,17 +76,10 @@ export function ForgotPasswordPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={submitting}
+                pending={submitting}
                 data-testid="forgot-submit"
               >
-                {submitting ? (
-                  <>
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                    Mengirim…
-                  </>
-                ) : (
-                  "Kirim OTP"
-                )}
+                Kirim OTP
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">

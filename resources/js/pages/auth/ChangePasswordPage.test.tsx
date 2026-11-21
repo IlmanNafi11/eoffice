@@ -143,3 +143,17 @@ describe("ChangePasswordPage — submit", () => {
     retry.resolve();
   });
 });
+
+describe("ChangePasswordPage — spinner pending (T7b)", () => {
+  it("tombol Ubah password aria-busy + spinner selama thunk in-flight", async () => {
+    vi.mocked(authApi.changePassword).mockImplementationOnce(() => new Promise(() => {}));
+    renderChangePassword(makeStore(), userWith(true));
+
+    await submitForm("lama-aman-8", "baru-aman-8", "baru-aman-8");
+
+    const button = screen.getByTestId("change-password-submit");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector('[data-slot="spinner"]')).toBeTruthy();
+    expect(button.textContent).toContain("Ubah password");
+  });
+});

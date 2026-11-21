@@ -6,11 +6,14 @@
  *   phone/position/rank. Sukses → `setUser` agar sidebar/header ikut segar.
  * - Upload signature memakai `FormData` (multipart) via `uploadSignature`;
  *   preview `signature_url` diperbarui setelah sukses, dan state user disinkron.
- * - Error 422 dari backend ditampilkan per-field (ApiError.errors).
+ * - Error 422 dari backend ditampilkan per-field via seam `toUiError` (T7b);
+ *   sukses → toast, gagal non-validation → toast + banner inline tetap.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +26,6 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FileInput } from "@/components/ui/file-input";
-import { ApiError } from "@/api/client";
 import { uploadSignature, updateProfile, fetchSignatureObjectUrl } from "@/api/profile";
 import { setUser, selectUser } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -101,15 +103,19 @@ export function ProfilePage() {
         rank: rank.trim() === "" ? null : rank.trim(),
       });
       dispatch(setUser(result));
-      setMessage("Profil berhasil diperbarui.");
+      // Sukses → toast saja; elemen inline role="status" sukses dihapus (S8).
+      toast.success(result.message);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setFieldErrors(err.errors ?? {});
-        if (!err.errors || Object.keys(err.errors).length === 0) {
-          setMessage(err.message);
-        }
+      const ui = toUiError(err);
+      if (ui.fields && Object.keys(ui.fields).length > 0) {
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(ui.fields).map(([field, m]) => [field, [m]]),
+          ),
+        );
       } else {
-        setMessage("Gagal menyimpan profil.");
+        setMessage(ui.message);
+        toast.error(ui.message);
       }
     } finally {
       setSaving(false);
@@ -136,15 +142,19 @@ export function ProfilePage() {
           signature_url: result.signature_url,
         }),
       );
-      setMessage("Tanda tangan berhasil diunggah.");
+      // Sukses → toast saja (S8).
+      toast.success(result.message);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setFieldErrors(err.errors ?? {});
-        if (!err.errors || Object.keys(err.errors).length === 0) {
-          setMessage(err.message);
-        }
+      const ui = toUiError(err);
+      if (ui.fields && Object.keys(ui.fields).length > 0) {
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(ui.fields).map(([field, m]) => [field, [m]]),
+          ),
+        );
       } else {
-        setMessage("Gagal mengunggah tanda tangan.");
+        setMessage(ui.message);
+        toast.error(ui.message);
       }
     } finally {
       setUploading(false);
@@ -203,9 +213,13 @@ export function ProfilePage() {
           <form onSubmit={handleSave} noValidate>
             <div className="flex flex-col gap-4">
               {message ? (
-                <div role="status" className="text-sm text-muted-foreground">
+                <p
+                  className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                  role="alert"
+                  data-testid="profile-error"
+                >
                   {message}
-                </div>
+                </p>
               ) : null}
 
               <Field>
@@ -253,17 +267,10 @@ export function ProfilePage() {
               <Button
                 type="submit"
                 className="w-full sm:w-auto"
-                disabled={saving}
+                pending={saving}
                 data-testid="profile-save"
               >
-                {saving ? (
-                  <>
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                    Menyimpan…
-                  </>
-                ) : (
-                  "Simpan profil"
-                )}
+                Simpan profil
               </Button>
             </div>
           </form>
@@ -305,12 +312,8 @@ export function ProfilePage() {
               <FieldError errors={signatureErrors?.map((m) => ({ message: m }))} />
             </Field>
 
-            {uploading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                Mengunggah…
-              </div>
-            ) : null}
+            {/* Upload berjalan = FileInput & field disabled; progres tampil
+                sebagai toast (manual spinner inline dihapus — S8). */}
           </div>
         </CardContent>
       </Card>

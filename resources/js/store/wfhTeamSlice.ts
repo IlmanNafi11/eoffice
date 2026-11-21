@@ -14,6 +14,7 @@
  */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+import type { Messaged } from "@/api/client";
 import * as wfhTeamApi from "@/api/wfh-team";
 import type {
   CreateTeamReportInput,
@@ -91,17 +92,17 @@ export const fetchWfhTeamReports = createAsyncThunk<
  * terpisah dari hasil mutasi yang sudah berhasil.
  */
 async function mutateAndRefetch(
-  mutate: () => Promise<WfhTeamReport>,
+  mutate: () => Promise<Messaged<WfhTeamReport>>,
   refetch: () => Promise<unknown>,
-): Promise<WfhTeamReport> {
-  const report = await mutate();
+): Promise<Messaged<WfhTeamReport>> {
+  const result = await mutate();
   await refetch(); // gagal refetch → list.error, bukan menggagalkan mutasi
-  return report;
+  return result;
 }
 
 /** POST /admin/wfh/team-reports — server memaksa status=pending + created_by. */
 export const createWfhTeamReport = createAsyncThunk<
-  WfhTeamReport,
+  Messaged<WfhTeamReport>,
   CreateTeamReportInput,
   { state: WithWfhTeam }
 >(
@@ -121,7 +122,7 @@ export const createWfhTeamReport = createAsyncThunk<
 
 /** POST /admin/wfh/team-reports/{id}/approve — payload kosong. */
 export const approveWfhTeamReport = createAsyncThunk<
-  WfhTeamReport,
+  Messaged<WfhTeamReport>,
   number,
   { state: WithWfhTeam }
 >(
@@ -141,7 +142,7 @@ export const approveWfhTeamReport = createAsyncThunk<
 
 /** POST /admin/wfh/team-reports/{id}/reject — alasan wajib. */
 export const rejectWfhTeamReport = createAsyncThunk<
-  WfhTeamReport,
+  Messaged<WfhTeamReport>,
   { teamReportId: number; reason: string },
   { state: WithWfhTeam }
 >(
@@ -215,12 +216,14 @@ const slice = createSlice({
         },
       )
       .addMatcher(
-        (action): action is { type: string; payload: WfhTeamReport } =>
+        (action): action is { type: string; payload: Messaged<WfhTeamReport> } =>
           WFH_TEAM_MUTATION_FULFILLED.test(action.type),
         (state, action) => {
           state.list.actionError = null;
-          const idx = state.list.items.findIndex((r) => r.id === action.payload.id);
-          if (idx !== -1) state.list.items[idx] = action.payload;
+          // `message` milik envelope toast — jangan bocor ke cache resource.
+          const { message: _message, ...resource } = action.payload;
+          const idx = state.list.items.findIndex((r) => r.id === resource.id);
+          if (idx !== -1) state.list.items[idx] = resource;
         },
       )
       .addMatcher(

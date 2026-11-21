@@ -207,3 +207,18 @@ describe("LoginPage — link lupa password", () => {
     expect(screen.getByText("halaman lupa password")).toBeTruthy();
   });
 });
+
+describe("LoginPage — spinner pending (T7b)", () => {
+  it("tombol Masuk aria-busy + spinner selama login in-flight", async () => {
+    vi.mocked(authApi.login).mockImplementationOnce(() => new Promise(() => {}));
+    renderLogin();
+
+    await submitLogin("staf@kominfo.go.id", "rahasia-aman");
+
+    const button = screen.getByTestId("login-submit");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector('[data-slot="spinner"]')).toBeTruthy();
+    // Label statis: spinner tidak lagi menggantikan teks tombol.
+    expect(button.textContent).toContain("Masuk");
+  });
+});

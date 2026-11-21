@@ -250,3 +250,47 @@ describe("ResetPasswordPage", () => {
     expect(sessionStorage.getItem(RESET_TOKEN_KEY)).toBeNull();
   });
 });
+
+describe("Auth flow — spinner pending (T7b)", () => {
+  it("ForgotPasswordPage: tombol Kirim OTP aria-busy + spinner saat forgotPassword in-flight", async () => {
+    vi.mocked(authApi.forgotPassword).mockImplementationOnce(() => new Promise(() => {}));
+    renderFlow("/forgot-password");
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/email/i), "staf@kominfo.go.id");
+    await user.click(screen.getByTestId("forgot-submit"));
+
+    const button = screen.getByTestId("forgot-submit");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector('[data-slot="spinner"]')).toBeTruthy();
+    expect(button.textContent).toContain("Kirim OTP");
+  });
+
+  it("OtpVerificationPage: tombol Verifikasi OTP aria-busy saat verifyOtp in-flight", async () => {
+    vi.mocked(authApi.verifyOtp).mockImplementationOnce(() => new Promise(() => {}));
+    renderFlow("/verify-otp?email=staf@kominfo.go.id");
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/kode otp/i), "123456");
+    await user.click(screen.getByTestId("otp-submit"));
+
+    const button = screen.getByTestId("otp-submit");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  });
+
+  it("ResetPasswordPage: tombol Simpan password aria-busy saat resetPassword in-flight", async () => {
+    sessionStorage.setItem(RESET_TOKEN_KEY, "f".repeat(60));
+    vi.mocked(authApi.resetPassword).mockImplementationOnce(() => new Promise(() => {}));
+    renderFlow("/reset-password");
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/^password baru$/i), "baru-aman-8");
+    await user.type(screen.getByLabelText(/konfirmasi password/i), "baru-aman-8");
+    await user.click(screen.getByTestId("reset-submit"));
+
+    const button = screen.getByTestId("reset-submit");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  });
+});

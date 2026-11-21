@@ -20,7 +20,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -103,17 +102,10 @@ export function LoginPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={submitting}
+                pending={submitting}
                 data-testid="login-submit"
               >
-                {submitting ? (
-                  <>
-                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                    Memproses…
-                  </>
-                ) : (
-                  "Masuk"
-                )}
+                Masuk
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">

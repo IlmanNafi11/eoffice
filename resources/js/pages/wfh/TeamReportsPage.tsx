@@ -24,6 +24,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { UsersRound } from "lucide-react";
+import { toast } from "sonner";
+import { toUiError } from "@/lib/ui-errors";
 
 import {
   Card,
@@ -124,13 +126,16 @@ export function TeamReportsPage() {
     setCreating(true);
     try {
       // Thunk fulfilled sudah memicu refetch daftar (query aktif).
-      await dispatch(
+      const result = await dispatch(
         createWfhTeamReport({ team_id: Number(teamId), report_date: reportDate }),
       ).unwrap();
       setTeamId("");
       setReportDate("");
-    } catch {
-      // actionError sudah diset reducer — pesan server tampil apa adanya.
+      toast.success(result.message);
+    } catch (err) {
+      // `unwrap()` melempar payload slice (string `messageOf`) — non-string
+      // tetap lewat seam. Banner inline tetap dirender (konvensi a602c46).
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setCreating(false);
     }
@@ -141,9 +146,12 @@ export function TeamReportsPage() {
     if (mutatingId !== null) return;
     setMutatingId(report.id);
     try {
-      await dispatch(approveWfhTeamReport(report.id)).unwrap();
-    } catch {
-      // actionError diset reducer — pesan server tampil dan selamat dari refetch.
+      const result = await dispatch(approveWfhTeamReport(report.id)).unwrap();
+      toast.success(result.message);
+    } catch (err) {
+      // `unwrap()` melempar payload slice (string `messageOf`) — non-string
+      // tetap lewat seam. Banner inline tetap dirender (konvensi a602c46).
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setMutatingId(null);
     }
@@ -163,11 +171,16 @@ export function TeamReportsPage() {
     if (reason === "") return;
     setRejecting(true);
     try {
-      await dispatch(rejectWfhTeamReport({ teamReportId: rejectTarget.id, reason })).unwrap();
+      const result = await dispatch(
+        rejectWfhTeamReport({ teamReportId: rejectTarget.id, reason }),
+      ).unwrap();
       setRejectOpen(false);
       setRejectTarget(null);
-    } catch {
-      // actionError diset reducer — dialog tetap terbuka, pesan server tampil.
+      toast.success(result.message);
+    } catch (err) {
+      // `unwrap()` melempar payload slice (string `messageOf`) — non-string
+      // tetap lewat seam. Dialog tetap terbuka, banner inline tetap dirender.
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setRejecting(false);
     }
@@ -271,7 +284,7 @@ export function TeamReportsPage() {
                   onChange={setReportDate}
                 />
               </Field>
-              <Button type="submit" disabled={creating}>
+              <Button type="submit" pending={creating}>
                 Simpan
               </Button>
             </form>
@@ -341,7 +354,7 @@ export function TeamReportsPage() {
                               {canApprove ? (
                                 <Button
                                   size="sm"
-                                  disabled={mutatingId !== null}
+                                  pending={mutatingId === r.id}
                                   onClick={() => void submitApprove(r)}
                                 >
                                   Setujui
@@ -409,7 +422,7 @@ export function TeamReportsPage() {
             <Button
               type="button"
               variant="destructive"
-              disabled={rejecting || rejectReason.trim() === ""}
+              pending={rejecting || rejectReason.trim() === ""}
               onClick={() => void submitReject()}
             >
               Tolak laporan

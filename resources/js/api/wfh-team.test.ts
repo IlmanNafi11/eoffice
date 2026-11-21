@@ -119,21 +119,22 @@ describe("api/wfh-team — list (envelope paginated)", () => {
 
 describe("api/wfh-team — create/approve/reject", () => {
   it("createWfhTeamReport mengirim JSON {team_id, report_date} dan melepas envelope", async () => {
-    created({ success: true, data: teamReport, message: null, meta: null });
+    created({ success: true, data: teamReport, message: "Laporan tim berhasil dibuat.", meta: null });
 
     const out = await createWfhTeamReport({ team_id: 3, report_date: "2025-07-11" });
 
     expect(requests[0]?.method).toBe("post");
     expect(requests[0]?.url).toBe("/admin/wfh/team-reports");
     expect(jsonBody(0)).toEqual({ team_id: 3, report_date: "2025-07-11" });
-    expect(out).toEqual(teamReport);
+    // T7b: `message` envelope server ikut sehingga halaman bisa toast sukses.
+    expect(out).toEqual({ ...teamReport, message: "Laporan tim berhasil dibuat." });
   });
 
   it("approveWfhTeamReport mengirim payload kosong dan melepas envelope", async () => {
     ok({
       success: true,
       data: { ...teamReport, status: "approved" },
-      message: null,
+      message: "Laporan tim berhasil disetujui.",
       meta: null,
     });
 
@@ -142,14 +143,18 @@ describe("api/wfh-team — create/approve/reject", () => {
     expect(requests[0]?.method).toBe("post");
     expect(requests[0]?.url).toBe("/admin/wfh/team-reports/12/approve");
     expect(requests[0]?.data).toBeUndefined();
-    expect(out).toEqual({ ...teamReport, status: "approved" });
+    expect(out).toEqual({
+      ...teamReport,
+      status: "approved",
+      message: "Laporan tim berhasil disetujui.",
+    });
   });
 
   it("rejectWfhTeamReport mengirim JSON {reason} dan melepas envelope", async () => {
     ok({
       success: true,
       data: { ...teamReport, status: "rejected", reject_reason: "Data tidak lengkap" },
-      message: null,
+      message: "Laporan tim ditolak.",
       meta: null,
     });
 
@@ -158,7 +163,12 @@ describe("api/wfh-team — create/approve/reject", () => {
     expect(requests[0]?.method).toBe("post");
     expect(requests[0]?.url).toBe("/admin/wfh/team-reports/12/reject");
     expect(jsonBody(0)).toEqual({ reason: "Data tidak lengkap" });
-    expect(out).toEqual({ ...teamReport, status: "rejected", reject_reason: "Data tidak lengkap" });
+    expect(out).toEqual({
+      ...teamReport,
+      status: "rejected",
+      reject_reason: "Data tidak lengkap",
+      message: "Laporan tim ditolak.",
+    });
   });
 });
 

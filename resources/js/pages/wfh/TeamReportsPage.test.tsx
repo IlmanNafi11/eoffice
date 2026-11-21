@@ -15,6 +15,8 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { PaginationMeta, WfhTeamReport } from "@/api/types";
+import { Toaster } from "@/components/ui/sonner";
+import { ApiError } from "@/api/client";
 
 vi.mock("@/api/wfh-team", () => ({
   listWfhTeamReports: vi.fn(),
@@ -94,6 +96,8 @@ function renderPageAs(overrides?: Partial<typeof user>) {
   store.dispatch(setUser({ ...user, ...overrides }));
   render(
     <Provider store={store}>
+      {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={["/team-reports"]}>
         <Routes>
           <Route path="/team-reports" element={<TeamReportsPage />} />
@@ -110,6 +114,7 @@ function renderPage() {
 
   render(
     <Provider store={store}>
+      <Toaster position="top-right" richColors />
       <MemoryRouter initialEntries={["/team-reports"]}>
         <Routes>
           <Route path="/team-reports" element={<TeamReportsPage />} />
@@ -270,7 +275,10 @@ describe("TeamReportsPage — create journey", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
 
-    expect(await screen.findByText("Laporan untuk tim dan tanggal ini sudah ada.")).toBeTruthy();
+    // Banner inline tetap menyajikan pesan server apa adanya (toast menyertai).
+    expect((await screen.findByTestId("team-action-error")).textContent).toContain(
+      "Laporan untuk tim dan tanggal ini sudah ada.",
+    );
     // Tidak ada refetch saat gagal — pesan tidak akan tersapu (akar a602c46).
     expect(mockedList).toHaveBeenCalledTimes(1);
   });
@@ -449,6 +457,156 @@ describe("TeamReportsPage — approve/reject journey", () => {
       "Laporan tidak berada dalam bidang Anda.",
     );
     // Dialog tetap terbuka agar pengguna bisa memperbaiki/membatalkan.
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+});
+
+describe("TeamReportsPage — spinner pending + toast (T7b)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedList.mockResolvedValue({ reports: [reportA, reportB], meta });
+    mockedListTeams.mockResolvedValue([teamResource]);
+  });
+
+  it("create sukses → toast sukses teks server", async () => {
+    renderPageAs(admin);
+    await screen.findByText("Tim Jaringan");
+
+    await pickSelect(/tim/i, "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
+
+    mockedCreate.mockResolvedValueOnce({
+      ...reportA,
+      id: 9,
+      report_date: "2026-08-12",
+      message: "Laporan tim berhasil dibuat.",
+    });
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan tim berhasil dibuat.");
+    });
+  });
+
+  it("create gagal → toast error pesan server + banner inline tetap", async () => {
+    renderPageAs(admin);
+    await screen.findByText("Tim Jaringan");
+
+    await pickSelect(/tim/i, "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-10");
+
+    mockedCreate.mockRejectedValueOnce(
+      new ApiError("http", "Laporan untuk tim dan tanggal ini sudah ada.", { status: 422 }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan untuk tim dan tanggal ini sudah ada.");
+    });
+    // Banner inline tetap dirender (konvensi a602c46).
+    expect(screen.getByTestId("team-action-error")).toBeTruthy();
+  });
+
+  it("tombol Simpan aria-busy selama create in-flight (mock never-resolves)", async () => {
+    mockedCreate.mockImplementation(() => new Promise(() => {}));
+    renderPageAs(admin);
+    await screen.findByText("Tim Jaringan");
+
+    await pickSelect(/tim/i, "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
+
+    const simpan = screen.getByRole("button", { name: /simpan/i });
+    await userEvent.click(simpan);
+
+    await waitFor(() => {
+      expect(simpan.getAttribute("aria-busy")).toBe("true");
+    });
+    expect((simpan as HTMLButtonElement).disabled).toBe(true);
+    // Spinner milik Button pending dirender.
+    expect(simpan.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  });
+
+  it("tombol Setujui aria-busy selama approve in-flight; sukses → toast teks server", async () => {
+    renderPageAs({
+      ...user,
+      permissions: ["wfh.team_report.view", "wfh.team_report.approve", "wfh.team_report.reject"],
+    });
+    await screen.findByTestId("team-report-row-1");
+
+    let resolveApprove!: (value: WfhTeamReport) => void;
+    mockedApprove.mockImplementation(
+      () => new Promise<WfhTeamReport>((res) => (resolveApprove = res)),
+    );
+
+    const setujui = within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+      name: /setujui/i,
+    });
+    await userEvent.click(setujui);
+    await waitFor(() => {
+      expect(setujui.getAttribute("aria-busy")).toBe("true");
+    });
+
+    resolveApprove({
+      ...reportA,
+      status: "approved",
+      message: "Laporan tim berhasil disetujui.",
+    } as WfhTeamReport);
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan tim berhasil disetujui.");
+    });
+  });
+
+  it("approve gagal → toast error pesan server + banner inline tetap", async () => {
+    renderPageAs({
+      ...user,
+      permissions: ["wfh.team_report.view", "wfh.team_report.approve", "wfh.team_report.reject"],
+    });
+    await screen.findByTestId("team-report-row-1");
+
+    mockedApprove.mockRejectedValueOnce(
+      new ApiError("http", "Laporan tidak berada dalam bidang Anda.", { status: 403 }),
+    );
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", { name: /setujui/i }),
+    );
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan tidak berada dalam bidang Anda.");
+    });
+    expect(screen.getByTestId("team-action-error")).toBeTruthy();
+  });
+
+  it("reject sukses → toast sukses; reject gagal → toast error + dialog tetap terbuka", async () => {
+    renderPageAs({
+      ...user,
+      permissions: ["wfh.team_report.view", "wfh.team_report.approve", "wfh.team_report.reject"],
+    });
+    await screen.findByTestId("team-report-row-1");
+
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", { name: /tolak/i }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByLabelText(/alasan penolakan/i), "Kuota habis.");
+
+    mockedReject.mockRejectedValueOnce(
+      new ApiError("http", "Laporan tidak berada dalam bidang Anda.", { status: 403 }),
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: /tolak laporan/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan tidak berada dalam bidang Anda.");
+    });
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });
