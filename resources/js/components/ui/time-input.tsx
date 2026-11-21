@@ -88,7 +88,7 @@ function TimeInput({
             variant="outline"
             disabled={disabled}
             className={cn(
-              "w-45 justify-between gap-1.5 font-normal",
+              "flex-1 min-w-32 max-w-full justify-between gap-1.5 font-normal",
               !parsed && "text-muted-foreground",
             )}
             {...props}

@@ -350,14 +350,14 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     renderDetail("staf", detail("draft"));
 
     await userEvent.click(await screen.findByRole("button", { name: /tambah kegiatan/i }));
-    await userEvent.type(await screen.findByLabelText(/deskripsi kegiatan/i), "Setup VPN");
+    await userEvent.type(await screen.findByLabelText(/^kegiatan$/i), "Setup VPN");
     await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan awal/i }));
     await userEvent.click(screen.getByRole("button", { name: /jam 08/i }));
     await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
     await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan akhir/i }));
     await userEvent.click(screen.getAllByRole("button", { name: /jam 10/i }).at(-1)!);
     await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
-    await userEvent.type(screen.getByLabelText(/link bukti kerja/i), "https://google.com");
+    await userEvent.type(screen.getByLabelText(/^link$/i), "https://google.com");
     await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
 
     await waitFor(() => {
@@ -451,7 +451,7 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     await waitFor(() => expect(screen.getByText("Kerja A")).toBeTruthy());
     mockedAddActivity.mockRejectedValueOnce(new Error("Gagal tambah kegiatan."));
     await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
-    await userEvent.type(await screen.findByLabelText(/deskripsi kegiatan/i), "Kerja X");
+    await userEvent.type(await screen.findByLabelText(/^kegiatan$/i), "Kerja X");
     await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
 
     await waitFor(() => {

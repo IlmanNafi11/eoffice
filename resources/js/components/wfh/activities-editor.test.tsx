@@ -11,6 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WfhReportActivity } from "@/api/types";
+import { TimeInput } from "@/components/ui/time-input";
 import { ActivitiesEditor, sortForDisplay } from "./activities-editor";
 
 const ACT_A: WfhReportActivity = {
@@ -73,7 +74,7 @@ describe("ActivitiesEditor", () => {
     render(<ActivitiesEditor activities={[ACT_A]} canEdit onChange={onChange} />);
 
     await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
-    await userEvent.type(screen.getByLabelText(/deskripsi kegiatan/i), "Tugas baru");
+    await userEvent.type(screen.getByLabelText(/^kegiatan$/i), "Tugas baru");
     await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
 
     const next = onChange.mock.lastCall![0] as WfhReportActivity[];
@@ -109,7 +110,7 @@ describe("ActivitiesEditor", () => {
     render(<ActivitiesEditor activities={[ACT_A]} canEdit onChange={onChange} />);
 
     await userEvent.click(screen.getByRole("button", { name: /ubah kegiatan/i }));
-    const desc = screen.getByLabelText(/deskripsi kegiatan/i);
+    const desc = screen.getByLabelText(/^kegiatan$/i);
     await userEvent.clear(desc);
     await userEvent.type(desc, "Laporan direvisi");
     await userEvent.click(screen.getByRole("button", { name: /simpan perubahan/i }));
@@ -122,14 +123,14 @@ describe("ActivitiesEditor", () => {
     const onChange = vi.fn();
     render(<ActivitiesEditor activities={[]} canEdit onChange={onChange} />);
     await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
-    await userEvent.type(screen.getByLabelText(/deskripsi kegiatan/i), "Membuat dokumen test case aplikasi eoffice");
+    await userEvent.type(screen.getByLabelText(/^kegiatan$/i), "Membuat dokumen test case aplikasi eoffice");
     await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan awal/i }));
     await userEvent.click(screen.getByRole("button", { name: /jam 08/i }));
     await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
     await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan akhir/i }));
     await userEvent.click(screen.getAllByRole("button", { name: /jam 10/i }).at(-1)!);
     await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
-    await userEvent.type(screen.getByLabelText(/link bukti kerja/i), "https://google.com");
+    await userEvent.type(screen.getByLabelText(/^link$/i), "https://google.com");
     await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
 
     const next = onChange.mock.lastCall![0] as WfhReportActivity[];
@@ -150,7 +151,7 @@ describe("ActivitiesEditor", () => {
     await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan awal/i }));
     await userEvent.click(screen.getByRole("button", { name: /jam 13/i }));
     await userEvent.click(screen.getByRole("button", { name: /menit 30/i }));
-    const linkInput = screen.getByLabelText(/link bukti kerja/i) as HTMLInputElement;
+    const linkInput = screen.getByLabelText(/^link$/i) as HTMLInputElement;
     await userEvent.tripleClick(linkInput);
     await userEvent.keyboard("{Backspace}");
     await userEvent.type(linkInput, "https://google.com/baru");
@@ -163,5 +164,45 @@ describe("ActivitiesEditor", () => {
   it("tampilan link bukti kerja dapat diklik", () => {
     render(<ActivitiesEditor activities={[ACT_C]} canEdit={false} onChange={() => {}} />);
     expect(screen.getByRole("link", { name: "https://example.com/proof" }).getAttribute("href")).toBe("https://example.com/proof");
+  });
+});
+
+describe("ActivitiesEditor — formulir kegiatan", () => {
+  it("input kegiatan dan link memiliki label terlihat (Kegiatan / Link)", async () => {
+    render(<ActivitiesEditor activities={[]} canEdit onChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
+
+    expect(screen.getByLabelText(/^kegiatan$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^link$/i)).toBeTruthy();
+  });
+
+  it("semua input berada dalam satu baris flex yang responsif", async () => {
+    render(<ActivitiesEditor activities={[]} canEdit onChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
+
+    const form = screen.getByLabelText(/^kegiatan$/i).closest("form") as HTMLElement;
+    expect(form.className).toContain("flex-wrap");
+    expect(form.className).toContain("items-end");
+
+    // Waktu awal, waktu akhir, Kegiatan, dan Link langsung bersaudara dalam
+    // satu baris (bukan bertumpuk di dalam grid/time wrapper terpisah).
+    const fields = Array.from(form.querySelectorAll('[data-slot="field"]')) as HTMLElement[];
+    // Input tidak menyumbang textContent (placeholder bukan text) —
+    // cukup verifikasi label + kontrol dari tiap Field bersaudara.
+    expect(fields.map((f) => f.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+      "Waktu awalPilih jam",
+      "Waktu akhirPilih jam",
+      "Kegiatan",
+      "Link",
+    ]);
+    expect(fields.every((f) => f.parentElement === form)).toBe(true);
+    const linkInput = fields[3]!.querySelector("input");
+    expect(linkInput?.getAttribute("placeholder")).toBe("https://google.com");
+  });
+
+  it("TimeInput tidak memakai lebar tetap yang membuat tombol X overflow", () => {
+    render(<TimeInput value="08:00" onChange={vi.fn()} aria-label="Waktu awal" />);
+    const trigger = screen.getByRole("button", { name: /waktu awal/i });
+    expect(trigger.className).not.toContain("w-45");
   });
 });

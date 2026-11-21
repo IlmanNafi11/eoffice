@@ -9,9 +9,13 @@
  *
  * Satu kegiatan = tiga jenis input: waktu pelaksanaan (awal + akhir),
  * deskripsi kegiatan, dan link bukti kerja (URL, ditampilkan clickable).
+ * Formulir tampil sebagai SATU BARIS horizontal responsif
+ * (Waktu awal | Waktu akhir | Kegiatan | Link | aksi) — wrap ke baris baru
+ * saat sempit; tiap input berlabel terlihat (bukan hanya aria-label).
  */
 import * as React from "react";
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TimeInput } from "@/components/ui/time-input";
@@ -110,38 +114,46 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
     onCancel?: () => void,
   ) {
     return (
-      <form onSubmit={onSubmit} className="flex flex-col gap-2">
-        <Input
-          aria-label="Deskripsi kegiatan"
-          value={draft.activity}
-          onChange={(e) => setDraft({ ...draft, activity: e.target.value })}
-          autoFocus
-        />
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Waktu awal</span>
-            <TimeInput
-              aria-label="Waktu pelaksanaan awal"
-              value={draft.start_time}
-              onChange={(value) => setDraft({ ...draft, start_time: value })}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Waktu akhir</span>
-            <TimeInput
-              aria-label="Waktu pelaksanaan akhir"
-              value={draft.end_time}
-              onChange={(value) => setDraft({ ...draft, end_time: value })}
-            />
-          </div>
-        </div>
-        <Input
-          type="url"
-          aria-label="Link bukti kerja"
-          placeholder="https://google.com"
-          value={draft.link}
-          onChange={(e) => setDraft({ ...draft, link: e.target.value })}
-        />
+      <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-x-3 gap-y-2">
+        <Field orientation="vertical" className="w-44 min-w-40">
+          <FieldLabel htmlFor="activity-start-time">Waktu awal</FieldLabel>
+          <TimeInput
+            id="activity-start-time"
+            aria-label="Waktu pelaksanaan awal"
+            value={draft.start_time}
+            onChange={(value) => setDraft({ ...draft, start_time: value })}
+            className="w-full"
+          />
+        </Field>
+        <Field orientation="vertical" className="w-44 min-w-40">
+          <FieldLabel htmlFor="activity-end-time">Waktu akhir</FieldLabel>
+          <TimeInput
+            id="activity-end-time"
+            aria-label="Waktu pelaksanaan akhir"
+            value={draft.end_time}
+            onChange={(value) => setDraft({ ...draft, end_time: value })}
+            className="w-full"
+          />
+        </Field>
+        <Field orientation="vertical" className="min-w-64 flex-1">
+          <FieldLabel htmlFor="activity-description">Kegiatan</FieldLabel>
+          <Input
+            id="activity-description"
+            value={draft.activity}
+            onChange={(e) => setDraft({ ...draft, activity: e.target.value })}
+            autoFocus
+          />
+        </Field>
+        <Field orientation="vertical" className="min-w-56 flex-[2]">
+          <FieldLabel htmlFor="activity-link">Link</FieldLabel>
+          <Input
+            id="activity-link"
+            type="url"
+            placeholder="https://google.com"
+            value={draft.link}
+            onChange={(e) => setDraft({ ...draft, link: e.target.value })}
+          />
+        </Field>
         <div className="flex gap-2">
           <Button type="submit" size="sm">
             {submitLabel}
