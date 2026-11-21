@@ -261,4 +261,13 @@ describe("api/wfh-monitoring — exportTeamWfhPdf (blob bypass unwrap)", () => {
       message: "Penandatangan belum atur tanda tangan.",
     });
   });
+
+  it("4xx body Blob non-JSON → fallback 'Gagal mengunduh PDF.' (bukan teks axios)", async () => {
+    queue.push({ status: 500, body: new Blob(["<html>boom</html>"], { type: "text/html" }) });
+
+    await expect(exportTeamWfhPdf(3, { date: "2026-07-15" })).rejects.toMatchObject({
+      status: 500,
+      message: "Gagal mengunduh PDF.",
+    });
+  });
 });

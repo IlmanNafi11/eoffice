@@ -12,7 +12,7 @@
  * PDF binary lewat `httpClient` blob — bypass unwrap interceptor (pola
  * `exportWfhReportPdf`).
  */
-import { api, ApiError, httpClient, requireData } from "@/api/client";
+import { api, ApiError, decodeBlobEnvelope, httpClient, requireData } from "@/api/client";
 import {
   ListAdminReportsQuery,
   PaginationMeta,
@@ -101,7 +101,8 @@ export async function exportTeamWfhPdf(
     return res.data;
   } catch (error) {
     if (error instanceof ApiError && error.responseBody instanceof Blob) {
-      throw new ApiError(error.kind, await blobMessage(error.responseBody), {
+      const { message } = await decodeBlobEnvelope(error.responseBody);
+      throw new ApiError(error.kind, message || "Gagal mengunduh PDF.", {
         status: error.status,
         errors: error.errors,
       });
@@ -110,21 +111,3 @@ export async function exportTeamWfhPdf(
   }
 }
 
-/** Ambil `message` dari body Blob (envelope JSON error), fallback teks mentah.
- *  `FileReader` (bukan `blob.text()`) agar juga jalan di jsdom (test). */
-async function blobMessage(blob: Blob): Promise<string> {
-  const text = await new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => resolve("");
-    reader.readAsText(blob);
-  });
-  try {
-    const parsed = JSON.parse(text) as { message?: unknown };
-    if (typeof parsed.message === "string" && parsed.message) return parsed.message;
-  } catch {
-    // teks non-JSON — jatuh ke raw text di bawah.
-  }
-  const trimmed = text.trim();
-  return trimmed.length > 0 ? trimmed : "Gagal mengunduh PDF.";
-}

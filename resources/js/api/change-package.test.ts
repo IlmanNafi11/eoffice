@@ -313,4 +313,13 @@ describe("api/change-package — PDF export (blob bypass unwrap)", () => {
       message: "Budi belum mengatur tanda tangan.",
     });
   });
+
+  it("exportImplementationPdf 4xx body Blob non-JSON → fallback 'Gagal mengunduh PDF.'", async () => {
+    queue.push({ status: 403, body: new Blob(["<html>forbidden</html>"], { type: "text/html" }) });
+
+    await expect(exportImplementationPdf(12)).rejects.toMatchObject({
+      status: 403,
+      message: "Gagal mengunduh PDF.",
+    });
+  });
 });

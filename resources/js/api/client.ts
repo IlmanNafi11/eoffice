@@ -18,6 +18,7 @@ import type {
   InternalAxiosRequestConfig,
 } from "axios";
 import type { Envelope, PaginationMeta } from "@/api/types";
+import { UI_ERROR_COPY } from "@/lib/ui-errors";
 
 /** Key localStorage tempat bearer token disimpan (kontrak spesifikasi). */
 export const AUTH_TOKEN_KEY = "auth_token";
@@ -71,6 +72,90 @@ export function requireData<T>(value: T | null, endpoint: string): T {
     throw new Error(`Respons ${endpoint} tidak berisi data.`);
   }
   return value;
+}
+
+/** Label Indonesia untuk kunci field internal yang dikenal UI (spec ui-feedback S6). */
+export const FIELD_LABELS: Record<string, string> = {
+  photo: "Foto absensi",
+  signature: "Tanda tangan",
+  files: "Lampiran",
+  session: "Sesi absensi",
+  value: "Nilai setting",
+  name: "Nama",
+  email: "Email",
+  nip: "NIP",
+  role: "Peran",
+  phone: "Telepon",
+  position: "Jabatan",
+  rank: "Pangkat",
+};
+
+/** Baca body Blob sebagai teks (FileReader, agar jalan di jsdom juga). */
+function blobToText(blob: Blob): Promise<string> {
+  const { promise, resolve } = Promise.withResolvers<string>();
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result ?? ""));
+  reader.onerror = () => resolve("");
+  reader.readAsText(blob);
+  return promise;
+}
+
+/** Ambil `message`/`errors` dari envelope JSON dalam body Blob 4xx. */
+export async function decodeBlobEnvelope(
+  blob: Blob,
+): Promise<{ message: string; errors: Record<string, string[]> | null }> {
+  const text = await blobToText(blob);
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== "object" || parsed === null) {
+      return { message: "", errors: null };
+    }
+    const message =
+      "message" in parsed && typeof parsed.message === "string"
+        ? parsed.message
+        : "";
+    const errors =
+      "errors" in parsed &&
+      typeof parsed.errors === "object" &&
+      parsed.errors !== null
+        ? (parsed.errors as Record<string, string[]>)
+        : null;
+    return { message, errors };
+  } catch {
+    return { message: "", errors: null };
+  }
+}
+
+/** Ambil pesan pertama tiap field; entri tanpa pesan dijatuhkan. */
+function firstMessages(errors: Record<string, string[]> | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [field, messages] of Object.entries(errors ?? {})) {
+    const first = messages[0];
+    if (first) out[field] = first;
+  }
+  return out;
+}
+
+/**
+ * Kunci field internal → label manusia. `files.N` → "Lampiran N+1"; kunci
+ * tidak dikenal DIBUANG (tidak diteruskan mentah ke UI — spec ui-feedback S6).
+ */
+export function fieldErrorMessages(
+  errors: Record<string, string[]> | null,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [field, message] of Object.entries(firstMessages(errors))) {
+    const indexed = /^(.+)\.(\d+)$/.exec(field);
+    if (indexed) {
+      const [, base, index] = indexed;
+      const label = base ? FIELD_LABELS[base] : undefined;
+      if (label && index) out[`${label} ${Number(index) + 1}`] = message;
+    } else {
+      const label = FIELD_LABELS[field];
+      if (label) out[label] = message;
+    }
+  }
+  return out;
 }
 
 export const httpClient: AxiosInstance = axios.create({
@@ -133,19 +218,22 @@ function unwrap<T>(body: unknown): Unwrapped<T> {
   return { data: body as T, message: null, meta: null };
 }
 
-function toApiError(error: AxiosError): ApiError {
+/** Copy aman bila body tidak berisi pesan domain dari server (ui-feedback S5/S6). */
+function fallbackCopy(status: number | null): string {
+  if (status === null) return UI_ERROR_COPY.network;
+  if (status === 422) return UI_ERROR_COPY.validation;
+  if (status >= 500) return UI_ERROR_COPY.server;
+  if (status === 401) return UI_ERROR_COPY.auth;
+  if (status === 403) return UI_ERROR_COPY.forbidden;
+  if (status === 404) return UI_ERROR_COPY.notFound;
+  if (status === 409) return UI_ERROR_COPY.conflict;
+  if (status === 429) return UI_ERROR_COPY.rateLimited;
+  return UI_ERROR_COPY.unknown;
+}
+
+async function toApiError(error: AxiosError): Promise<ApiError> {
   const status: number | null = error.response?.status ?? null;
   const body: unknown = error.response?.data;
-  const message =
-    typeof body === "object" && body !== null && "message" in body &&
-    typeof body.message === "string"
-      ? body.message
-      : error.message;
-  const errors =
-    typeof body === "object" && body !== null && "errors" in body &&
-    typeof body.errors === "object" && body.errors !== null
-      ? (body.errors as Record<string, string[]>)
-      : null;
 
   if (
     status === 401 &&
@@ -163,6 +251,19 @@ function toApiError(error: AxiosError): ApiError {
     unauthorizedHandler?.();
     window.location.assign(REDIRECT_LOGIN);
   }
+
+  const hasServerMessage =
+    typeof body === "object" && body !== null && "message" in body &&
+    typeof body.message === "string" && body.message.length > 0;
+  const decoded = body instanceof Blob ? await decodeBlobEnvelope(body) : null;
+  const serverMessage = decoded?.message || (hasServerMessage ? String(body.message) : "");
+  const message = serverMessage || fallbackCopy(status);
+  const errors =
+    decoded?.errors ??
+    (typeof body === "object" && body !== null && "errors" in body &&
+    typeof body.errors === "object" && body.errors !== null
+      ? (body.errors as Record<string, string[]>)
+      : null);
 
   if (status === 422) {
     return new ApiError("validation", message, { status, errors, responseBody: body });
@@ -182,7 +283,10 @@ httpClient.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError) => Promise.reject(toApiError(error)),
+  (error: AxiosError) =>
+    // `toApiError` async hanya saat perlu decode Blob; interceptor tetap
+    // mengembalikan Promise yang reject dengan ApiError.
+    toApiError(error).then((apiError) => Promise.reject(apiError)),
 );
 
 /**

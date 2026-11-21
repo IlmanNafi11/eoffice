@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
-import { api, httpClient, setAuthToken, getStoredToken, onUnauthorized } from "@/api/client";
+import { api, decodeBlobEnvelope, fieldErrorMessages, FIELD_LABELS, httpClient, setAuthToken, getStoredToken, onUnauthorized } from "@/api/client";
 
 type Recorded = { method?: string; url?: string; headers: AxiosHeaders; params?: unknown; data?: unknown };
 
@@ -247,3 +247,71 @@ describe("api/client — instance & interceptor (frontend-phase1 / axios client)
     expect(err).toMatchObject({ kind: "validation", status: 422 });
   });
  });
+
+describe("api/client — blob decode + tanpa teks axios + label field (ui-feedback T2)", () => {
+  it("HTTP 422 dengan responseBody Blob → pesan server, bukan teks axios", async () => {
+    const blob = new Blob(
+      [JSON.stringify({ success: false, message: "Anda belum mengatur tanda tangan. Atur tanda tangan terlebih dahulu sebelum mengekspor PDF." })],
+      { type: "application/json" },
+    );
+    queue.push({ status: 422, body: blob });
+
+    const err = await api.get("/wfh/reports/7/pdf").catch((e: unknown) => e);
+
+    expect(err).toMatchObject({
+      kind: "validation",
+      status: 422,
+      message: "Anda belum mengatur tanda tangan. Atur tanda tangan terlebih dahulu sebelum mengekspor PDF.",
+    });
+    expect(err instanceof Error && err.message).not.toMatch(/Request failed/);
+  });
+
+  it("blob 4xx tanpa JSON → copy per kind, bukan teks axios", async () => {
+    queue.push({ status: 403, body: new Blob(["<html>forbidden</html>"], { type: "text/html" }) });
+
+    const err = await api.get("/admin/wfh/teams/3/pdf").catch((e: unknown) => e);
+
+    expect(err).toMatchObject({ kind: "http", status: 403, message: "Anda tidak memiliki izin." });
+    expect(err instanceof Error && err.message).not.toMatch(/Request failed/);
+  });
+
+  it("network error → message copy, bukan 'Network Error'", async () => {
+    httpClient.defaults.adapter = (config) =>
+      Promise.reject(new AxiosError("Network Error", AxiosError.ERR_NETWORK, config));
+
+    const err = await api.get("/auth/me").catch((e: unknown) => e);
+
+    expect(err).toMatchObject({ kind: "network", message: "Koneksi bermasalah, coba lagi." });
+  });
+
+  it("decodeBlobEnvelope: envelope JSON → {message, errors}; non-JSON → {message:'', errors:null}", async () => {
+    const decoded = await decodeBlobEnvelope(
+      new Blob(
+        [JSON.stringify({ success: false, message: "Gagal.", errors: { photo: ["Ukuran foto maksimal 2MB."] } })],
+        { type: "application/json" },
+      ),
+    );
+    expect(decoded).toEqual({ message: "Gagal.", errors: { photo: ["Ukuran foto maksimal 2MB."] } });
+
+    const raw = await decodeBlobEnvelope(new Blob(["<html>oops</html>"], { type: "text/html" }));
+    expect(raw).toEqual({ message: "", errors: null });
+  });
+
+  it("fieldErrorMessages: kunci internal → label Indonesia; files.N → 'Lampiran N+1'; kunci tak dikenal dijatuhkan", () => {
+    expect(
+      fieldErrorMessages({ photo: ["Ukuran foto maksimal 2MB."], "files.0": ["Format file harus JPG, JPEG, atau PNG."] }),
+    ).toEqual({
+      "Foto absensi": "Ukuran foto maksimal 2MB.",
+      "Lampiran 1": "Format file harus JPG, JPEG, atau PNG.",
+    });
+    // Kunci tak dikenal tidak diteruskan mentah; entri tanpa pesan juga dijatuhkan.
+    expect(fieldErrorMessages({ "signature.dimensions": ["terlalu kecil"], photo: [] })).toEqual({});
+    expect(fieldErrorMessages(null)).toEqual({});
+  });
+
+  it("FIELD_LABELS memuat kunci field yang dipakai form", () => {
+    for (const key of ["photo", "signature", "files", "session", "value", "name", "email", "nip", "role", "phone", "position", "rank"]) {
+      expect(FIELD_LABELS[key]).toBeTruthy();
+    }
+  });
+});
