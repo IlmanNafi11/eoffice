@@ -1,202 +1,189 @@
-# Spec: API Hardening & Audit Closeout (eoffice)
+# Spec: Feedback UX & Fixes (eoffice)
 
-> Module ids and build order: `CAPABILITY-MAP.md` (approved 2026-10-28).
-> Source intent: `docs/intent/api-hardening-closeout.md`.
-> Per-module specs: `SPEC-<module-id>.md`.
+> Module ids and build order: `CAPABILITY-MAP-feedback-ux.md` (approved 2026-11-21).
+> Per-module specs: `SPEC-ui-feedback.md`, `SPEC-settings-layout.md`, `SPEC-upload-errors.md`,
+> `SPEC-pdf-signature.md`.
+> Source of intent: `docs/superpowers/specs/2026-11-21-feedback-ui-settings-wfh-pdf-design.md` (approved).
+> Implementation plan: `docs/superpowers/plans/2026-11-21-feedback-ui-settings-wfh-pdf.md` (tasks 1–11).
 
 ## Objective
 
-Menutup **seluruh** temuan audit arsitektur `eoffice` tanpa terkecuali, dalam satu
-rangkaian perubahan tanpa shim kompatibilitas. Sasaran akhir: satu kontrak API
-tunggal, satu jalur error tunggal, tanpa dead code, tanpa duplikasi guard, dan
-tanpa N+1 pada jalur yang terukur.
+Menutup seluruh temuan feedback UX dan dua bug fungsional yang dilaporkan pengguna, secara
+sistematis dan menyeluruh:
 
-**User:** tim backend `eoffice`. **Konsumen API:** SPA di repo ini yang belum
-diimplementasi → *breaking change* penuh diperbolehkan.
+1. **Settings hening** — simpan pengaturan tanpa feedback apa pun, dan layout satu kolom.
+2. **PDF WFH** — tanda tangan menimpa label, dan unduhan gagal tanpa penjelasan pada laporan
+   tanpa foto absensi.
+3. **UI feedback** — tombol aksi tanpa spinner, mutasi tanpa toast, skeleton yang belum merata.
+4. **Upload gambar** — error tampil sebagai "Data yang diberikan tidak valid." tanpa petunjuk.
 
-**Success (testable):**
+**User:** seluruh pengguna SPA (staf, kepala tim, admin). **Konsumen kontrak internal:** semua
+halaman mutasi + semua slice Redux.
+
+**Success inisiatif (testable):**
 
 | # | Kriteria | Cara verifikasi |
 |---|---|---|
-| S1 | Setiap respons (sukses & error) memuat `success` boolean | Test kontrak baru + grep `response()->json(` di `app/` hanya di `ApiResponse`/`Handler` |
-| S2 | Tidak ada `catch` yang mengubah exception non-otoritatif menjadi body HTTP | grep `catch` di `app/`; hanya `ApiException`/`DomainException` yang dipetakan |
-| S3 | Setiap route memakai route-model binding untuk parameter model | grep `int $id` di controller = 0 kecuali non-model |
-| S4 | Tidak ada respons 500 untuk kondisi yang dapat dipicu user | Test transisi invalid (submit/approve ulang) = 422 |
-| S5 | Dead code A1–A11 hilang atau dipakai | grep daftar simbol = 0 hit non-definisi |
-| S6 | Klaster duplikasi DRY tertutup | `git grep` pola duplikat = 1 lokasi per aturan |
-| S7 | Query per baris pada import & list hilang | Test hitung query (`DB::listen`) |
-| S8 | Suite test penuh hijau | `php artisan test --compact` exit 0 |
-| S9 | `APP_DEBUG` default aman pada template deploy | grep `.env.example`, `docker-compose.yml` |
+| I1 | Setiap aksi mutasi menyajikan spinner selama in-flight dan hasil via toast (sukses: kalimat server; gagal: toast + banner inline) | Test per halaman modul `ui-feedback` (S8) + `settings-layout` (S3–S5) |
+| I2 | Layer UI tidak mengetahui detail error transport — tidak ada impor `ApiError` di luar `resources/js/api/` | Grep gate `ui-feedback` S10 |
+| I3 | Settings tersusun grid 2 kolom dengan card password admin & user bersebelahan | `settings-layout` S1–S2 |
+| I4 | File upload yang jelas salah ditolak sebelum request; error server tampil representatif per-field | `upload-errors` S1–S9 |
+| I5 | Signature PDF berada di dalam box (tidak menimpa label) di 3 template; pesan 422 signature tampil di UI | `pdf-signature` S1–S6 |
+| I6 | Skeleton loading halaman tetap konsisten di semua list/detail (tidak ada halaman yang kehilangan skeleton) | Test skeleton existing tetap lulus + review manual |
+| I7 | Kedua suite hijau | `npx vitest run` dan `php artisan test --compact` exit 0 |
 
 ## Tech Stack
 
-- PHP `^8.2` (CI memakai 8.4), Laravel `^11.0`
-- `laravel/sanctum ^4.0` (Bearer token), `spatie/laravel-permission ^6.25` (RBAC)
-- `barryvdh/laravel-dompdf ^3.1` (dev-dep, PDF), `maatwebsite/excel ^3.1` (import)
-- `intervention/image ^4.2` (normalisasi tanda tangan), `resend/resend-laravel ^1.4` (email OTP)
-- PostgreSQL 15 (produksi & test), PHPUnit 11, Laravel Pint (preset `laravel`)
-
-**Tidak ada dependency baru** dalam initiative ini.
+- Laravel 12 (PHP ^8.2) + PostgreSQL; Blade + DOMPDF (`barryvdh/laravel-dompdf`) untuk PDF.
+- React 19 + Redux Toolkit + TypeScript strict + Tailwind + Vite.
+- `sonner@^2.0.8` + `components/ui/sonner.tsx` (sudah ada, belum di-mount) untuk toast.
+- PHPUnit 11 (Feature) + Vitest 5/jsdom + Testing Library.
+- **Tidak ada dependency baru** di frontend maupun backend.
 
 ## Commands
 
-Host **tidak** punya `php`/`composer`/`vendor`. Semua perintah lewat Docker
-(`docker-compose.yml`, service `app` + `postgres`).
+Host saat ini punya `php`, `composer`, `vendor/`, `docker`, dan `node_modules/`.
 
 ```bash
-# Sekali per checkout (vendor masuk ke ./vendor di host via bind mount)
-docker compose up -d postgres
-docker compose run --rm app composer install --no-interaction --prefer-dist
+# Frontend
+npx vitest run                                   # semua test
+npx vitest run resources/js/lib/ui-errors.test.ts
+npx vitest run resources/js/pages/admin/SettingsPage.test.tsx
+npx vitest run resources/js/api/client.test.ts
+npm run typecheck
+npm run build
 
-# Verifikasi utama
-docker compose run --rm app vendor/bin/pint --test          # lint (make lint)
-docker compose run --rm app php artisan test --compact      # semua test (make test)
-docker compose run --rm app php artisan test --compact --filter=SegregationOfDutiesTest
-docker compose run --rm app php artisan test --compact tests/Feature/ChangePackageFlowTest.php
+# Backend
+php artisan test --compact                       # suite penuh (798 tests / 2524 assertions, 2026-11-21)
+php artisan test --compact tests/Feature/Wfh/WfhReportPdfTemplateTest.php
+php artisan test --compact tests/Feature/Wfh/ReportAttendanceSubResourceTest.php
+php artisan test --compact tests/Feature/ChangeManagement
 
-# Auto-fix format
-docker compose run --rm app vendor/bin/pint
+# Lint
+vendor/bin/pint --test
 
-# Container image check (sama dengan CI job build)
-docker build --check .
+# Cadangan bila host toolchain bermasalah (skill eoffice-php-test-via-docker)
+docker run --rm --network eoffice-net -v "$PWD":/app -w /app \
+  -e DB_CONNECTION=pgsql -e DB_HOST=eoffice-db -e DB_PORT=5432 \
+  -e DB_DATABASE=kominfo_wfh -e DB_USERNAME=kominfo -e DB_PASSWORD=kominfo \
+  eoffice-test vendor/bin/phpunit
 
-# Tinker terarah
-docker compose run --rm app php artisan tinker
+# Verifikasi render PDF nyata
+docker exec eoffice-app-run-5517ec2f6c0f php artisan tinker --execute='
+$r = \App\Domains\Wfh\Models\WfhReport::find(1);
+$data = app(\App\Domains\Wfh\Services\WfhReportPdfData::class)->forReport(app(\App\Domains\Wfh\Repositories\EloquentWfhRepository::class)->loadReportWithRelations($r));
+$pdf = app(\App\Support\Pdf\PdfRendererService::class)->render("pdf.wfh-report", $data);
+echo "bytes=".strlen($pdf)." head=".substr($pdf,0,5)."\n";'
 ```
-
-`phpunit.xml` sudah menyetel `APP_ENV=testing`, `CACHE_DRIVER=array`,
-`MAIL_MAILER=array`, `QUEUE_CONNECTION=sync`. `DB_*` datang dari environment
-container (`pgsql` → `postgres:5432`).
 
 ## Project Structure
 
 ```
-app/
-  Domains/                     → modular monolith, satu folder per domain
-    Auth/                      → login, OTP, reset password
-      Http/{Controllers,Requests}, Concerns, Services
-    ChangeManagement/          → paket perubahan (initiation + implementation)
-      Http/{Controllers,Requests,Resources}, Models, Repositories, Services
-    Organization/              → user, team, role, permission, profile
-    Wfh/                       → laporan WFH, absensi, team report, monitoring
-    Shared/Contracts/          → interface lintas domain (RepositoryInterface)
-  Exceptions/ApiException.php  → SATU-satunya exception yang boleh jadi body HTTP
-  Http/{Controllers,Middleware,Requests}
-  Models/                      → User, Team, Field, Setting
-  Providers/
-  Repositories/EloquentRepository.php  → base CRUD (find/create/update/delete saja)
-  Support/                     → Constants, Dates, Http(ApiResponse), Import, Pdf,
-                                 QrCode, Signature
-routes/api.php                 → SELURUH permukaan API (/api prefix)
-routes/web.php                 → hanya catch-all SPA
-tests/Feature/                 → test endpoint (per domain: Auth/, Organization/, Wfh/)
-tests/Unit/                    → state machine, service, helper
-docs/intent/                   → statement of intent (bukan dokumentasi fitur)
-CAPABILITY-MAP.md, SPEC*.md    → artefak spec ini
+resources/js/
+  lib/            → utilitas lintas halaman: ui-errors.ts (BARU), upload-validate.ts (BARU)
+  api/            → satu-satunya tempat yang tahu axios/ApiError; client.ts satu titik unwrap + mapping error
+  store/          → slice Redux; thunk reject dengan string hasil toUiError
+  pages/          → halaman; memakai toast + Button pending, tidak melihat ApiError
+  components/ui/  → primitif (button.tsx, sonner.tsx) — satu implementasi lintas aplikasi
+resources/views/pdf/ → 4 template self-contained DOMPDF
+tests/Feature/  → PHPUnit Feature (template, guard, validasi upload)
+docs/superpowers/ → sumber desain & plan (di-gitignore, tidak di-commit)
 ```
 
-Konvensi penempatan yang **wajib** dipertahankan: controller baru untuk domain
-X tinggal di `app/Domains/X/Http/Controllers/`, request di `.../Http/Requests/`,
-resource di `.../Http/Resources/`, service lintas-domain yang murni teknis di
-`app/Support/`.
+Konvensi penempatan yang **wajib**: logika error lintas modul di `lib/`; akses jaringan hanya
+di `api/`; template PDF tetap self-contained tanpa shared stylesheet.
 
 ## Code Style
 
-Laravel Pint preset `laravel`, PSR-12, 4 spasi, trailing comma pada array
-multibaris. Nama kelas `PascalCase`, metode `camelCase`, kolom/JSON `snake_case`.
-Constructor property promotion untuk dependency. Tanpa `final` (kode existing
-tidak memakainya). Komentar bahasa Indonesia untuk pesan pengguna, bahasa
-Inggris untuk komentar teknis.
+Naming: komponen `PascalCase`, fungsi `camelCase`, tipe `PascalCase`; komentar teknis bahasa
+Inggris, pesan pengguna bahasa Indonesia. Pesan sukses memakai kalimat server dari envelope.
 
-**Pola respons — satu-satunya cara:**
+```ts
+// resources/js/lib/ui-errors.ts — kontrak presentasi tunggal
+export interface UiError {
+  kind: "validation" | "auth" | "forbidden" | "notFound" | "conflict" | "rateLimited" | "server" | "network" | "unknown";
+  message: string;
+  fields?: Record<string, string>;
+}
+```
 
-```php
-// app/Support/Http/ApiResponse.php
-final class ApiResponse
-{
-    public static function ok(mixed $data = null, ?string $message = null): JsonResponse
-    public static function created(mixed $data, string $message): JsonResponse   // 201
-    public static function deleted(): Response                                   // 204
-    public static function paginated(LengthAwarePaginator $page, string $resource): JsonResponse
-    public static function fail(string $message, int $status = 422, ?array $errors = null): JsonResponse
+```tsx
+// halaman — pola wajib
+try {
+  const res = await dispatch(updateSettingThunk({ key, value })).unwrap();
+  toast.success(res.message);
+} catch (err) {
+  toast.error(toUiError(err).message);   // banner inline tetap dirender
 }
 ```
 
 ```php
-// Controller: baca
-return ApiResponse::ok(new UserResource($user));
-
-// Controller: mutasi
-return ApiResponse::created(new UserResource($user), 'User berhasil dibuat.');
-
-// Controller: hapus
-return ApiResponse::deleted();
-
-// Controller: aturan bisnis dilanggar (dipetakan Handler, bukan dibangun manual)
-throw new ApiException('Hanya paket draft yang dapat disubmit.', 422);
-throw new ApiException('Inisiator tidak dapat menyetujui paketnya sendiri.', 403);
+// FormRequest — pesan pengguna Indonesia
+'photo.mimes' => 'Format foto harus JPG, JPEG, atau PNG.',
 ```
 
-**Larangan gaya** yang harus tetap dipatuhi setelah perubahan:
+**Dilarang:**
 
-```php
-// ❌ dilarang: envelope manual
-return response()->json(['success' => false, 'message' => '...'], 404);
-
-// ❌ dilarang: mengembalikan teks exception arbitrer
-return response()->json(['message' => $e->getMessage()], 500);
-
-// ❌ dilarang: paginator mentah
-return response()->json($paginator);
+```tsx
+import { ApiError } from "@/api/client";   // di luar resources/js/api/
+toast.error(String(err));                  // detail mentah
+toast.error("Request failed with status code 422");
 ```
 
 ## Testing Strategy
 
-- Framework: PHPUnit 11, `RefreshDatabase` untuk Feature test, database PostgreSQL.
-- Lokasi: `tests/Feature/**` untuk kontrak HTTP, `tests/Unit/**` untuk state machine,
-  service, helper.
-- Setup wajib di Feature test yang menyentuh izin:
-  `$this->artisan('db:seed', ['--class' => 'RolePermissionSeeder'])`.
-- Level yang dipakai:
-  - **Unit** — `WfhReportStateMachine`, `TeamReportStateMachine`, `ChangePackage`
-    transisi, `DateRangeHelper`, `QrCodeService`, `PasswordResetService`.
-  - **Feature** — setiap endpoint: status, `success`, path `data`/`meta`, dan
-    perilaku otorisasi (401/403/404/422).
-  - **Kontrak** — satu test baru per aturan global: envelope semua endpoint yang
-    disentuh, 204 pada DELETE, 404 generik tanpa FQCN, 500 tanpa stack trace.
-- Assertion gaya baru: `assertJsonPath('success', true)` + `assertJsonStructure`;
-  **jangan** `assertSee`/string-matching body.
-- Coverage: tidak ada target persentase; setiap perubahan perilaku wajib punya
-  test yang gagal sebelum dan lulus sesudah.
-- Tidak ada test baru untuk wiring/forwarding/tautan sepele.
+- Framework: Vitest 5 + jsdom (frontend); PHPUnit 11 Feature (backend).
+- Lokasi: test di samping file (`*.test.ts(x)`); backend `tests/Feature/**`.
+- Level:
+  - **Unit** — `toUiError`, `fieldMessage`, `validateUploads`, `decodeBlobEnvelope`.
+  - **Komponen** — `Button pending`; pre-check upload per flow.
+  - **Halaman** — spinner in-flight (`aria-busy` dengan mock never-resolves), toast sukses teks
+    server, toast gagal + banner inline tetap. Auth: spinner saja, tanpa toast.
+  - **Slice** — `rejectWithValue` menghasilkan pesan hasil abstraksi.
+  - **Backend** — kontrak render template (struktur, CSS), pesan validasi `mimes` Indonesia.
+- TDD wajib per task: test gagal → implementasi → hijau (lihat plan).
+- Coverage: tanpa target persentase; setiap perilaku yang dijanjikan spec punya assertion.
+- Verifikasi visual bersifat struktural, bukan piksel (DOMPDF terbatas); render PDF nyata
+  sebagai bukti tambahan, bukan pengganti test.
+- Tidak ada test untuk wiring/impor sepele — grep gate untuk aturan struktur.
 
 ## Boundaries
 
 **Always do**
 
-- Jalankan `php artisan test --compact` sebelum menyatakan slice selesai.
-- Pertahankan konvensi yang sudah ada (domain folder, resource, factory, seeder,
-  bahasa pesan pengguna Indonesia).
-- Pertahankan perilaku otorisasi yang sudah benar: Sanctum + Spatie + guard
-  kepemilikan di controller.
-- Perbarui test yang mem-pin perilaku lama; assertion dipertahankan, nilai
-  status/envelope disesuaikan dengan kontrak baru.
-- Jaga agar setiap respons JSON berbentuk satu kontrak (`success` selalu ada).
+- Jalankan test area yang tersentuh sebelum menyatakan task selesai; suite penuh sebelum closeout.
+- Pertahankan banner inline error saat gagal (konvensi a602c46: error persisten).
+- Gunakan `toUiError`/`UiError` di luar `api/`; pesan sukses dari envelope server.
+- Pertahankan kontrak payload/response yang ada (settings per-key, envelope API).
+- Terapkan CSS signature identik di ketiga template; verifikasi render nyata setelah mengubahnya.
 
 **Ask first**
 
-- Perubahan skema/tabel database, atau migrasi baru.
-- Menambah dependency composer/npm.
-- Mengubah `phpunit.xml`, `docker-compose.yml` service, atau matrix CI.
-- Menghapus permission yang masih dirujuk route/controller.
-- Mengubah aturan bisnis (bukan representasinya) — mis. siapa boleh approve.
+- Menambah dependency apa pun.
+- Mengubah envelope backend `{success, data, message, meta}` atau menambah `code` stabil (E2).
+- Mengubah batas validasi upload (client dan backend harus berubah bersama).
+- Mengubah guard ekspor PDF (status/kepemilikan/permission/signature).
+- Menyentuh `resources/js/pages/changes/ChangePackageFormPage.tsx` di luar prop `pending`/toast —
+  ada perubahan lokal lain di file itu.
 
 **Never do**
 
-- Menambah shim/alias/endpoint kompatibilitas mundur atau parameter `legacy`.
-- Menyisakan `TODO`, stub, fallback palsu, atau kode mati baru.
-- Mengembalikan teks exception arbitrer (`$e->getMessage()` diluar
-  `ApiException`/`DomainException`) ke body HTTP.
-- Menonaktifkan/menghapus test tanpa menggantinya dengan test perilaku baru.
-- Menyentuh `vendor/`, `.git/`, atau file rahasia.
-- Mematikan `SecurityHeaders` atau melemahkan `throttle:auth` demi test.
+- Mengimpor `ApiError`/axios di luar `resources/js/api/`.
+- Menampilkan teks axios, status code, stack trace, atau body mentah ke UI.
+- Men-toast pada halaman auth atau pada fetch/read biasa (hanya mutasi).
+- Menghapus/melemahkan test otorisasi ekspor, validasi upload, atau assertion untuk membuat test lulus.
+- Menyimpan/menyajikan signature, foto absensi, atau lampiran di disk publik.
+- Mengganti DOMPDF atau menambah library PDF/toast alternatif.
+- Mengubah `vendor/` atau file generated.
+
+## Success Criteria
+
+I1–I7 terpenuhi dengan bukti perintah yang tercantum. Rincian per modul ada di
+`SPEC-ui-feedback.md` (S1–S12), `SPEC-settings-layout.md` (S1–S7),
+`SPEC-upload-errors.md` (S1–S10), `SPEC-pdf-signature.md` (S1–S8).
+
+## Open Questions
+
+Tidak ada. Keputusan yang mengikat: E1 + pintu E2 (abstraksi error), A1 (primitive feedback
+bersama), B1 (card per setting, grid 2 kolom), toast + inline saat gagal, auth tanpa toast, dan
+"UX saja" untuk guard signature PDF.
