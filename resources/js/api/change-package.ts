@@ -18,7 +18,7 @@
  * Lampiran multipart memakai kunci `files[]` persis cara parsing array PHP
  * (`UploadChangePackageAttachmentsRequest`).
  */
-import { api, ApiError, decodeBlobEnvelope, httpClient, requireData } from "@/api/client";
+import { api, ApiError, decodeBlobEnvelope, httpClient, Messaged, requireData } from "@/api/client";
 import {
   ChangePackage,
   ChangeType,
@@ -55,9 +55,9 @@ export async function listPackages(
 }
 
 /** POST /changes — buat draft (initiation + implementation opsional). */
-export async function createPackage(input: PackageDraftInput): Promise<ChangePackage> {
+export async function createPackage(input: PackageDraftInput): Promise<Messaged<ChangePackage>> {
   const res = await api.post<ChangePackage>("/changes", input);
-  return requireData(res.data, "createPackage");
+  return { ...requireData(res.data, "createPackage"), message: res.message ?? "" };
 }
 
 /** GET /changes/{id} — detail (relasi `change_types`/`attachments` di-load). */
@@ -70,9 +70,9 @@ export async function showPackage(packageId: number): Promise<ChangePackage> {
 export async function updatePackage(
   packageId: number,
   input: PackageDraftInput,
-): Promise<ChangePackage> {
+): Promise<Messaged<ChangePackage>> {
   const res = await api.put<ChangePackage>(`/changes/${packageId}`, input);
-  return requireData(res.data, "updatePackage");
+  return { ...requireData(res.data, "updatePackage"), message: res.message ?? "" };
 }
 
 /** DELETE /changes/{id} — `SuccessResponse` tanpa `data`; kembalikan message. */
@@ -85,21 +85,21 @@ export async function deletePackage(packageId: number): Promise<string> {
 export async function submitPackage(
   packageId: number,
   input: PackageSubmitInput,
-): Promise<ChangePackage> {
+): Promise<Messaged<ChangePackage>> {
   const res = await api.post<ChangePackage>(`/changes/${packageId}/submit`, input);
-  return requireData(res.data, "submitPackage");
+  return { ...requireData(res.data, "submitPackage"), message: res.message ?? "" };
 }
 
 /** POST /changes/{id}/approve — body kosong (tanpa reason, Resolved #4). */
-export async function approvePackage(packageId: number): Promise<ChangePackage> {
+export async function approvePackage(packageId: number): Promise<Messaged<ChangePackage>> {
   const res = await api.post<ChangePackage>(`/changes/${packageId}/approve`, {});
-  return requireData(res.data, "approvePackage");
+  return { ...requireData(res.data, "approvePackage"), message: res.message ?? "" };
 }
 
 /** POST /changes/{id}/reject — body kosong (tanpa reason, Resolved #4). */
-export async function rejectPackage(packageId: number): Promise<ChangePackage> {
+export async function rejectPackage(packageId: number): Promise<Messaged<ChangePackage>> {
   const res = await api.post<ChangePackage>(`/changes/${packageId}/reject`, {});
-  return requireData(res.data, "rejectPackage");
+  return { ...requireData(res.data, "rejectPackage"), message: res.message ?? "" };
 }
 
 /**
@@ -109,14 +109,14 @@ export async function rejectPackage(packageId: number): Promise<ChangePackage> {
 export async function uploadPackageAttachments(
   packageId: number,
   files: File[],
-): Promise<{ id: number; url: string; sort_order: number }[]> {
+): Promise<Messaged<{ files: { id: number; url: string; sort_order: number }[] }>> {
   const form = new FormData();
   files.forEach((file, i) => form.append(`files[${i}]`, file));
   const res = await api.postForm<{ id: number; url: string; sort_order: number }[]>(
     `/changes/${packageId}/attachments`,
     form,
   );
-  return requireData(res.data, "uploadPackageAttachments");
+  return { files: requireData(res.data, "uploadPackageAttachments"), message: res.message ?? "" };
 }
 
 /**

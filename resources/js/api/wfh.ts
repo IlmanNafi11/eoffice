@@ -6,7 +6,7 @@
  * yang berjalan lewat `httpClient` langsung (`responseType: "blob"`) karena
  * responsnya binary non-envelope — lihat Resolved Question #2 pada SPEC.
  */
-import { api, httpClient, requireData } from "@/api/client";
+import { api, httpClient, Messaged, requireData } from "@/api/client";
 import type { PaginationMeta } from "@/api/types";
 import {
   ActivityInput,
@@ -55,10 +55,10 @@ export async function listWfhReports(query: ListWfhReportsQuery = {}): Promise<{
 }
 
 /** POST /wfh/reports — multipart (get-or-create; `status` draft default / submit). */
-export async function createWfhReport(input: CreateWfhReportInput): Promise<WfhReport> {
+export async function createWfhReport(input: CreateWfhReportInput): Promise<Messaged<WfhReport>> {
   const form = buildStoreReportForm(input);
   const res = await api.postForm<WfhReport>("/wfh/reports", form);
-  return requireData(res.data, "createWfhReport");
+  return { ...requireData(res.data, "createWfhReport"), message: res.message ?? "" };
 }
 
 /** GET /wfh/reports/{report} — detail dengan `attendances`. */
@@ -68,9 +68,9 @@ export async function getWfhReport(reportId: number): Promise<WfhReport> {
 }
 
 /** PUT /wfh/reports/{report} — metadata only `{report_date}` (kontrak v6). */
-export async function updateWfhReportMetadata(reportId: number, reportDate: string): Promise<WfhReport> {
+export async function updateWfhReportMetadata(reportId: number, reportDate: string): Promise<Messaged<WfhReport>> {
   const res = await api.put<WfhReport>(`/wfh/reports/${reportId}`, { report_date: reportDate });
-  return requireData(res.data, "updateWfhReportMetadata");
+  return { ...requireData(res.data, "updateWfhReportMetadata"), message: res.message ?? "" };
 }
 
 /** DELETE /wfh/reports/{report} — SuccessResponse tanpa `data`; kembalikan message. */
@@ -80,33 +80,33 @@ export async function deleteWfhReport(reportId: number): Promise<string> {
 }
 
 /** POST /wfh/reports/{report}/submit. */
-export async function submitWfhReport(reportId: number): Promise<WfhReport> {
+export async function submitWfhReport(reportId: number): Promise<Messaged<WfhReport>> {
   const res = await api.post<WfhReport>(`/wfh/reports/${reportId}/submit`);
-  return requireData(res.data, "submitWfhReport");
+  return { ...requireData(res.data, "submitWfhReport"), message: res.message ?? "" };
 }
 
 /** POST /wfh/reports/{report}/approve. */
-export async function approveWfhReport(reportId: number): Promise<WfhReport> {
+export async function approveWfhReport(reportId: number): Promise<Messaged<WfhReport>> {
   const res = await api.post<WfhReport>(`/wfh/reports/${reportId}/approve`);
-  return requireData(res.data, "approveWfhReport");
+  return { ...requireData(res.data, "approveWfhReport"), message: res.message ?? "" };
 }
 
 /** POST /wfh/reports/{report}/reject — alasan wajib. */
-export async function rejectWfhReport(reportId: number, reason: string): Promise<WfhReport> {
+export async function rejectWfhReport(reportId: number, reason: string): Promise<Messaged<WfhReport>> {
   const res = await api.post<WfhReport>(`/wfh/reports/${reportId}/reject`, { reason } satisfies RejectReportRequest);
-  return requireData(res.data, "rejectWfhReport");
+  return { ...requireData(res.data, "rejectWfhReport"), message: res.message ?? "" };
 }
 
 /** POST /wfh/reports/{report}/revise. */
-export async function reviseWfhReport(reportId: number): Promise<WfhReport> {
+export async function reviseWfhReport(reportId: number): Promise<Messaged<WfhReport>> {
   const res = await api.post<WfhReport>(`/wfh/reports/${reportId}/revise`);
-  return requireData(res.data, "reviseWfhReport");
+  return { ...requireData(res.data, "reviseWfhReport"), message: res.message ?? "" };
 }
 
 /** POST /wfh/reports/{report}/activities — tambah satu kegiatan (JSON). */
-export async function addReportActivity(reportId: number, input: ActivityInput): Promise<WfhReportActivity> {
+export async function addReportActivity(reportId: number, input: ActivityInput): Promise<Messaged<WfhReportActivity>> {
   const res = await api.post<WfhReportActivity>(`/wfh/reports/${reportId}/activities`, input);
-  return requireData(res.data, "addReportActivity");
+  return { ...requireData(res.data, "addReportActivity"), message: res.message ?? "" };
 }
 
 /** PUT /wfh/reports/{report}/activities/{activity} — links id-diff. */
@@ -114,9 +114,9 @@ export async function updateReportActivity(
   reportId: number,
   activityId: number,
   input: ActivityUpdateInput,
-): Promise<WfhReportActivity> {
+): Promise<Messaged<WfhReportActivity>> {
   const res = await api.put<WfhReportActivity>(`/wfh/reports/${reportId}/activities/${activityId}`, input);
-  return requireData(res.data, "updateReportActivity");
+  return { ...requireData(res.data, "updateReportActivity"), message: res.message ?? "" };
 }
 
 /** DELETE /wfh/reports/{report}/activities/{activity}. */
@@ -135,12 +135,12 @@ export async function reorderReportActivities(reportId: number, input: ReorderIn
 export async function addReportAttendance(
   reportId: number,
   input: AttendanceUploadInput,
-): Promise<WfhAttendanceUploaded> {
+): Promise<Messaged<WfhAttendanceUploaded>> {
   const form = new FormData();
   form.append("session", input.session);
   form.append("photo", input.photo);
   const res = await api.postForm<WfhAttendanceUploaded>(`/wfh/reports/${reportId}/attendances`, form);
-  return requireData(res.data, "addReportAttendance");
+  return { ...requireData(res.data, "addReportAttendance"), message: res.message ?? "" };
 }
 
 /** DELETE /wfh/reports/{report}/attendances/{attendance}. */

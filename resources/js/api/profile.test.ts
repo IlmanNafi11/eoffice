@@ -101,6 +101,7 @@ describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
     expect(requests[0]?.headers.get("content-type")).toContain("multipart/form-data");
     expect(result).toEqual({
       signature_url: "http://localhost/storage/signatures/1-signature.png",
+      message: "",
     });
   });
 
@@ -147,5 +148,33 @@ describe("api/profile — endpoint & multipart (frontend-phase1)", () => {
       updateProfile({ phone: "081234567890", position: null, rank: null }),
     ).rejects.toThrow(/tidak berisi data/);
   });
+});
 
+
+
+describe("api/profile — mutasi meneruskan message envelope (T4)", () => {
+  it("updateProfile menyertakan message server", async () => {
+    ok({ success: true, data: profile, message: "Profil berhasil diperbarui." });
+
+    const result = await updateProfile({ phone: "081298765432" });
+
+    expect(result.name).toBe("Budi Santoso");
+    expect(result.message).toBe("Profil berhasil diperbarui.");
+  });
+
+  it("uploadSignature menyertakan message server", async () => {
+    ok({
+      success: true,
+      data: { signature_url: "http://localhost/storage/signatures/1-signature.png" },
+      message: "Tanda tangan berhasil diunggah.",
+    });
+
+    const form = new FormData();
+    form.append("signature", new File(["png-bytes"], "ttd.png", { type: "image/png" }));
+
+    const result = await uploadSignature(form);
+
+    expect(result.signature_url).toBe("http://localhost/storage/signatures/1-signature.png");
+    expect(result.message).toBe("Tanda tangan berhasil diunggah.");
+  });
 });

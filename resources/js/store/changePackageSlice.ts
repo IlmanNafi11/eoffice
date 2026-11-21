@@ -216,7 +216,7 @@ export const decidePackageThunk = createAsyncThunk<
 
 /** POST /changes/{id}/attachments — multipart; halaman refetch detail setelahnya. */
 export const uploadAttachmentsThunk = createAsyncThunk<
-  { id: number; url: string; sort_order: number }[],
+  { files: { id: number; url: string; sort_order: number }[]; message: string },
   { packageId: number; files: File[] }
 >(
   "changePackage/uploadAttachments",

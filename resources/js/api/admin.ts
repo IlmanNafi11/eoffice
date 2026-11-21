@@ -9,7 +9,7 @@
  * `listUsers`; aksi berkontrak `data` lewat `requireData`; `deleteUser`
  * mengembalikan pesan envelope (tanpa `data`).
  */
-import { api, requireData } from "@/api/client";
+import { api, Messaged, requireData } from "@/api/client";
 import {
   AdminPermission,
   AdminRole,
@@ -51,9 +51,9 @@ export async function listUsers(
 }
 
 /** POST /admin/users — 201; password kosong → server injek default dari Settings. */
-export async function createUser(input: StoreUserInput): Promise<AdminUser> {
+export async function createUser(input: StoreUserInput): Promise<Messaged<AdminUser>> {
   const res = await api.post<AdminUser>("/admin/users", input);
-  return requireData(res.data, "createUser");
+  return { ...requireData(res.data, "createUser"), message: res.message ?? "" };
 }
 
 /** GET /admin/users/{id} — 404 "User tidak ditemukan." dipisah server dari 403. */
@@ -63,9 +63,9 @@ export async function getUserById(userId: number): Promise<AdminUser> {
 }
 
 /** PUT /admin/users/{id} — semua opsional; `permissions` sync penuh bila dikirim. */
-export async function updateUser(userId: number, input: UpdateUserInput): Promise<AdminUser> {
+export async function updateUser(userId: number, input: UpdateUserInput): Promise<Messaged<AdminUser>> {
   const res = await api.put<AdminUser>(`/admin/users/${userId}`, input);
-  return requireData(res.data, "updateUser");
+  return { ...requireData(res.data, "updateUser"), message: res.message ?? "" };
 }
 
 /** DELETE /admin/users/{id} — mengembalikan pesan envelope "User berhasil dihapus.". */
@@ -92,9 +92,9 @@ export async function listRoles(): Promise<AdminRole[]> {
 export async function updateRolePermissions(
   roleId: number,
   permissions: string[],
-): Promise<AdminRole> {
+): Promise<Messaged<AdminRole>> {
   const res = await api.put<AdminRole>(`/admin/roles/${roleId}/permissions`, { permissions });
-  return requireData(res.data, "updateRolePermissions");
+  return { ...requireData(res.data, "updateRolePermissions"), message: res.message ?? "" };
 }
 
 /** GET /admin/permissions — daftar `{id, name}`. */
@@ -113,10 +113,10 @@ export async function listSettings(): Promise<SettingsMap> {
 export async function updateSetting(
   key: string,
   value: string | number | boolean | (string | number)[],
-): Promise<{ key: string; value: unknown }> {
+): Promise<Messaged<{ key: string; value: unknown }>> {
   const res = await api.put<{ key: string; value: unknown }>(
     `/admin/settings/${encodeURIComponent(key)}`,
     { value },
   );
-  return requireData(res.data, "updateSetting");
+  return { ...requireData(res.data, "updateSetting"), message: res.message ?? "" };
 }

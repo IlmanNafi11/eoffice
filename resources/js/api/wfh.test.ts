@@ -189,7 +189,7 @@ describe("api/wfh — create & metadata", () => {
     const uploaded = fd.get("attendances[pagi][photo]");
     expect(uploaded).toBeInstanceOf(File);
     expect((uploaded as File).name).toBe("pagi.jpg");
-    expect(result).toEqual(report);
+    expect(result).toEqual({ ...report, message: "Laporan WFH berhasil dibuat." });
   });
 
   it("createWfhReport minimal: hanya report_date, tanpa key activities/attendances", async () => {
@@ -249,6 +249,7 @@ describe("api/wfh — transisi status", () => {
     expect(requests[0]?.url).toBe(url);
     expect(requests[0]?.data).toBeUndefined();
     expect(result.status).toBe("pending");
+    expect(result.message).toBe("Laporan berhasil disubmit untuk persetujuan.");
   });
 
   it("rejectWfhReport POST {reason} → requireData resource", async () => {
@@ -260,6 +261,7 @@ describe("api/wfh — transisi status", () => {
     expect(requests[0]?.url).toBe("/wfh/reports/23/reject");
     expect(jsonBody()).toEqual({ reason: "Rincian aktivitas kurang detail." });
     expect(result.status).toBe("rejected");
+    expect(result.message).toBe("Laporan ditolak.");
   });
 });
 
@@ -283,6 +285,7 @@ describe("api/wfh — sub-resource activities", () => {
       links: [{ url: "https://git.kominfo.go.id/intern/wfh-api/-/merge_requests/12" }],
     });
     expect(result.id).toBe(67);
+    expect(result.message).toBe("Kegiatan berhasil ditambahkan.");
     // Asimetri kontrak v6.0.0: sub-resource activity TIDAK mengirim sort_order di links.
     expect(result.links?.[0]?.sort_order).toBeUndefined();
   });
@@ -312,6 +315,7 @@ describe("api/wfh — sub-resource activities", () => {
       ],
     });
     expect(result.id).toBe(67);
+    expect(result.message).toBe("Kegiatan berhasil diperbarui.");
   });
 
   it("deleteReportActivity DELETE → SUCCESS message", async () => {
@@ -354,7 +358,7 @@ describe("api/wfh — sub-resource attendances", () => {
     expect((fd as FormData).get("session")).toBe("pagi");
     expect((fd as FormData).get("photo")).toBeInstanceOf(File);
     expect(result.id).toBe(45);
-    expect(result.session).toBe("pagi");
+    expect(result.message).toBe("Absensi WFH berhasil.");
   });
 
   it("deleteReportAttendance DELETE → SUCCESS message", async () => {
@@ -392,5 +396,69 @@ describe("api/wfh — PDF & session config", () => {
     expect(requests[0]?.method).toBe("get");
     expect(requests[0]?.url).toBe("/wfh/session-config");
     expect(result).toEqual({ sessions: ["pagi", "siang", "sore"], allowed_days: [1, 2, 3, 4, 5] });
+  });
+});
+
+describe("api/wfh — mutasi meneruskan message envelope (T4)", () => {
+  it("createWfhReport menyertakan message server", async () => {
+    created({ success: true, data: report, message: "Laporan WFH berhasil dibuat." });
+
+    const result = await createWfhReport({ report_date: "2025-07-11" });
+
+    expect(result.id).toBe(23);
+    expect(result.message).toBe("Laporan WFH berhasil dibuat.");
+  });
+
+  it("updateWfhReportMetadata menyertakan message server", async () => {
+    ok({ success: true, data: report, message: "Laporan WFH berhasil diperbarui." });
+
+    const result = await updateWfhReportMetadata(23, "2025-07-12");
+
+    expect(result.message).toBe("Laporan WFH berhasil diperbarui.");
+  });
+
+  it("submitWfhReport menyertakan message server", async () => {
+    ok({ success: true, data: { ...report, status: "pending" }, message: "Laporan berhasil disubmit untuk persetujuan." });
+
+    const result = await submitWfhReport(23);
+
+    expect(result.status).toBe("pending");
+    expect(result.message).toBe("Laporan berhasil disubmit untuk persetujuan.");
+  });
+
+  it("addReportActivity menyertakan message server", async () => {
+    created({ success: true, data: activity, message: "Kegiatan berhasil ditambahkan." });
+
+    const result = await addReportActivity(23, {
+      activity: "Kegiatan baru",
+      start_time: null,
+      end_time: null,
+      links: [],
+    });
+
+    expect(result.id).toBe(67);
+    expect(result.message).toBe("Kegiatan berhasil ditambahkan.");
+  });
+
+  it("addReportAttendance menyertakan message server", async () => {
+    created({
+      success: true,
+      data: { id: 45, date: "2025-07-11", session: "pagi", photo_url: "http://localhost/x", check_in_at: "2025-07-11T08:15:30.000000Z" },
+      message: "Absensi WFH berhasil.",
+    });
+
+    const photo = new File(["jpg-bytes"], "pagi.jpg", { type: "image/jpeg" });
+    const result = await addReportAttendance(23, { session: "pagi", photo });
+
+    expect(result.id).toBe(45);
+    expect(result.message).toBe("Absensi WFH berhasil.");
+  });
+
+  it("fungsi message-only (delete/reorder) tidak berubah bentuk", async () => {
+    ok({ success: true, data: null, message: "Laporan WFH berhasil dihapus." });
+
+    const message = await deleteWfhReport(23);
+
+    expect(message).toBe("Laporan WFH berhasil dihapus.");
   });
 });

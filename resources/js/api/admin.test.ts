@@ -168,7 +168,7 @@ describe("api/admin — create/get/update/delete user", () => {
     expect(requests[0]?.method).toBe("post");
     expect(requests[0]?.url).toBe("/admin/users");
     expect(jsonBody(0)).toEqual(input);
-    expect(out).toEqual(adminUser);
+    expect(out).toEqual({ ...adminUser, message: "" });
   });
 
   it("createUser mengirim permissions dan password bila diisi", async () => {
@@ -211,7 +211,7 @@ describe("api/admin — create/get/update/delete user", () => {
     expect(requests[0]?.method).toBe("put");
     expect(requests[0]?.url).toBe("/admin/users/12");
     expect(jsonBody(0)).toEqual({ permissions: [], is_active: false });
-    expect(out).toEqual(adminUser);
+    expect(out).toEqual({ ...adminUser, message: "" });
   });
 
   it("deleteUser DELETE dan mengembalikan pesan envelope", async () => {
@@ -272,7 +272,7 @@ describe("api/admin — roles & permissions", () => {
     expect(requests[0]?.method).toBe("put");
     expect(requests[0]?.url).toBe("/admin/roles/2/permissions");
     expect(jsonBody(0)).toEqual({ permissions: ["wfh.report.approve"] });
-    expect(out).toEqual(roleResource);
+    expect(out).toEqual({ ...roleResource, message: "" });
   });
 
   it("updateRolePermissions mengirim array kosong apa adanya (replace, bukan omit)", async () => {
@@ -316,7 +316,7 @@ describe("api/admin — settings", () => {
     expect(requests[0]?.method).toBe("put");
     expect(requests[0]?.url).toBe("/admin/settings/password_default_user");
     expect(jsonBody(0)).toEqual({ value: "BaruUser123!" });
-    expect(out).toEqual({ key: "password_default_user", value: "BaruUser123!" });
+    expect(out).toEqual({ key: "password_default_user", value: "BaruUser123!", message: "" });
   });
 
   it("updateSetting mengirim array apa adanya (control checkbox)", async () => {
@@ -333,5 +333,68 @@ describe("api/admin — settings", () => {
     await updateSetting("k/ey", "v");
 
     expect(requests[0]?.url).toBe("/admin/settings/k%2Fey");
+  });
+});
+
+// ── message envelope mutasi (ui-feedback T4) ────────────────────────
+// Task 4: fungsi mutasi yang dikonsumsi UI wajib meneruskan `message`
+// envelope server supaya halaman bisa `toast.success(message)`.
+
+describe("api/admin — mutasi meneruskan message envelope (T4)", () => {
+  it("createUser menyertakan message server", async () => {
+    created({ success: true, data: adminUser, message: "User berhasil ditambahkan.", meta: null });
+
+    const out = await createUser({
+      name: "Budi",
+      nip: "199503152024011002",
+      email: "budi@kominfo.go.id",
+      roles: ["staf"],
+    });
+
+    expect(out.id).toBe(12);
+    expect(out.message).toBe("User berhasil ditambahkan.");
+  });
+
+  it("updateUser menyertakan message server", async () => {
+    ok({ success: true, data: adminUser, message: "User berhasil diperbarui.", meta: null });
+
+    const out = await updateUser(12, { is_active: true });
+
+    expect(out.name).toBe("Dewi Lestari");
+    expect(out.message).toBe("User berhasil diperbarui.");
+  });
+
+  it("updateRolePermissions menyertakan message server", async () => {
+    ok({ success: true, data: roleResource, message: "Hak akses role berhasil diperbarui.", meta: null });
+
+    const out = await updateRolePermissions(2, ["wfh.report.approve"]);
+
+    expect(out.name).toBe("kepala_bidang");
+    expect(out.message).toBe("Hak akses role berhasil diperbarui.");
+  });
+
+  it("updateSetting menyertakan message server", async () => {
+    ok({
+      success: true,
+      data: { key: "password_default_user", value: "BaruUser123!" },
+      message: "Setting berhasil diperbarui.",
+      meta: null,
+    });
+
+    const out = await updateSetting("password_default_user", "BaruUser123!");
+
+    expect(out).toEqual({
+      key: "password_default_user",
+      value: "BaruUser123!",
+      message: "Setting berhasil diperbarui.",
+    });
+  });
+
+  it("envelope tanpa message → message string kosong (bukan null)", async () => {
+    ok({ success: true, data: { key: "wfh_sessions", value: ["pagi"] }, message: null, meta: null });
+
+    const out = await updateSetting("wfh_sessions", ["pagi"]);
+
+    expect(out.message).toBe("");
   });
 });

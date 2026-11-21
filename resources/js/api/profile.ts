@@ -5,7 +5,7 @@
  * jangan set `Content-Type` manual (perlu boundary yang dibuat browser).
  */
 
-import { api, httpClient, requireData } from "@/api/client";
+import { api, httpClient, Messaged, requireData } from "@/api/client";
 import type { ProfileData, UpdateProfileRequest } from "@/api/types";
 
 /** `#/components/schemas/SignatureUploadResponse` */
@@ -14,15 +14,15 @@ export interface SignatureUploadResponse {
 }
 
 /** PUT /profile — field opsional; `null` untuk mengosongkan. */
-export async function updateProfile(input: UpdateProfileRequest): Promise<ProfileData> {
+export async function updateProfile(input: UpdateProfileRequest): Promise<Messaged<ProfileData>> {
   const res = await api.put<ProfileData>("/profile", input);
-  return requireData(res.data, "profile");
+  return { ...requireData(res.data, "profile"), message: res.message ?? "" };
 }
 
 /** POST /profile/signature — PNG/JPG/JPEG, max 2MB / 2000x2000px (divalidasi backend). */
-export async function uploadSignature(signature: FormData): Promise<SignatureUploadResponse> {
+export async function uploadSignature(signature: FormData): Promise<Messaged<SignatureUploadResponse>> {
   const res = await api.postForm<SignatureUploadResponse>("/profile/signature", signature);
-  return requireData(res.data, "profile/signature");
+  return { ...requireData(res.data, "profile/signature"), message: res.message ?? "" };
 }
 
 /**

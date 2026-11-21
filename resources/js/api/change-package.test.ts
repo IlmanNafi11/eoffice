@@ -169,7 +169,7 @@ describe("api/change-package — create/show/update/delete", () => {
     expect(requests[0]?.method).toBe("post");
     expect(requests[0]?.url).toBe("/changes");
     expect(jsonBody()).toEqual(input);
-    expect(out).toEqual(pkg);
+    expect(out).toEqual({ ...pkg, message: "Paket disimpan." });
   });
 
   it("showPackage GET /changes/{id} via requireData", async () => {
@@ -193,7 +193,7 @@ describe("api/change-package — create/show/update/delete", () => {
     expect(requests[0]?.method).toBe("put");
     expect(requests[0]?.url).toBe("/changes/12");
     expect(jsonBody()).toEqual(input);
-    expect(out).toEqual(pkg);
+    expect(out).toEqual({ ...pkg, message: "Paket diperbarui." });
   });
 
   it("deletePackage DELETE /changes/{id} mengembalikan message (tanpa data)", async () => {
@@ -274,7 +274,10 @@ describe("api/change-package — upload attachments (multipart)", () => {
     const form = requests[0]?.data as FormData;
     expect(form.get("files[0]")).toBe(fileA);
     expect(form.get("files[1]")).toBe(fileB);
-    expect(out).toEqual(attachments);
+    expect(out).toEqual({
+      files: attachments,
+      message: "Lampiran berhasil diunggah.",
+    });
   });
 });
 
@@ -321,5 +324,87 @@ describe("api/change-package — PDF export (blob bypass unwrap)", () => {
       status: 403,
       message: "Gagal mengunduh PDF.",
     });
+  });
+});
+
+describe("api/change-package — mutasi meneruskan message envelope (T4)", () => {
+  const draft: PackageDraftInput = { initiation: { field_id: 3, description: "D", reason: "R" } };
+
+  it("createPackage menyertakan message server", async () => {
+    created({ success: true, data: pkg, message: "Paket disimpan." });
+
+    const out = await createPackage(draft);
+
+    expect(out.initiation.id).toBe(pkg.initiation.id);
+    expect(out.message).toBe("Paket disimpan.");
+  });
+
+  it("updatePackage menyertakan message server", async () => {
+    ok({ success: true, data: pkg, message: "Paket diperbarui." });
+
+    const out = await updatePackage(12, draft);
+
+    expect(out.message).toBe("Paket diperbarui.");
+  });
+
+  it("submitPackage menyertakan message server", async () => {
+    ok({
+      success: true,
+      data: { ...pkg, initiation: { ...pkg.initiation, status: "pending" } },
+      message: "Paket berhasil diajukan.",
+    });
+
+    const out = await submitPackage(12, {
+      initiation: { field_id: 3, needed_by_date: "2025-12-15", description: "D", reason: "R" },
+      implementation: {
+        priority: "normal",
+        impact: "Minor",
+        change_type_ids: [2],
+        test_plan: "Smoke test.",
+        execution_date: "2025-11-10",
+        release_date: "2025-11-15",
+        implementation_result: "Selesai.",
+      },
+    });
+
+    expect(out.initiation.status).toBe("pending");
+    expect(out.message).toBe("Paket berhasil diajukan.");
+  });
+
+  it("approvePackage menyertakan message server", async () => {
+    ok({
+      success: true,
+      data: { ...pkg, initiation: { ...pkg.initiation, status: "approved" } },
+      message: "Paket disetujui.",
+    });
+
+    const out = await approvePackage(12);
+
+    expect(out.message).toBe("Paket disetujui.");
+  });
+
+  it("uploadPackageAttachments menyertakan message server", async () => {
+    ok({
+      success: true,
+      data: [{ id: 15, url: "/api/changes/12/attachments/15/download", sort_order: 1 }],
+      message: "Lampiran berhasil diunggah.",
+    });
+
+    const out = await uploadPackageAttachments(12, [
+      new File(["a"], "a.png", { type: "image/png" }),
+    ]);
+
+    expect(out.files).toEqual([
+      { id: 15, url: "/api/changes/12/attachments/15/download", sort_order: 1 },
+    ]);
+    expect(out.message).toBe("Lampiran berhasil diunggah.");
+  });
+
+  it("deletePackage tetap message-only (tidak berubah bentuk)", async () => {
+    ok({ success: true, data: null, message: "Paket dihapus." });
+
+    const out = await deletePackage(12);
+
+    expect(out).toBe("Paket dihapus.");
   });
 });

@@ -33,6 +33,13 @@ export interface Unwrapped<T> {
   meta: PaginationMeta | null;
 }
 
+/**
+ * Hasil mutasi: payload resource + `message` envelope (selalu string, `""`
+ * bila server tidak mengirim pesan). Halaman memakainya langsung untuk
+ * `toast.success`, tanpa membuka `ApiError`/axios (spec ui-feedback T4).
+ */
+export type Messaged<T> = T & { message: string };
+
 /** Kategori error setelah interceptor — menentukan cara UI menampilkannya. */
 export type ApiErrorKind = "http" | "api" | "validation" | "network";
 
