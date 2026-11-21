@@ -40,6 +40,27 @@ class WfhReportPdfTemplateTest extends TestCase
         $this->assertStringNotContainsString('LOGO<br>', $html);
     }
 
+    public function test_letterhead_uses_table_with_vertically_aligned_logo_and_text(): void
+    {
+        $html = view('pdf.wfh-report', $this->data())->render();
+
+        $this->assertStringContainsString('<table class="kop-surat">', $html);
+        $this->assertMatchesRegularExpression('/\.kop-surat td\s*\{\s*vertical-align:\s*middle;/', $html);
+        $this->assertStringNotContainsString('display: flex', $html);
+    }
+
+    public function test_signature_date_sits_directly_above_supervisor_column(): void
+    {
+        $html = view('pdf.wfh-report', $this->data())->render();
+
+        // Tanggal harus berada di dalam sel kanan signature-table (induk
+        // dari label "Atasan Langsung"), bukan baris full-width di luar tabel.
+        $this->assertMatchesRegularExpression(
+            '/<td class="atasan">\s*<div class="tanggal">Surabaya, .*?<\/div>.*?Atasan Langsung/s',
+            $html,
+        );
+    }
+
     public function test_template_omits_the_electronic_signature_legal_paragraph(): void
     {
         $html = view('pdf.wfh-report', $this->data())->render();

@@ -103,18 +103,42 @@ class WfhReportPdfDataTest extends TestCase
         $this->assertNull($data['signatureSupervisorPath']);
         $this->assertSame(
             [[
-                // start_time/end_time are datetime casts, so the rendered value
-                // carries whatever date the row was written on. Derive it from
-                // the persisted row instead of hard-coding today's date, which
-                // made this test expire at midnight.
-                'waktu' => $activity->fresh()->start_time->format('Y-m-d H:i:s')
-                    .' – '.$activity->fresh()->end_time->format('Y-m-d H:i:s'),
+                'waktu' => '08:00 – 09:00',
                 'kegiatan' => 'Menyusun laporan',
                 'links' => ['https://example.test/doc'],
             ]],
             $data['kegiatan'],
         );
     }
+
+
+    public function test_report_builder_formats_activity_time_as_h_i(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+        $staf = User::factory()->create(['team_id' => $team->id, 'name' => 'Budi Santoso']);
+        $staf->assignRole('staf');
+        $this->setUserSignature($staf);
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $staf->id,
+            'status' => 'pending',
+        ]);
+        WfhReportActivity::create([
+            'wfh_report_id' => $report->id,
+            'start_time' => '08:00',
+            'end_time' => '10:00',
+            'activity' => 'Membuat dokumen test case aplikasi eoffice',
+            'sort_order' => 1,
+        ]);
+
+        $data = app(WfhReportPdfData::class)->forReport(
+            $report->load(['activities.links', 'user.team', 'supervisor'])
+        );
+
+        $this->assertSame('08:00 – 10:00', $data['kegiatan'][0]['waktu']);
+    }
+
 
     public function test_report_builder_sets_qr_code_only_for_approved_reports(): void
     {

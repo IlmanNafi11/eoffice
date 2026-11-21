@@ -16,16 +16,17 @@
 
         /* === KOP SURAT === */
         .kop-surat {
-            display: flex;
-            align-items: flex-start;
+            width: 100%;
+            border-collapse: collapse;
+            border-bottom: 3px solid #000;
             margin-bottom: 5px;
             padding-bottom: 8px;
-            border-bottom: 3px solid #000;
+        }
+        .kop-surat td {
+            vertical-align: middle;
         }
         .kop-logo {
             width: 74px;
-            flex-shrink: 0;
-            margin-right: 14px;
         }
         .kop-logo img {
             width: 74px;
@@ -34,7 +35,7 @@
         }
         .kop-text {
             text-align: center;
-            flex-grow: 1;
+            padding-left: 14px;
         }
         .kop-text h3 {
             margin: 0;
@@ -160,7 +161,7 @@
             margin-top: 10px;
         }
         .tanggal {
-            text-align: right;
+            text-align: center;
             margin-bottom: 8px;
         }
         .qr-box {
@@ -180,15 +181,17 @@
 <body>
 
     {{-- KOP SURAT --}}
-    <div class="kop-surat">
-        <img class="kop-logo" src="{{ $logoDoc }}" alt="Logo Jawa Timur">
-        <div class="kop-text">
-            <h3>PEMERINTAH PROVINSI JAWA TIMUR</h3>
-            <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
-            <p>Jalan Ahmad Yani Nomor 242-244, Gayungan, Surabaya, Jawa Timur 60235<br>
-            Tlp. (031) 8294608, Fak. (031) 8294517, Laman kominfo.jatimprov.go.id, Pos-el kominfo@jatimprov.go.id</p>
-        </div>
-    </div>
+    <table class="kop-surat">
+        <tr>
+            <td class="kop-logo"><img src="{{ $logoDoc }}" alt="Logo Jawa Timur"></td>
+            <td class="kop-text">
+                <h3>PEMERINTAH PROVINSI JAWA TIMUR</h3>
+                <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
+                <p>Jalan Ahmad Yani Nomor 242-244, Gayungan, Surabaya, Jawa Timur 60235<br>
+                Tlp. (031) 8294608, Fak. (031) 8294517, Laman kominfo.jatimprov.go.id, Pos-el kominfo@jatimprov.go.id</p>
+            </td>
+        </tr>
+    </table>
 
     {{-- JUDUL --}}
     <div class="judul">
@@ -233,10 +236,8 @@
         </tbody>
     </table>
 
-
-    {{-- FOOTER: TANGGAL + QR --}}
+    {{-- FOOTER: QR (tanggal berada di atas label Atasan Langsung) --}}
     <div class="footer-bar">
-        <div class="tanggal">Surabaya, {{ $tanggalPelaksanaan }}</div>
         <div class="qr-box">
             @if ($isApproved && $qrSvg)
                 {!! $qrSvg !!}
@@ -256,7 +257,8 @@
                     <div class="signature-name">{{ $makerName }}</div>
                     <div class="signature-nip">NIP. {{ $makerNip }}</div>
                 </td>
-                <td>
+                <td class="atasan">
+                    <div class="tanggal">Surabaya, {{ $tanggalPelaksanaan }}</div>
                     <div class="signature-role">Atasan Langsung</div>
                     <div class="signature-box">
                         @if ($isApproved && $signatureSupervisorPath)
@@ -269,6 +271,5 @@
             </tr>
         </table>
     </div>
-
 </body>
 </html>

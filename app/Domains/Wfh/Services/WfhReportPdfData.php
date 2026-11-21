@@ -36,7 +36,8 @@ class WfhReportPdfData
 
         $kegiatan = $report->activities->map(function ($activity) {
             return [
-                'waktu' => $activity->start_time.' – '.$activity->end_time,
+                'waktu' => ($activity->start_time?->format('H:i') ?? '-')
+                    .' – '.($activity->end_time?->format('H:i') ?? '-'),
                 'kegiatan' => $activity->activity,
                 'links' => $activity->links->pluck('url')->toArray(),
             ];
