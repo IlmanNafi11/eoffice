@@ -41,6 +41,7 @@ vi.mock("@/api/admin", () => ({
 }));
 
 import * as adminApi from "@/api/admin";
+import { ApiError } from "@/api/client";
 import {
   fetchUsers,
   fetchUser,
@@ -155,8 +156,8 @@ describe("adminSlice — fetchUsers (list)", () => {
     expect(selectAdminUsersList(store.getState()).perPage).toBe(15);
   });
 
-  it("gagal → status failed + error siap tampil", async () => {
-    mockedListUsers.mockRejectedValueOnce(new Error("403 unauthorized"));
+  it("gagal → status failed + error siap tampil (pesan domain server diteruskan)", async () => {
+    mockedListUsers.mockRejectedValueOnce(new ApiError("http", "403 unauthorized", { status: 403 }));
     const store = makeStore();
 
     await store.dispatch(fetchUsers({}));
@@ -167,8 +168,18 @@ describe("adminSlice — fetchUsers (list)", () => {
     expect(list.items).toEqual([]);
   });
 
+  it("error non-transport (bukan ApiError) → copy aman, bukan teks teknis mentah", async () => {
+    mockedListUsers.mockRejectedValueOnce(new Error("Request failed with status code 500"));
+    const store = makeStore();
+
+    await store.dispatch(fetchUsers({}));
+
+    expect(selectAdminUsersList(store.getState()).error).not.toMatch(/Request failed/);
+    expect(selectAdminUsersList(store.getState()).error).toBe("Terjadi kesalahan. Coba lagi.");
+  });
+
   it("pending TIDAK membersihkan error (a602c46) — error bertahan sampai sukses", async () => {
-    mockedListUsers.mockRejectedValueOnce(new Error("422 validation"));
+    mockedListUsers.mockRejectedValueOnce(new ApiError("validation", "422 validation", { status: 422 }));
     const store = makeStore();
     await store.dispatch(fetchUsers({}));
     expect(selectAdminUsersList(store.getState()).error).toBe("422 validation");
@@ -239,7 +250,7 @@ describe("adminSlice — fetchUser (prefill edit)", () => {
   });
 
   it("pending TIDAK membersihkan current.error (a602c46)", async () => {
-    mockedUser.mockRejectedValueOnce(new Error("User tidak ditemukan."));
+    mockedUser.mockRejectedValueOnce(new ApiError("http", "User tidak ditemukan.", { status: 404 }));
     const store = makeStore();
     await store.dispatch(fetchUser(12));
     expect(selectAdminCurrentUser(store.getState()).error).toBe("User tidak ditemukan.");
@@ -338,7 +349,7 @@ describe("adminSlice — cache roles/permissions/settings (sekali per sesi)", ()
   });
 
   it("cache gagal → error tersimpan; dispatch ulang RETRY (status belum succeeded)", async () => {
-    mockedListRoles.mockRejectedValueOnce(new Error("403"));
+    mockedListRoles.mockRejectedValueOnce(new ApiError("http", "403", { status: 403 }));
     const store = makeStore();
 
     await store.dispatch(fetchRoles());
@@ -381,7 +392,9 @@ describe("adminSlice — mutasi", () => {
     expect(mockedImport).toHaveBeenCalledWith(file);
   });
   it("importUsersThunk rejected → users.error siap tampil", async () => {
-    mockedImport.mockRejectedValueOnce(new Error("Import gagal. Silakan periksa format file."));
+    mockedImport.mockRejectedValueOnce(
+      new ApiError("validation", "Import gagal. Silakan periksa format file.", { status: 422 }),
+    );
     const store = makeStore();
 
     await store.dispatch(importUsersThunk(new File(["x"], "u.csv", { type: "text/csv" })));
@@ -392,7 +405,9 @@ describe("adminSlice — mutasi", () => {
   });
 
   it("error hapus bertahan saat refetch list masih pending (a602c46)", async () => {
-    mockedDelete.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedDelete.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     const store = makeStore();
 
     await store.dispatch(deleteUserThunk(12));

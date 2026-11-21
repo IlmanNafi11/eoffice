@@ -44,6 +44,7 @@ import * as adminApi from "@/api/admin";
 import { UsersPage } from "@/pages/admin/UsersPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
+import { ApiError } from "@/api/client";
 
 const mockedListUsers = adminApi.listUsers as unknown as Mock;
 const mockedDelete = adminApi.deleteUser as unknown as Mock;
@@ -222,7 +223,9 @@ describe("UsersPage — import", () => {
   });
 
   it("import gagal (422) → pesan server tersaji; list tidak di-refresh", async () => {
-    mockedImport.mockRejectedValueOnce(new Error("Import gagal. Silakan periksa format file."));
+    mockedImport.mockRejectedValueOnce(
+      new ApiError("validation", "Import gagal. Silakan periksa format file.", { status: 422 }),
+    );
     const u = userEvent.setup();
     renderPageAs(["user.manage", "user.import"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
@@ -257,7 +260,9 @@ describe("UsersPage — hapus user", () => {
 
   it("hapus gagal → pesan server dirender DI DALAM dialog; user tidak hilang", async () => {
     const u = userEvent.setup();
-    mockedDelete.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedDelete.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     renderPageAs(["user.manage", "user.delete"]);
     await waitFor(() => expect(screen.getByText("Dewi Lestari")).toBeTruthy());
 

@@ -28,6 +28,8 @@ vi.mock("@/api/admin", () => ({
 }));
 
 import * as adminApi from "@/api/admin";
+import { ApiError } from "@/api/client";
+import { Toaster } from "@/components/ui/sonner";
 import { SettingsPage } from "@/pages/admin/SettingsPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
@@ -58,8 +60,11 @@ const adminUser: AuthUser = {
 function renderPageAs(permissions: string[]) {
   const store = makeStore();
   store.dispatch(setUser({ ...adminUser, permissions }));
+  // Toaster asli: toast dirender ke document.body (portal sonner) — test
+  // toast sukses/gagal membaca elemen `[data-sonner-toast]`.
   render(
     <Provider store={store}>
+      <Toaster position="top-right" richColors />
       <SettingsPage />
     </Provider>,
   );
@@ -200,7 +205,9 @@ describe("SettingsPage — label & kontrol per kind", () => {
   });
 
   it("gagal fetch → pesan error tersaji", async () => {
-    mockedListSettings.mockRejectedValue(new Error("Gagal memuat setting."));
+    mockedListSettings.mockRejectedValue(
+      new ApiError("http", "Gagal memuat setting.", { status: 500 }),
+    );
     renderPageAs(["setting.manage"]);
 
     const alert = await screen.findByRole("alert");
@@ -274,7 +281,7 @@ describe("SettingsPage — simpan nilai ter-decode per kind", () => {
     const user = userEvent.setup();
     renderPageAs(["setting.manage"]);
     mockedUpdateSetting.mockRejectedValue(
-      new Error("Setting 'wfh_allowed_days' tidak ditemukan."),
+      new ApiError("http", "Setting 'wfh_allowed_days' tidak ditemukan.", { status: 404 }),
     );
 
     const row = await findRow("wfh_allowed_days");
@@ -362,5 +369,90 @@ describe("SettingsPage — gate setting.manage", () => {
       ) as HTMLInputElement).disabled,
     ).toBe(true);
     expect(saveButtonOf(passwordRow)).toBeNull();
+  });
+});
+
+describe("SettingsPage — grid 2 kolom + toast + pending + dirty reset (settings-layout S1–S5)", () => {
+  it("S1+S2: wrapper grid md:grid-cols-2; pasangan password admin & user bersebelahan", async () => {
+    renderPageAs(["setting.manage"]);
+    await findRow("wfh_allowed_days");
+
+    const grid = screen.getByTestId("settings-grid");
+    expect(grid.className).toContain("md:grid-cols-2");
+
+    const admin = screen.getByTestId("setting-row-password_default_admin");
+    const userRow = screen.getByTestId("setting-row-password_default_user");
+    // Urutan DOM mengikuti SETTING_META: admin sebelum user.
+    expect(
+      admin.compareDocumentPosition(userRow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // 5 card (ganjil): card ke-3 (jam notifikasi) membentang 2 kolom agar
+    // pasangan password admin & user auto-place bersebelahan di baris akhir.
+    const gridChildren = Array.from(grid.children) as HTMLElement[];
+    const pivot = gridChildren[2]!;
+    expect(pivot.className).toContain("md:col-span-2");
+    expect(pivot.querySelector('[data-testid="setting-row-wfh_notify_start_time"]')).toBeTruthy();
+    expect(gridChildren[3]!.className).not.toContain("md:col-span-2");
+    expect(gridChildren[4]!.className).not.toContain("md:col-span-2");
+  });
+
+  it("S3: simpan sukses → toast sukses teks server + tombol Simpan disabled kembali (dirty reset)", async () => {
+    const user = userEvent.setup();
+    mockedUpdateSetting.mockResolvedValue({
+      key: "wfh_allowed_days",
+      value: [1, 2, 3, 4, 5],
+      message: "Setting berhasil diperbarui.",
+    });
+    renderPageAs(["setting.manage"]);
+
+    const row = await findRow("wfh_allowed_days");
+    await user.click(dayCheckbox(row, "Sabtu"));
+    await user.click(saveButtonOf(row)!);
+
+    // Toast dirender ke document.body oleh sonner (di luar container).
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("Setting berhasil diperbarui.");
+    });
+    await waitFor(() => {
+      expect((saveButtonOf(row) as HTMLButtonElement).disabled).toBe(true);
+    });
+    expect(row.getAttribute("aria-busy")).toBeNull();
+  });
+
+  it("S4: simpan gagal → toast error pesan terabstraksi + banner inline tetap", async () => {
+    const user = userEvent.setup();
+    renderPageAs(["setting.manage"]);
+    mockedUpdateSetting.mockRejectedValue(
+      new ApiError("http", "Setting 'wfh_allowed_days' tidak ditemukan.", { status: 404 }),
+    );
+
+    const row = await findRow("wfh_allowed_days");
+    await user.click(dayCheckbox(row, "Sabtu"));
+    await user.click(saveButtonOf(row)!);
+
+    // Toast error spesifik: elemen sonner berisi pesan, bukan sekadar banner.
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Setting 'wfh_allowed_days' tidak ditemukan.");
+    });
+    const alert = await screen.findByTestId("settings-error");
+    expect(alert.textContent).toContain("Setting 'wfh_allowed_days' tidak ditemukan.");
+  });
+
+  it("S5: tombol Simpan aria-busy selama thunk in-flight (mock never-resolves)", async () => {
+    const user = userEvent.setup();
+    renderPageAs(["setting.manage"]);
+    mockedUpdateSetting.mockImplementation(() => new Promise(() => {}));
+
+    const row = await findRow("wfh_allowed_days");
+    await user.click(dayCheckbox(row, "Sabtu"));
+    await user.click(saveButtonOf(row)!);
+
+    const save = saveButtonOf(row)!;
+    await waitFor(() => {
+      expect(save.getAttribute("aria-busy")).toBe("true");
+    });
   });
 });

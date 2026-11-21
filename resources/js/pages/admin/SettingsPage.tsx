@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,11 +41,13 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { can } from "@/lib/permissions";
 import {
+  SETTING_META,
   WFH_DAYS,
   WFH_SESSIONS,
   settingMeta,
   type SettingMeta,
 } from "@/lib/settings-meta";
+import { toUiError } from "@/lib/ui-errors";
 import { selectUser } from "@/store/authSlice";
 
 /** Nilai yang boleh dikirim ke `PUT /admin/settings/{key}`. */
@@ -97,14 +100,25 @@ interface SettingRowProps {
   settingKey: string;
   value: unknown;
   canManage: boolean;
+  /** Aksi simpan untuk key ini sedang in-flight (spinner + disabled). */
+  pending: boolean;
   onSave: (key: string, value: SettingSaveValue) => void;
 }
 
-function SettingRow({ settingKey, value, canManage, onSave }: SettingRowProps) {
+function SettingRow({ settingKey, value, canManage, pending, onSave }: SettingRowProps) {
   const meta = settingMeta(settingKey);
   const [draft, setDraft] = useState(() => initialDraft(meta, value));
   const [dirty, setDirty] = useState(false);
   const [reveal, setReveal] = useState(false);
+
+  // Sinkron draft dengan nilai baru dari cache slice — setelah simpan sukses
+  // (fulfilled memperbarui `value`) draft bersih kembali: tombol Simpan
+  // disabled, toast sukses tidak terpicu ulang (settings-layout S3).
+  useEffect(() => {
+    setDraft(initialDraft(meta, value));
+    setDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   const editable = canManage;
   const inputId = `setting-input-${settingKey}`;
@@ -120,7 +134,7 @@ function SettingRow({ settingKey, value, canManage, onSave }: SettingRowProps) {
   return (
     <div
       data-testid={`setting-row-${settingKey}`}
-      className="flex flex-col gap-2 rounded-lg border border-border px-4 py-3"
+      className="flex flex-col gap-3 rounded-lg border border-border p-4"
     >
       <div className="flex flex-col gap-0.5">
         <Label htmlFor={inputId} className="font-medium">
@@ -221,6 +235,7 @@ function SettingRow({ settingKey, value, canManage, onSave }: SettingRowProps) {
           <Button
             type="button"
             size="sm"
+            pending={pending}
             disabled={!dirty}
             onClick={() => onSave(settingKey, draft.value)}
           >
@@ -248,16 +263,25 @@ export function SettingsPage() {
     key: string;
     value: SettingSaveValue;
   } | null>(null);
+  /** Key yang sedang disimpan — sumber prop `pending` tombol Simpan. */
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchSettings());
   }, [dispatch]);
 
   async function doSave(key: string, value: SettingSaveValue) {
+    setSavingKey(key);
     try {
-      await dispatch(updateSettingThunk({ key, value })).unwrap();
-    } catch {
-      // error diset reducer (current.error) — pesan server tampil apa adanya.
+      const res = await dispatch(updateSettingThunk({ key, value })).unwrap();
+      toast.success(res.message);
+    } catch (err) {
+      // `unwrap()` melempar payload `rejectWithValue` slice — sudah hasil
+      // `toUiError` (string). Non-string tetap lewat seam untuk keamanan.
+      // Banner inline tetap dirender (current.error dari reducer).
+      toast.error(typeof err === "string" && err ? err : toUiError(err).message);
+    } finally {
+      setSavingKey(null);
     }
   }
 
@@ -279,7 +303,18 @@ export function SettingsPage() {
   }
 
   const loading = settings === null;
-  const entries = settings ? Object.entries(settings) : [];
+  // Urutan render mengikuti SETTING_META (password admin sebelum user);
+  // key tak dikenal tetap tampil, di belakang key yang dikenal.
+  const keys = settings
+    ? [
+        ...Object.keys(SETTING_META).filter((k) => k in settings),
+        ...Object.keys(settings).filter((k) => !(k in SETTING_META)),
+      ]
+    : [];
+  // Jumlah ganjil: card tepat sebelum pasangan terakhir membentang 2 kolom,
+  // sehingga pasangan terakhir (password admin & user) auto-place bersebelahan
+  // di baris terakhir (I3).
+  const lastOdd = keys.length > 0 && keys.length % 2 === 1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -306,20 +341,27 @@ export function SettingsPage() {
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
         </div>
-      ) : entries.length === 0 ? (
+      ) : keys.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Tidak ada setting untuk ditampilkan.
         </p>
       ) : (
-        <div className="flex flex-col gap-4">
-          {entries.map(([key, value]) => (
-            <SettingRow
+        <div data-testid="settings-grid" className="grid gap-4 md:grid-cols-2">
+          {keys.map((key, i) => (
+            <div
               key={key}
-              settingKey={key}
-              value={value}
-              canManage={canManage}
-              onSave={requestSave}
-            />
+              className={
+                lastOdd && i === keys.length - 3 ? "md:col-span-2" : undefined
+              }
+            >
+              <SettingRow
+                settingKey={key}
+                value={settings![key]}
+                canManage={canManage}
+                pending={savingKey === key}
+                onSave={requestSave}
+              />
+            </div>
           ))}
         </div>
       )}

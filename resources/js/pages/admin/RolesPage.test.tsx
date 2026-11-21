@@ -40,6 +40,7 @@ import { RolesPage } from "@/pages/admin/RolesPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
 import { permissionMeta } from "@/lib/permissions-meta";
+import { ApiError } from "@/api/client";
 
 const mockedListRoles = adminApi.listRoles as unknown as Mock;
 const mockedListPermissions = adminApi.listPermissions as unknown as Mock;
@@ -233,7 +234,11 @@ describe("RolesPage — simpan per role (sync penuh)", () => {
 
   it("422 lockout → pesan server dirender dan tetap tampil", async () => {
     mockedSyncRoles.mockRejectedValueOnce(
-      new Error("Role 'admin' tidak boleh kehilangan permission kritis: user.manage."),
+      new ApiError(
+        "validation",
+        "Role 'admin' tidak boleh kehilangan permission kritis: user.manage.",
+        { status: 422 },
+      ),
     );
     renderPageAs(["role.manage", "permission.manage"]);
     await waitFor(() => expect(rowOf(1)).toBeTruthy());
@@ -315,7 +320,9 @@ describe("RolesPage — gate role.manage", () => {
   });
 
   it("fetchRoles gagal 403 → pesan server dirender", async () => {
-    mockedListRoles.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedListRoles.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     renderPageAs(["role.manage"]);
 
     await waitFor(() =>

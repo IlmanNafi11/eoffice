@@ -35,6 +35,7 @@ import type {
   PaginationMeta,
   SettingsMap,
 } from "@/api/types";
+import { toUiError } from "@/lib/ui-errors";
 
 export type AdminFetchStatus = "idle" | "loading" | "succeeded" | "failed";
 
@@ -94,11 +95,12 @@ export function initialAdminState(): AdminState {
   };
 }
 
-/** Pesan error siap tampil; `ApiError`/`Error` sama-sama punya `message`. */
+/**
+ * Pesan error siap tampil lewat seam `toUiError` (detail transport tidak
+ * pernah sampai ke UI; pesan domain server tetap diteruskan apa adanya).
+ */
 function messageOf(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error === "string" && error) return error;
-  return "Terjadi kesalahan. Coba lagi.";
+  return toUiError(error).message;
 }
 
 /** Bentuk state minimal untuk kondisi cache (`getState(): WithAdmin`). */
@@ -226,7 +228,7 @@ export const syncRolePermissionsThunk = createAsyncThunk<
 
 /** PUT /admin/settings/{key} — value scalar atau array (backend menerima array). */
 export const updateSettingThunk = createAsyncThunk<
-  { key: string; value: unknown },
+  { key: string; value: unknown; message: string },
   { key: string; value: string | number | boolean | (string | number)[] }
 >(
   "admin/updateSetting",
