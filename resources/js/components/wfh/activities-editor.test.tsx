@@ -27,6 +27,14 @@ const ACT_B: WfhReportActivity = {
   sort_order: 2,
   links: [],
 };
+const ACT_C: WfhReportActivity = {
+  id: 13,
+  activity: "Membuat dokumen test case aplikasi eoffice",
+  start_time: "08:00",
+  end_time: "10:00",
+  sort_order: 3,
+  links: [{ id: 31, url: "https://example.com/proof" }],
+};
 
 describe("sortForDisplay", () => {
   it("mengurutkan baris sesuai sort_order tanpa memutasi input", () => {
@@ -108,5 +116,52 @@ describe("ActivitiesEditor", () => {
 
     const next = onChange.mock.lastCall![0] as WfhReportActivity[];
     expect(next[0]!.activity).toBe("Laporan direvisi");
+  });
+
+  it("tambah kegiatan: waktu awal/akhir + link ikut terkirim, bukan hanya deskripsi", async () => {
+    const onChange = vi.fn();
+    render(<ActivitiesEditor activities={[]} canEdit onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
+    await userEvent.type(screen.getByLabelText(/deskripsi kegiatan/i), "Membuat dokumen test case aplikasi eoffice");
+    await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan awal/i }));
+    await userEvent.click(screen.getByRole("button", { name: /jam 08/i }));
+    await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
+    await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan akhir/i }));
+    await userEvent.click(screen.getAllByRole("button", { name: /jam 10/i }).at(-1)!);
+    await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
+    await userEvent.type(screen.getByLabelText(/link bukti kerja/i), "https://google.com");
+    await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
+
+    const next = onChange.mock.lastCall![0] as WfhReportActivity[];
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({
+      activity: "Membuat dokumen test case aplikasi eoffice",
+      start_time: "08:00",
+      end_time: "10:00",
+      links: [{ url: "https://google.com" }],
+    });
+  });
+
+  it("ubah kegiatan: waktu dan link baru ikut terkirim", async () => {
+    const onChange = vi.fn();
+    render(<ActivitiesEditor activities={[ACT_A]} canEdit onChange={onChange} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /ubah kegiatan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan awal/i }));
+    await userEvent.click(screen.getByRole("button", { name: /jam 13/i }));
+    await userEvent.click(screen.getByRole("button", { name: /menit 30/i }));
+    const linkInput = screen.getByLabelText(/link bukti kerja/i) as HTMLInputElement;
+    await userEvent.tripleClick(linkInput);
+    await userEvent.keyboard("{Backspace}");
+    await userEvent.type(linkInput, "https://google.com/baru");
+    await userEvent.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+
+    const next = onChange.mock.lastCall![0] as WfhReportActivity[];
+    expect(next[0]).toMatchObject({ start_time: "13:30", links: [{ url: "https://google.com/baru" }] });
+  });
+
+  it("tampilan link bukti kerja dapat diklik", () => {
+    render(<ActivitiesEditor activities={[ACT_C]} canEdit={false} onChange={() => {}} />);
+    expect(screen.getByRole("link", { name: "https://example.com/proof" }).getAttribute("href")).toBe("https://example.com/proof");
   });
 });

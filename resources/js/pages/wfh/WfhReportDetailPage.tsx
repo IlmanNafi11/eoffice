@@ -207,7 +207,15 @@ export function WfhReportDetailPage() {
     for (const row of next.filter((a) => a.id == null)) {
       ops.push(
         dispatch(
-          addReportActivity({ reportId: report.id, input: { activity: row.activity } }),
+          addReportActivity({
+            reportId: report.id,
+            input: {
+              activity: row.activity,
+              start_time: row.start_time ?? null,
+              end_time: row.end_time ?? null,
+              links: (row.links ?? []).map((l) => ({ id: l.id ?? null, url: l.url })),
+            },
+          }),
         ),
       );
     }
@@ -219,10 +227,16 @@ export function WfhReportDetailPage() {
       );
     }
 
-    // Ubah teks (id sama, teks beda → PUT; links dibawa ulang id-diff).
+    // Ubah (id sama, konten beda → PUT; links dibawa id-diff).
     for (const row of next.filter((a) => a.id != null)) {
       const before = prevById.get(row.id as number);
-      if (before && before.activity !== row.activity) {
+      const changed =
+        before &&
+        (before.activity !== row.activity ||
+          (before.start_time ?? null) !== (row.start_time ?? null) ||
+          (before.end_time ?? null) !== (row.end_time ?? null) ||
+          JSON.stringify(before.links ?? []) !== JSON.stringify(row.links ?? []));
+      if (changed) {
         ops.push(
           dispatch(
             updateReportActivity({
@@ -231,8 +245,9 @@ export function WfhReportDetailPage() {
               input: {
                 id: row.id,
                 activity: row.activity,
-                links:
-                  before.links?.map((l) => ({ id: l.id ?? null, url: l.url })) ?? [],
+                start_time: row.start_time ?? null,
+                end_time: row.end_time ?? null,
+                links: (row.links ?? []).map((l) => ({ id: l.id ?? null, url: l.url })),
               },
             }),
           ),

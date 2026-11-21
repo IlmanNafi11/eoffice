@@ -345,16 +345,31 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     });
   });
 
-  it("tambah kegiatan (owner, draft) → POST sub-resource", async () => {
+  it("tambah kegiatan (owner, draft) → POST sub-resource dengan waktu & link", async () => {
     mockedAddActivity.mockResolvedValue({ id: 12, activity: "Setup VPN", sort_order: 2 });
     renderDetail("staf", detail("draft"));
 
     await userEvent.click(await screen.findByRole("button", { name: /tambah kegiatan/i }));
     await userEvent.type(await screen.findByLabelText(/deskripsi kegiatan/i), "Setup VPN");
+    await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan awal/i }));
+    await userEvent.click(screen.getByRole("button", { name: /jam 08/i }));
+    await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
+    await userEvent.click(screen.getByRole("button", { name: /waktu pelaksanaan akhir/i }));
+    await userEvent.click(screen.getAllByRole("button", { name: /jam 10/i }).at(-1)!);
+    await userEvent.click(screen.getAllByRole("button", { name: /menit 00/i }).at(-1)!);
+    await userEvent.type(screen.getByLabelText(/link bukti kerja/i), "https://google.com");
     await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
 
     await waitFor(() => {
-      expect(mockedAddActivity).toHaveBeenCalledWith(1, expect.objectContaining({ activity: "Setup VPN" }));
+      expect(mockedAddActivity).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          activity: "Setup VPN",
+          start_time: "08:00",
+          end_time: "10:00",
+          links: [{ id: null, url: "https://google.com" }],
+        }),
+      );
     });
   });
   it(

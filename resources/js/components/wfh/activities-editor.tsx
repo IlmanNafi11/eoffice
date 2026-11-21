@@ -6,11 +6,15 @@
  * tampil HANYA saat `canEdit` — helper `canEditReport(status)` di halaman
  * menghitung draft|rejected (spec §Code Style: aksi disembunyikan, bukan
  * disabled).
+ *
+ * Satu kegiatan = tiga jenis input: waktu pelaksanaan (awal + akhir),
+ * deskripsi kegiatan, dan link bukti kerja (URL, ditampilkan clickable).
  */
 import * as React from "react";
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimeInput } from "@/components/ui/time-input";
 import type { WfhReportActivity } from "@/api/types";
 
 /** Urut sesuai `sort_order` (undefined di belakang), tanpa memutasi input. */
@@ -24,34 +28,132 @@ interface ActivitiesEditorProps {
   onChange: (next: WfhReportActivity[]) => void;
 }
 
+interface ActivityDraft {
+  activity: string;
+  start_time: string;
+  end_time: string;
+  link: string;
+}
+
+const EMPTY_DRAFT: ActivityDraft = { activity: "", start_time: "", end_time: "", link: "" };
+
+/** Hanya URL http(s) yang dirender sebagai tautan; teks lain dibiarkan polos. */
+function isClickableLink(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
 export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEditorProps) {
   const [editingId, setEditingId] = React.useState<number | "new" | null>(null);
-  const [draft, setDraft] = React.useState("");
+  const [draft, setDraft] = React.useState<ActivityDraft>(EMPTY_DRAFT);
 
   const rows = sortForDisplay(activities);
 
   function submitNew() {
-    if (!draft.trim()) return;
+    if (!draft.activity.trim()) return;
+    const link = draft.link.trim();
     onChange([
       ...rows,
-      { activity: draft.trim(), sort_order: rows.length + 1 },
+      {
+        activity: draft.activity.trim(),
+        start_time: draft.start_time || null,
+        end_time: draft.end_time || null,
+        sort_order: rows.length + 1,
+        links: link ? [{ url: link }] : [],
+      },
     ]);
-    setDraft("");
+    setDraft(EMPTY_DRAFT);
     setEditingId(null);
   }
 
   function startEdit(row: WfhReportActivity) {
     setEditingId(row.id ?? null);
-    setDraft(row.activity);
+    setDraft({
+      activity: row.activity,
+      start_time: row.start_time ?? "",
+      end_time: row.end_time ?? "",
+      link: row.links?.[0]?.url ?? "",
+    });
   }
 
   function submitEdit(target: WfhReportActivity) {
-    if (!draft.trim()) return;
+    if (!draft.activity.trim()) return;
+    const link = draft.link.trim()
+      ? { id: target.links?.[0]?.id ?? undefined, url: draft.link.trim() }
+      : null;
     onChange(
-      rows.map((r) => (r === target ? { ...r, activity: draft.trim() } : r)),
+      rows.map((r) =>
+        r === target
+          ? {
+              ...r,
+              activity: draft.activity.trim(),
+              start_time: draft.start_time || null,
+              end_time: draft.end_time || null,
+              links: link
+                ? [...(target.links ?? []).filter((_, i) => i > 0), link]
+                : [],
+            }
+          : r,
+      ),
     );
-    setDraft("");
+    setDraft(EMPTY_DRAFT);
     setEditingId(null);
+  }
+
+  function startNew() {
+    setDraft(EMPTY_DRAFT);
+    setEditingId("new");
+  }
+
+  function activityForm(
+    onSubmit: (e: React.FormEvent) => void,
+    submitLabel: string,
+    onCancel?: () => void,
+  ) {
+    return (
+      <form onSubmit={onSubmit} className="flex flex-col gap-2">
+        <Input
+          aria-label="Deskripsi kegiatan"
+          value={draft.activity}
+          onChange={(e) => setDraft({ ...draft, activity: e.target.value })}
+          autoFocus
+        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Waktu awal</span>
+            <TimeInput
+              aria-label="Waktu pelaksanaan awal"
+              value={draft.start_time}
+              onChange={(value) => setDraft({ ...draft, start_time: value })}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Waktu akhir</span>
+            <TimeInput
+              aria-label="Waktu pelaksanaan akhir"
+              value={draft.end_time}
+              onChange={(value) => setDraft({ ...draft, end_time: value })}
+            />
+          </div>
+        </div>
+        <Input
+          type="url"
+          aria-label="Link bukti kerja"
+          placeholder="https://google.com"
+          value={draft.link}
+          onChange={(e) => setDraft({ ...draft, link: e.target.value })}
+        />
+        <div className="flex gap-2">
+          <Button type="submit" size="sm">
+            {submitLabel}
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              Batal
+            </Button>
+          ) : null}
+        </div>
+      </form>
+    );
   }
 
   function remove(target: WfhReportActivity) {
@@ -74,16 +176,13 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
           <li key={row.id ?? `new-${i}`} className="flex items-start gap-3 rounded-lg border p-3">
             <div className="flex-1">
               {editingId !== null && row === rows[i] && editingId === row.id ? (
-                <form onSubmit={(e) => { e.preventDefault(); submitEdit(row); }} className="flex flex-col gap-2">
-                  <Input
-                    aria-label="Deskripsi kegiatan"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                  />
-                  <Button type="submit" size="sm">
-                    Simpan perubahan
-                  </Button>
-                </form>
+                activityForm(
+                  (e) => {
+                    e.preventDefault();
+                    submitEdit(row);
+                  },
+                  "Simpan perubahan",
+                )
               ) : (
                 <>
                   <p className="text-sm font-medium">{row.activity}</p>
@@ -92,14 +191,23 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
                       {row.start_time ?? "—"} – {row.end_time ?? "—"}
                     </p>
                   ) : null}
-                  {row.links?.map((link, li) => (
-                    <p
-                      key={link.id ?? `link-${li}`}
-                      className="text-xs text-primary underline"
-                    >
-                      {link.url}
-                    </p>
-                  ))}
+                  {row.links?.map((link, li) =>
+                    isClickableLink(link.url) ? (
+                      <a
+                        key={link.id ?? `link-${li}`}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary underline"
+                      >
+                        {link.url}
+                      </a>
+                    ) : (
+                      <p key={link.id ?? `link-${li}`} className="text-xs text-muted-foreground">
+                        {link.url}
+                      </p>
+                    ),
+                  )}
                 </>
               )}
             </div>
@@ -125,22 +233,21 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
 
       {canEdit ? (
         editingId === "new" ? (
-          <form onSubmit={(e) => { e.preventDefault(); submitNew(); }} className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
-            <Input
-              aria-label="Deskripsi kegiatan"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button type="submit" size="sm">Simpan</Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => { setDraft(""); setEditingId(null); }}>
-                Batal
-              </Button>
-            </div>
-          </form>
+          <div className="rounded-lg border border-dashed p-3">
+            {activityForm(
+              (e) => {
+                e.preventDefault();
+                submitNew();
+              },
+              "Simpan",
+              () => {
+                setDraft(EMPTY_DRAFT);
+                setEditingId(null);
+              },
+            )}
+          </div>
         ) : (
-          <Button type="button" variant="outline" onClick={() => { setDraft(""); setEditingId("new"); }}>
+          <Button type="button" variant="outline" onClick={startNew}>
             <Plus aria-hidden="true" className="size-4" />
             Tambah kegiatan
           </Button>
