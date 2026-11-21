@@ -171,4 +171,85 @@ describe("AttendanceUploadList", () => {
     });
   });
 
-});
+  it("pre-check: foto > 2MB ditolak sebelum onUpload (0 panggilan) + pesan inline", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AttendanceUploadList
+        sessions={["pagi"]}
+        attendances={[]}
+        canEdit
+        onUpload={onUpload}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const big = new File(
+      [new ArrayBuffer(3 * 1024 * 1024)],
+      "pagi.png",
+      { type: "image/png" },
+    );
+    const hidden = document.getElementById(
+      "attendance-upload-pagi",
+    ) as HTMLInputElement;
+    await userEvent.upload(hidden, big);
+
+    // Tidak ada request: callback tidak pernah dipanggil.
+    expect(onUpload).not.toHaveBeenCalled();
+    // Pesan inline dirender di dekat input (bukan hanya toast).
+    expect(
+      await screen.findByText(/ukuran foto absensi maksimal 2mb/i),
+    ).toBeTruthy();
+  });
+
+  it("pre-check: tipe salah (.gif) ditolak tanpa onUpload", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AttendanceUploadList
+        sessions={["pagi"]}
+        attendances={[]}
+        canEdit
+        onUpload={onUpload}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const gif = new File([new ArrayBuffer(8)], "pagi.gif", {
+      type: "image/gif",
+    });
+    const hidden = document.getElementById(
+      "attendance-upload-pagi",
+    ) as HTMLInputElement;
+    await userEvent.upload(hidden, gif, { applyAccept: false });
+
+    expect(onUpload).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/format foto absensi harus jpg, jpeg, atau png/i),
+    ).toBeTruthy();
+  });
+
+  it("pre-check lolos → pesan inline tidak dirender", async () => {
+    const onUpload = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AttendanceUploadList
+        sessions={["pagi"]}
+        attendances={[]}
+        canEdit
+        onUpload={onUpload}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const ok = new File([new ArrayBuffer(8)], "pagi.jpg", {
+      type: "image/jpeg",
+    });
+    const hidden = document.getElementById(
+      "attendance-upload-pagi",
+    ) as HTMLInputElement;
+    await userEvent.upload(hidden, ok);
+
+    await waitFor(() => expect(onUpload).toHaveBeenCalled());
+    expect(screen.queryByText(/ukuran foto absensi/i)).toBeNull();
+    expect(screen.queryByText(/format foto absensi/i)).toBeNull();
+  });
+
+ });

@@ -12,6 +12,7 @@
  * `auto-fit` supaya Hapus & Unggah foto selalu berbagi lebar yang sama.
  */
 import * as React from "react";
+import { ATTENDANCE_RULE, validateUploads } from "@/lib/upload-validate";
 import { ImageOff, Trash2, Loader2 } from "lucide-react";
 import { httpClient } from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,8 @@ function AttendanceRow({
 }) {
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const previewUrlRef = React.useRef<string | null>(null);
+  // Pesan pre-check T9a: inline di dekat input, bukan kunci field internal.
+  const [preCheckError, setPreCheckError] = React.useState<string | null>(null);
 
   const setAndTrack = React.useCallback((next: string | null) => {
     if (previewUrlRef.current && previewUrlRef.current !== next) {
@@ -157,6 +160,14 @@ function AttendanceRow({
     // Early-return: dua event `change` ter-antre sebelum re-render jangan
     // memicu upload paralel (ship review #4 double-select guard).
     if (!file || uploading) return;
+    // Pre-check client (T9a): tolak file yang pasti salah SEBELUM request
+    // network dikirim; pesan inline memakai label Indonesia, bukan kunci.
+    const invalid = validateUploads([file], ATTENDANCE_RULE);
+    if (invalid !== null) {
+      setPreCheckError(invalid);
+      return;
+    }
+    setPreCheckError(null);
     await onUpload(file);
   }
   /**
@@ -205,13 +216,18 @@ function AttendanceRow({
           ) : null}
           <FileInput
             id={`attendance-upload-${session}`}
-            accept="image/*"
+            accept="image/jpeg,image/png"
             placeholder="Unggah foto"
             onFileChange={(f) => void handleFileChange(f)}
             disabled={uploading}
             size="sm"
             className="w-full"
           />
+          {preCheckError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {preCheckError}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

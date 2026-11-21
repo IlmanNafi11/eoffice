@@ -399,7 +399,9 @@ describe("ChangePackageDetailPage — aksi mutasi", () => {
     renderDetail(staf);
     await screen.findByText("001/9/1.1/114/2025");
 
-    const file = new File(["pdf-bytes"], "bukti.pdf", { type: "application/pdf" });
+    // Kontrak backend `files.*` = mimes:jpg,jpeg,png (bukan PDF) — pre-check
+    // client memakai rule yang sama, jadi file uji harus gambar valid.
+    const file = new File(["png-bytes"], "bukti.png", { type: "image/png" });
     const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
     await userEvent.upload(input, file);
 
@@ -409,6 +411,64 @@ describe("ChangePackageDetailPage — aksi mutasi", () => {
     await waitFor(() => {
       expect(mockedShow).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe("ChangePackageDetailPage — pre-check lampiran (T9a)", () => {
+  it("11 file ditolak sebelum upload (0 panggilan API) + pesan jumlah", async () => {
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const files = Array.from(
+      { length: 11 },
+      (_, i) => new File([new ArrayBuffer(8)], `f${i}.png`, { type: "image/png" }),
+    );
+    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
+    await userEvent.upload(input, files);
+
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(await screen.findByText(/maksimal 10 lampiran/i)).toBeTruthy();
+  });
+
+  it("file > 10MB ditolak sebelum upload dengan pesan ukuran label", async () => {
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const big = new File(
+      [new ArrayBuffer(10 * 1024 * 1024 + 1)],
+      "besar.png",
+      { type: "image/png" },
+    );
+    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
+    await userEvent.upload(input, big);
+
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(await screen.findByText(/ukuran lampiran maksimal 10mb/i)).toBeTruthy();
+  });
+
+  it("tipe salah (.gif) ditolak sebelum upload dengan pesan format label", async () => {
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const gif = new File([new ArrayBuffer(8)], "ttd.gif", { type: "image/gif" });
+    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
+    await userEvent.upload(input, gif);
+
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/format lampiran harus jpg, jpeg, atau png/i),
+    ).toBeTruthy();
+  });
+
+  it("lampiran lolos pre-check → tetap terkirim (tidak ada false positive)", async () => {
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    const ok = new File([new ArrayBuffer(8)], "ok.png", { type: "image/png" });
+    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
+    await userEvent.upload(input, ok);
+
+    await waitFor(() => expect(mockedUpload).toHaveBeenCalledWith(12, [ok]));
   });
 });
 

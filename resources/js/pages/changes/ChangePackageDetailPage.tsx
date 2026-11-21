@@ -35,6 +35,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
+import { ATTACHMENT_RULE, validateUploads } from "@/lib/upload-validate";
 import { ArrowLeft, Check, Pencil, Send, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,7 @@ export function ChangePackageDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingPackage, setDeletingPackage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   // Guard double-submit (pola WFH detail #4): ref sinkron menolak dua klik
   // beruntun; state men-disable tombol selama in-flight. DIDEKLARASIKAN
@@ -430,6 +432,14 @@ export function ChangePackageDetailPage() {
                 onFileChange={() => undefined}
                 onFilesChange={(files) => {
                   if (files.length === 0) return;
+                  // Pre-check client (T9a): jumlah/ukuran/tipe dicek SEBELUM
+                  // request; pesan inline memakai label, bukan kunci `files.N`.
+                  const invalid = validateUploads(files, ATTACHMENT_RULE);
+                  if (invalid !== null) {
+                    setUploadError(invalid);
+                    return;
+                  }
+                  setUploadError(null);
                   void (async () => {
                     setUploading(true);
                     try {
@@ -445,6 +455,11 @@ export function ChangePackageDetailPage() {
                   })();
                 }}
               />
+              {uploadError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {uploadError}
+                </p>
+              ) : null}
             </Field>
           ) : null}
           {canDelete ? (

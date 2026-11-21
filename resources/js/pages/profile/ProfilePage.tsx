@@ -14,6 +14,7 @@ import type { FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
+import { SIGNATURE_RULE, validateUploads } from "@/lib/upload-validate";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -126,6 +127,13 @@ export function ProfilePage() {
     // Guard double-select: event `change` kedua yang ter-antre sebelum
     // re-render tidak boleh memicu upload multipart paralel (ship review #4).
     if (!file || !user || uploading) return;
+    // Pre-check client (T9a): tolak file yang pasti salah SEBELUM request
+    // dikirim; pesan inline per-field memakai label, bukan kunci `signature`.
+    const invalid = validateUploads([file], SIGNATURE_RULE);
+    if (invalid !== null) {
+      setFieldErrors({ signature: [invalid] });
+      return;
+    }
     setUploading(true);
     setFieldErrors({});
     setMessage(null);

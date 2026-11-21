@@ -209,6 +209,56 @@ describe("ProfilePage — upload tanda tangan", () => {
   });
 });
 
+describe("ProfilePage — pre-check tanda tangan (T9a)", () => {
+  it("file > 2MB ditolak sebelum upload (0 panggilan API) + pesan inline", async () => {
+    renderProfile();
+
+    const big = new File(
+      [new ArrayBuffer(3 * 1024 * 1024)],
+      "ttd.png",
+      { type: "image/png" },
+    );
+    await userEvent.upload(signatureInput(), big);
+
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/ukuran tanda tangan maksimal 2mb/i),
+    ).toBeTruthy();
+  });
+
+  it("tipe salah (.gif) ditolak sebelum upload dengan pesan format label", async () => {
+    renderProfile();
+
+    const gif = new File([new ArrayBuffer(8)], "ttd.gif", {
+      type: "image/gif",
+    });
+    // applyAccept: false → uji gate handler; `accept` di DOM hanya petunjuk
+    // dialog OS dan tidak menjamin (drag-drop / dialog "semua file").
+    await userEvent.upload(signatureInput(), gif, { applyAccept: false });
+
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/format tanda tangan harus jpg, jpeg, atau png/i),
+    ).toBeTruthy();
+    // Pesan memakai label manusia, bukan kunci field internal.
+    expect((await screen.findByRole("alert")).textContent).not.toMatch(
+      /\bsignature\b/,
+    );
+  });
+
+  it("pesan pre-check bukan kunci field internal (signature) mentah", async () => {
+    renderProfile();
+
+    const gif = new File([new ArrayBuffer(8)], "ttd.gif", {
+      type: "image/gif",
+    });
+    await userEvent.upload(signatureInput(), gif, { applyAccept: false });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toMatch(/\bsignature\b/);
+  });
+});
+
 describe("ProfilePage — rehidrasi", () => {
   it("memuat user null sebagai spinner, bukan form kosong", () => {
     // Buat store tanpa token/user: user masih null sampai rehidrasi selesai.
