@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchChangeTypes,
@@ -469,7 +470,7 @@ export function ChangePackageFormPage() {
             </Field>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-description">Deskripsi</FieldLabel>
-              <Input
+              <Textarea
                 id="change-package-description"
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
@@ -477,7 +478,7 @@ export function ChangePackageFormPage() {
             </Field>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-reason">Alasan</FieldLabel>
-              <Input
+              <Textarea
                 id="change-package-reason"
                 value={form.reason}
                 onChange={(e) => set("reason", e.target.value)}
@@ -514,53 +515,55 @@ export function ChangePackageFormPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <Field orientation="vertical">
-              <FieldLabel htmlFor="change-package-priority">Prioritas</FieldLabel>
-              <Select
-                value={form.priority === "" ? undefined : form.priority}
-                onValueChange={(v) =>
-                  set("priority", (v ?? "") as FormState["priority"])
-                }
-              >
-                <SelectTrigger
-                  id="change-package-priority"
-                  aria-label="Prioritas"
-                  className="w-full"
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field orientation="vertical">
+                <FieldLabel htmlFor="change-package-priority">Prioritas</FieldLabel>
+                <Select
+                  value={form.priority === "" ? undefined : form.priority}
+                  onValueChange={(v) =>
+                    set("priority", (v ?? "") as FormState["priority"])
+                  }
                 >
-                  <SelectValue placeholder="Pilih prioritas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">—</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="emergency">Emergency</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field orientation="vertical">
-              <FieldLabel htmlFor="change-package-impact">Dampak</FieldLabel>
-              <Select
-                value={form.impact === "" ? undefined : form.impact}
-                onValueChange={(v) =>
-                  set("impact", (v ?? "") as FormState["impact"])
-                }
-              >
-                <SelectTrigger
-                  id="change-package-impact"
-                  aria-label="Dampak"
-                  className="w-full"
+                  <SelectTrigger
+                    id="change-package-priority"
+                    aria-label="Prioritas"
+                    className="w-full"
+                  >
+                    <SelectValue placeholder="Pilih prioritas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">—</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="emergency">Emergency</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field orientation="vertical">
+                <FieldLabel htmlFor="change-package-impact">Dampak</FieldLabel>
+                <Select
+                  value={form.impact === "" ? undefined : form.impact}
+                  onValueChange={(v) =>
+                    set("impact", (v ?? "") as FormState["impact"])
+                  }
                 >
-                  <SelectValue placeholder="Pilih dampak" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">—</SelectItem>
-                  <SelectItem value="Minor">Minor</SelectItem>
-                  <SelectItem value="Mayor">Mayor</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
+                  <SelectTrigger
+                    id="change-package-impact"
+                    aria-label="Dampak"
+                    className="w-full"
+                  >
+                    <SelectValue placeholder="Pilih dampak" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">—</SelectItem>
+                    <SelectItem value="Minor">Minor</SelectItem>
+                    <SelectItem value="Mayor">Mayor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
             <Field orientation="vertical">
               <FieldLabel>Jenis perubahan</FieldLabel>
-              <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 {changeTypes.items.map((type) => (
                   <label
                     key={type.id}
@@ -575,7 +578,7 @@ export function ChangePackageFormPage() {
                   </label>
                 ))}
                 {changeTypes.status !== "succeeded" ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
                     Jenis perubahan dimuat…
                   </p>
                 ) : null}
@@ -585,7 +588,7 @@ export function ChangePackageFormPage() {
               <FieldLabel htmlFor="change-package-test-plan">
                 Rencana pengujian
               </FieldLabel>
-              <Input
+              <Textarea
                 id="change-package-test-plan"
                 value={form.testPlan}
                 onChange={(e) => set("testPlan", e.target.value)}
@@ -617,7 +620,7 @@ export function ChangePackageFormPage() {
               <FieldLabel htmlFor="change-package-implementation-result">
                 Hasil implementasi
               </FieldLabel>
-              <Input
+              <Textarea
                 id="change-package-implementation-result"
                 value={form.implementationResult}
                 onChange={(e) => set("implementationResult", e.target.value)}
@@ -627,7 +630,7 @@ export function ChangePackageFormPage() {
               <FieldLabel htmlFor="change-package-production-impact">
                 Dampak produksi
               </FieldLabel>
-              <Input
+              <Textarea
                 id="change-package-production-impact"
                 value={form.productionImpact}
                 onChange={(e) => set("productionImpact", e.target.value)}
