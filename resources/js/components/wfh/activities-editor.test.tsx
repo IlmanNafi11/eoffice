@@ -165,6 +165,43 @@ describe("ActivitiesEditor", () => {
     render(<ActivitiesEditor activities={[ACT_C]} canEdit={false} onChange={() => {}} />);
     expect(screen.getByRole("link", { name: "https://example.com/proof" }).getAttribute("href")).toBe("https://example.com/proof");
   });
+
+  it("waktu tampil HH:mm, bukan timestamp ISO mentah", () => {
+    const legacy: WfhReportActivity = {
+      id: 14,
+      activity: "Kerja lama",
+      start_time: "2026-11-20T18:00:00.000000Z",
+      end_time: "2026-11-20T19:25:00.000000Z",
+      sort_order: 1,
+      links: [],
+    };
+    render(<ActivitiesEditor activities={[legacy]} canEdit={false} onChange={() => {}} />);
+    expect(screen.getByText(/–/).textContent).toBe("18:00 – 19:25");
+  });
+
+  it("edit kegiatan dengan timestamp ISO warisan → TimeInput menerima HH:mm", async () => {
+    const onChange = vi.fn();
+    const legacy: WfhReportActivity = {
+      id: 15,
+      activity: "Kerja lama",
+      start_time: "2026-11-20T18:00:00.000000Z",
+      end_time: "2026-11-20T19:25:00.000000Z",
+      sort_order: 1,
+      links: [],
+    };
+    render(<ActivitiesEditor activities={[legacy]} canEdit onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: /ubah kegiatan/i }));
+    // aria-label menimpa teks visual sebagai accessible name — asersi teks
+    // trigger (apa yang user lihat) bukan nama role.
+    const startTrigger = screen.getByRole("button", {
+      name: /waktu pelaksanaan awal/i,
+    });
+    expect(startTrigger.textContent).toContain("18:00");
+    const endTrigger = screen.getByRole("button", {
+      name: /waktu pelaksanaan akhir/i,
+    });
+    expect(endTrigger.textContent).toContain("19:25");
+  });
 });
 
 describe("ActivitiesEditor — formulir kegiatan", () => {

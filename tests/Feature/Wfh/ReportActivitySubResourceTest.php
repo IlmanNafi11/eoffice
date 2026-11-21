@@ -68,6 +68,28 @@ class ReportActivitySubResourceTest extends TestCase
         ]);
     }
 
+    /** Detail report (WfhReportResource) wajib mengembalikan jam HH:mm,
+     *  bukan timestamp ISO — TimeInput FE mem-parsing tepat HH:mm dan
+     *  Carbon cast pada kolom `time` menggeser jam bila diserialisasi mentah. */
+    public function test_show_report_returns_activity_times_as_hh_mm(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user);
+        $this->postJson("/api/wfh/reports/{$report->id}/activities", [
+            'activity' => 'Kerja uji format waktu',
+            'start_time' => '01:00',
+            'end_time' => '02:25',
+        ])->assertStatus(201);
+
+        $this->getJson("/api/wfh/reports/{$report->id}")
+            ->assertOk()
+            ->assertJsonPath('data.activities.0.start_time', '01:00')
+            ->assertJsonPath('data.activities.0.end_time', '02:25');
+    }
+
     public function test_create_activity_on_approved_report_returns_422(): void
     {
         $user = User::factory()->create();

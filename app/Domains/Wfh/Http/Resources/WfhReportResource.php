@@ -67,8 +67,11 @@ class WfhReportResource extends JsonResource
             $data['activities'] = $this->activities->map(function ($activity) {
                 $act = [
                     'id' => $activity->id,
-                    'start_time' => $activity->start_time,
-                    'end_time' => $activity->end_time,
+                    // HH:mm — sama dengan ReportActivityController (sub-resource).
+                    // Cast datetime pada kolom `time` menggeser jam (ISO
+                    // 2026-11-20T18:00Z untuk 01:00) → TimeInput FE gagal parse.
+                    'start_time' => $activity->start_time?->format('H:i'),
+                    'end_time' => $activity->end_time?->format('H:i'),
                     'activity' => $activity->activity,
                     'sort_order' => $activity->sort_order,
                 ];

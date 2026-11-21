@@ -41,6 +41,17 @@ interface ActivityDraft {
 
 const EMPTY_DRAFT: ActivityDraft = { activity: "", start_time: "", end_time: "", link: "" };
 
+/** Tampilkan jam ramah user: terima `HH:mm` (kontrak) atau timestamp ISO
+ *  warisan (respons lama), render `HH:mm`; teks lain dibiarkan apa adanya. */
+export function formatDisplayTime(value: string): string {
+  const m = /^(\d{2}:\d{2})/.exec(value);
+  if (m) return m[1]!;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? value
+    : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 /** Hanya URL http(s) yang dirender sebagai tautan; teks lain dibiarkan polos. */
 function isClickableLink(value: string): boolean {
   return /^https?:\/\//i.test(value);
@@ -73,8 +84,8 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
     setEditingId(row.id ?? null);
     setDraft({
       activity: row.activity,
-      start_time: row.start_time ?? "",
-      end_time: row.end_time ?? "",
+      start_time: row.start_time ? formatDisplayTime(row.start_time) : "",
+      end_time: row.end_time ? formatDisplayTime(row.end_time) : "",
       link: row.links?.[0]?.url ?? "",
     });
   }
@@ -200,7 +211,7 @@ export function ActivitiesEditor({ activities, canEdit, onChange }: ActivitiesEd
                   <p className="text-sm font-medium">{row.activity}</p>
                   {row.start_time || row.end_time ? (
                     <p className="text-xs text-muted-foreground">
-                      {row.start_time ?? "—"} – {row.end_time ?? "—"}
+                      {formatDisplayTime(row.start_time ?? "—")} – {formatDisplayTime(row.end_time ?? "—")}
                     </p>
                   ) : null}
                   {row.links?.map((link, li) =>
