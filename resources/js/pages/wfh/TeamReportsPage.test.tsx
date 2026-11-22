@@ -347,24 +347,47 @@ describe("TeamReportsPage — approve/reject journey", () => {
   });
 
   it("approve → panggil API id baris + daftar di-refetch, baris ter-update", async () => {
+    // Dua baris pending: baris yang disetujui + saudara yang belum disentuh.
+    const reportC: WfhTeamReport = { ...reportA, id: 3, team: { id: 5, name: "Tim Layanan" } };
+    mockedList.mockResolvedValueOnce({ reports: [reportA, reportC, reportB], meta });
     renderPageAs(approver);
     await screen.findByTestId("team-report-row-1");
 
-    mockedApprove.mockResolvedValueOnce({ ...reportA, status: "approved" });
+    let resolveApprove!: (value: WfhTeamReport) => void;
+    mockedApprove.mockImplementation(
+      () => new Promise<WfhTeamReport>((res) => (resolveApprove = res)),
+    );
     await userEvent.click(
       within(screen.getByTestId("team-report-row-1")).getByRole("button", {
         name: /setujui/i,
       }),
     );
 
+    // Gate symmetry (ship#14 F2): saat satu baris in-flight, aksi baris SAUDARA
+    // juga terkunci — approve saudara (disabled) dan reject saudara sama-sama
+    // nonaktif, bukan tampil aktif lalu diam-diam menelan klik.
+    await waitFor(() => {
+      expect(
+        (within(screen.getByTestId("team-report-row-3")).getByRole("button", {
+          name: /setujui/i,
+        }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+    expect(
+      (within(screen.getByTestId("team-report-row-1")).getByRole("button", {
+        name: /tolak/i,
+      }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveApprove({ ...reportA, status: "approved" });
+    // Refetch pasca-mutasi (sumber kebenaran = server).
     await waitFor(() => {
       expect(mockedApprove).toHaveBeenCalledWith(1);
     });
-    // Refetch pasca-mutasi (sumber kebenaran = server).
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledTimes(2);
     });
-  });
+   });
 
   it("reject membuka dialog alasan wajib; kosong → tidak mengirim; terisi → payload {reason}", async () => {
     renderPageAs(approver);
@@ -379,20 +402,28 @@ describe("TeamReportsPage — approve/reject journey", () => {
     const dialog = await screen.findByRole("dialog");
     const input = within(dialog).getByLabelText(/alasan penolakan/i);
     const submit = within(dialog).getByRole("button", { name: /tolak laporan/i });
-
     // Alasan kosong → submit disabled, tidak ada panggilan API.
     expect((submit as HTMLButtonElement).disabled).toBe(true);
     await userEvent.click(submit);
     expect(mockedReject).not.toHaveBeenCalled();
 
-    // Alasan whitespace saja masih dianggap kosong.
+    // Alasan whitespace saja masih dianggap kosong, dan S2: spinner/aria-busy
+    // hanya saat thunk in-flight — alasan kosong berarti DISABLED biasa, bukan
+    // pending (regresi ship#14 F1: `pending` dipakai sebagai gate disable
+    // sehingga dialog selalu tampil spinner saat dibuka).
     await userEvent.type(input, "   ");
     expect((submit as HTMLButtonElement).disabled).toBe(true);
+    expect((submit as HTMLButtonElement).getAttribute("aria-busy")).toBeNull();
+    expect(submit.querySelector('[data-slot="spinner"]')).toBeNull();
 
     await userEvent.type(input, "Melebihi kuota WFH bulan ini.");
     expect((submit as HTMLButtonElement).disabled).toBe(false);
 
-    mockedReject.mockResolvedValueOnce({ ...reportA, status: "rejected" });
+    mockedReject.mockResolvedValueOnce({
+      ...reportA,
+      status: "rejected",
+      message: "Laporan tim berhasil ditolak.",
+    });
     await userEvent.click(submit);
     await waitFor(() => {
       expect(mockedReject).toHaveBeenCalledWith(1, { reason: "Melebihi kuota WFH bulan ini." });
@@ -401,11 +432,17 @@ describe("TeamReportsPage — approve/reject journey", () => {
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledTimes(2);
     });
-    // Dialog tertutup setelah sukses.
+    // Toast sukses dengan pesan server + dialog tertutup setelah sukses.
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Laporan tim berhasil ditolak.");
+      expect(toast!.getAttribute("data-type")).toBe("success");
+    });
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
-  });
+   });
 
   it("403 lintas bidang pada approve → pesan server tersaji dan SELAMAT setelah refetch (regresi a602c46)", async () => {
     renderPageAs(approver);

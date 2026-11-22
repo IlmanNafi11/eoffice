@@ -355,6 +355,7 @@ export function TeamReportsPage() {
                                 <Button
                                   size="sm"
                                   pending={mutatingId === r.id}
+                                  disabled={mutatingId !== null}
                                   onClick={() => void submitApprove(r)}
                                 >
                                   Setujui
@@ -422,7 +423,8 @@ export function TeamReportsPage() {
             <Button
               type="button"
               variant="destructive"
-              pending={rejecting || rejectReason.trim() === ""}
+              pending={rejecting}
+              disabled={rejectReason.trim() === ""}
               onClick={() => void submitReject()}
             >
               Tolak laporan
