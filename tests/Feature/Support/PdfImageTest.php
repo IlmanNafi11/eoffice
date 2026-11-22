@@ -76,4 +76,26 @@ class PdfImageTest extends TestCase
 
         PdfImage::dataUri('images/does-not-exist.webp');
     }
+
+    public function test_forged_oversized_header_is_rejected_before_gd_decode(): void
+    {
+        // Header PNG palsu 10000×10000 pada berkas kecil: GD mengalokasikan
+        // bitmap penuh SEBELUM `imagesx` bisa diperiksa — tanpa guard, worker
+        // PDF di-OOM-kan (bukan exception yang tertangkap). getimagesize hanya
+        // membaca header, jadi penolakan harus terjadi di situ.
+        $w = 10000;
+        $h = 10000;
+        $ihdr = pack('NNCCCCC', $w, $h, 8, 6, 0, 0, 0);
+        $png = "\x89PNG\r\n\x1a\n"
+            .pack('N', 13).'IHDR'.$ihdr.pack('N', crc32('IHDR'.$ihdr))
+            .pack('N', 0).pack('N', crc32('IEND')).'IEND';
+        file_put_contents(public_path('images/bomb-test.png'), $png);
+
+        try {
+            $this->expectException(\InvalidArgumentException::class);
+            PdfImage::dataUri('images/bomb-test.png');
+        } finally {
+            @unlink(public_path('images/bomb-test.png'));
+        }
+    }
 }

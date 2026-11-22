@@ -16,6 +16,13 @@ class PdfImage
     private const MAX_WIDTH = 148;
 
     /**
+     * Batas luas bitmap ter-dekode (px²) sebelum GD dipanggil. ~4 byte/px →
+     * 16M px ≈ 64MB bitmap, jauh di bawah memory_limit 256M namun menolak
+     * header palsu yang meng-OOM-kan worker (ship review #14).
+     */
+    private const MAX_DECODED_PIXELS = 16_000_000;
+
+    /**
      * Data URI untuk aset gambar publik. MIME diambil dari isi berkas
      * (bukan diasumsikan), dan bitmap diturunkan skalanya ke lebar render.
      */
@@ -40,6 +47,17 @@ class PdfImage
 
         $bytes = (string) file_get_contents($absolute);
         $mime = self::mimeOf($absolute);
+
+        // Bom dekompresi: GD mengalokasikan width×height×~4 byte SEBELUM kode
+        // bisa memeriksa ukuran, jadi dimensi header diperiksa lebih dulu.
+        // Header palsu (10000×10000 pada berkas ~200 KB) akan meng-OOM-kan
+        // worker tanpa guard ini (ship review #14).
+        $dimensions = @getimagesize($absolute);
+        if (is_array($dimensions) && ($dimensions[0] * $dimensions[1]) > self::MAX_DECODED_PIXELS) {
+            throw new \InvalidArgumentException(
+                "PDF image asset dimensions exceed the decode budget: {$publicPath}",
+            );
+        }
 
         $scaled = self::downscaled($absolute, $mime);
 

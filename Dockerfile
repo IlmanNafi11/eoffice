@@ -34,9 +34,12 @@ RUN docker-php-ext-configure gd --with-jpeg --with-freetype --with-webp \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY --from=assets /app/public/build /app/public/build
 
-# Envelope de dev/prod: 256M menutup render PDF (dompdf WebP→PNG) dan test
-# suite tanpa memotong fitur; memory_get_peak_usage nyata < 200M.
-RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
-    && echo "memory_limit = 256M" > "$PHP_INI_DIR/conf.d/memory.ini"
+# Baseline produksi (bukan php.ini-development: `display_errors=On` +
+# `expose_php=On` membocorkan stack/fingerprint di luar handler Laravel,
+# ship#14 F2) + memory_limit 256M untuk render PDF dompdf (peak < 200M).
+# Log PHP ke stderr agar audit trail ikut ke collector orchestrator.
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    && printf 'memory_limit = 256M\nexpose_php = Off\nlog_errors = On\nerror_log = /dev/stderr\n' \
+    > "$PHP_INI_DIR/conf.d/eoffice.ini"
 
 WORKDIR /app
