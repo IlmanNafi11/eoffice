@@ -417,13 +417,20 @@ describe("changePackageSlice — mutations", () => {
     expect(mockedDelete).toHaveBeenCalledWith(12);
   });
 
-  it("uploadAttachmentsThunk sukses menandai current succeeded (halaman refetch)", async () => {
-    mockedUpload.mockResolvedValueOnce([{ id: 1, url: "/attachments/1/download", sort_order: 1 }]);
+  it("uploadAttachmentsThunk meneruskan {files, message} — pesan envelope tidak dibuang", async () => {
+    const attachments = [{ id: 1, url: "/attachments/1/download", sort_order: 1 }];
+    mockedUpload.mockResolvedValueOnce({
+      files: attachments,
+      message: "Lampiran berhasil diunggah.",
+    });
     const store = makeStore();
-    const files = [new File(["x"], "a.txt")];
+    const files = [new File(["x"], "a.png")];
 
-    await store.dispatch(uploadAttachmentsThunk({ packageId: 12, files }));
+    const res = await store
+      .dispatch(uploadAttachmentsThunk({ packageId: 12, files }))
+      .unwrap();
 
+    expect(res).toEqual({ files: attachments, message: "Lampiran berhasil diunggah." });
     expect(selectChangePackageCurrent(store.getState()).status).toBe("succeeded");
     expect(mockedUpload).toHaveBeenCalledWith(12, files);
   });

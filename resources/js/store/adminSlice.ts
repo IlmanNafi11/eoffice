@@ -229,7 +229,7 @@ export const syncRolePermissionsThunk = createAsyncThunk<
 
 /** PUT /admin/settings/{key} — value scalar atau array (backend menerima array). */
 export const updateSettingThunk = createAsyncThunk<
-  { key: string; value: unknown; message: string },
+  Messaged<{ key: string; value: unknown }>,
   { key: string; value: string | number | boolean | (string | number)[] }
 >(
   "admin/updateSetting",
@@ -373,7 +373,8 @@ const slice = createSlice({
         state.current.status = "loading";
       })
       .addCase(syncRolePermissionsThunk.fulfilled, (state, action) => {
-        const updated = action.payload;
+        // `message` milik envelope toast — jangan bocor ke cache resource.
+        const { message: _message, ...updated } = action.payload;
         if (state.roles.items) {
           const idx = state.roles.items.findIndex((r) => r.id === updated.id);
           if (idx !== -1) state.roles.items[idx] = updated;

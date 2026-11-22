@@ -17,6 +17,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import { toUiError } from "@/lib/ui-errors";
 import * as wfhApi from "@/api/wfh";
+import type { Messaged } from "@/api/client";
 import type {
   ActivityInput,
   ActivityUpdateInput,
@@ -359,14 +360,16 @@ const slice = createSlice({
       })
       // ── Mutasi WfhReport: update current + baris list yang cocok ──
       .addMatcher(
-        (action): action is { type: string; payload: WfhReport } =>
+        (action): action is { type: string; payload: Messaged<WfhReport> } =>
           WFH_MUTATION_FULFILLED.test(action.type),
         (state, action) => {
+          // `message` milik envelope toast — jangan bocor ke cache resource.
+          const { message: _message, ...resource } = action.payload;
           state.current.status = "succeeded";
-          state.current.report = action.payload;
+          state.current.report = resource;
           state.current.error = null;
-          const idx = state.list.items.findIndex((r) => r.id === action.payload.id);
-          if (idx !== -1) state.list.items[idx] = action.payload;
+          const idx = state.list.items.findIndex((r) => r.id === resource.id);
+          if (idx !== -1) state.list.items[idx] = resource;
         },
       )
       .addMatcher(
