@@ -5,6 +5,28 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-22 — tindak lanjut ship-review #14)
+- `TeamReportsPage`: `pending` salah dipakai sebagai gate disable pada tombol
+  "Tolak laporan" — dialog selalu menampilkan spinner saat dibuka padahal tak
+  ada aksi in-flight (melanggar S2). Kini `pending={rejecting}` +
+  `disabled={alasan kosong}`; tombol Setujui baris juga kembali men-disable
+  global saat ada mutasi berjalan (gate symmetry approve/reject).
+- Kegagalan 422 dengan kunci field yang tak dirender halaman (Profil, Form
+  User) tidak lagi senyap: toast error selalu dikirim, banner inline tetap.
+- Seam `toUiError` kini menerjemahkan kunci field internal ke label Indonesia
+  (S6 tuntas): `files.0` → "Lampiran 1", kunci tak dikenal dijatuhkan;
+  `fieldErrorsByKey` memetakan balik ke kunci server untuk state per-field
+  halaman. `fieldMessage` + duplikasi label di `api/client.ts` dihapus.
+- Envelope `message` tidak lagi bocor ke cache resource: matcher mutasi
+  `wfhSlice`, `syncRolePermissions` di `adminSlice`, dan `setUser` pasca
+  `updateProfile` kini melepas `message` (invarian yang sebelumnya hanya
+  dipatuhi 2 dari 5 site).
+- `PdfImage`: guard bom dekompresi — header gambar dengan dimensi > 16M px
+  (bitmap ~64MB) ditolak SEBELUM GD dipanggil; tanpa guard, header palsu
+  meng-OOM-kan worker PDF (exit 137, bukan exception).
+- Dockerfile: `php.ini-production` (bukan development — `display_errors=On`,
+  `expose_php=On`), `expose_php=Off`, log PHP ke `/dev/stderr`.
+
 ### Fixed (backend+frontend, 2026-11-22 — tindak lanjut ship-review #13)
 - `ChangePackageFormPage`: `handleSaveDraft` kehilangan `finally { setBusy(false) }`
   (terhapus saat refactor T7a) — gagal simpan draft membiarkan tombol
