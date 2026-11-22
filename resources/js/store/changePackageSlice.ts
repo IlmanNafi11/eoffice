@@ -15,7 +15,7 @@
  * - `fetchChangeTypes` di-cache — sekali sukses, dispatch ulang no-op
  *   (referensi statis, seeder tak berubah di sesi).
  */
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import * as changePackageApi from "@/api/change-package";
 import type {
   ChangePackage,
@@ -250,7 +250,18 @@ interface ChangePackageMutationSettled {
 const slice = createSlice({
   name: "changePackage",
   initialState: initialChangePackageState,
-  reducers: {},
+  reducers: {
+    /**
+     * Ganti resource `current` dengan hasil fetch segar (mis. setelah upload
+     * lampiran dari form). Tidak menyentuh status/error — pemanggil sudah
+     * memegang data final, jadi tidak ada flash `loading`.
+     */
+    setCurrentPackage: (state, action: PayloadAction<ChangePackage>) => {
+      state.current.data = action.payload;
+      state.current.status = "succeeded";
+      state.current.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       // ── List ─────────────────────────────────────────────────
@@ -378,6 +389,7 @@ const slice = createSlice({
   },
 });
 
+export const { setCurrentPackage } = slice.actions;
 export const changePackageReducer = slice.reducer;
 
 // ── Selectors ─────────────────────────────────────────────────────

@@ -40,6 +40,12 @@ interface FileInputProps
   inputLabel?: string;
   /** Tampilkan tombol hapus saat ada file (default true). */
   clearable?: boolean;
+  /**
+   * Penempatan tombol hapus: `inline` (default) di samping tombol pilih;
+   * `none` menyembunyikannya — consumer merender penghapusnya sendiri
+   * (mis. tombol X di bar aksi grid) agar layout sempit tak meluber.
+   */
+  clearButton?: "inline" | "none";
 }
 
 function FileInput({
@@ -51,6 +57,7 @@ function FileInput({
   placeholder = "Pilih file",
   inputLabel,
   clearable = true,
+  clearButton = "inline",
   disabled,
   className,
   id,
@@ -105,7 +112,10 @@ function FileInput({
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
         className={cn(
-          "w-full justify-start gap-1.5 font-normal",
+          // `flex-1 min-w-0`, bukan `w-full`: tombol X adalah sibling di baris
+          // yang sama, jadi `w-full` (100% parent) + X pasti meluber keluar
+          // kartu saat nama file panjang di kolom sempit.
+          "min-w-0 flex-1 justify-start gap-1.5 font-normal",
           shown.length === 0 && "text-muted-foreground",
         )}
         {...props}

@@ -5,6 +5,23 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (frontend+PDF, 2026-11-22 — umpan balik UX)
+- PDF WFH personal: label "Yang Membuat Laporan" dan "Atasan Langsung" kini
+  berada di satu baris tabel yang sama (sejajar horizontal); tanggal
+  "Surabaya, …" menempati baris terpisah di atas kolom Atasan Langsung.
+- Form Implementasi (create & edit): input Lampiran (hasil pengujian
+  implementasi) tersedia sejak awal — tidak lagi menunggu draft tersimpan;
+  label "Effort yang dibutuhkan" → "Upaya/Tindakan", plus penyelarasan label
+  lain dengan `form-implementasi-example.pdf`.
+- `/changes/new`: opsi evaluator berformat "Nama - NIP"; kolom "Tanggal
+  dibutuhkan" dan "Evaluator" sejajar horizontal (`sm:grid-cols-2`,
+  responsif).
+- Kartu Absensi WFH: tombol X (hapus file) digroup satu baris dengan Hapus &
+  Unggah; root cause overflow diperbaiki di `FileInput` (`w-full` →
+  `flex-1 min-w-0` karena tombol X adalah sibling di baris yang sama).
+- Navigasi: "Profil Saya" pindah dari sidebar ke dropdown avatar (di atas
+  Keluar).
+
 ### Fixed (backend+frontend, 2026-11-22 — tindak lanjut ship-review #14)
 - `TeamReportsPage`: `pending` salah dipakai sebagai gate disable pada tombol
   "Tolak laporan" — dialog selalu menampilkan spinner saat dibuka padahal tak

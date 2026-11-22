@@ -13,7 +13,7 @@
  */
 import * as React from "react";
 import { ATTENDANCE_RULE, validateUploads } from "@/lib/upload-validate";
-import { ImageOff, Trash2, Loader2 } from "lucide-react";
+import { ImageOff, Trash2, Loader2, X } from "lucide-react";
 import { httpClient } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { FileInput } from "@/components/ui/file-input";
@@ -121,9 +121,10 @@ function AttendanceRow({
 }) {
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const previewUrlRef = React.useRef<string | null>(null);
+  // File terpilih (belum terunggah) — menentukan kapan tombol X/Batal tampil.
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   // Pesan pre-check T9a: inline di dekat input, bukan kunci field internal.
   const [preCheckError, setPreCheckError] = React.useState<string | null>(null);
-
   const setAndTrack = React.useCallback((next: string | null) => {
     if (previewUrlRef.current && previewUrlRef.current !== next) {
       URL.revokeObjectURL(previewUrlRef.current);
@@ -168,17 +169,28 @@ function AttendanceRow({
       return;
     }
     setPreCheckError(null);
-    await onUpload(file);
+    setSelectedFile(file);
+    try {
+      await onUpload(file);
+      setSelectedFile(null);
+    } catch {
+      // Error di-surfacing orang tua; file terpilih tetap bisa dibatalkan.
+    }
+  }
+
+  /** Batal pilih file — sama dengan tombol X bawaan FileInput. */
+  function clearSelected() {
+    setSelectedFile(null);
+    setPreCheckError(null);
   }
   /**
    * Bar aksi: grid `auto-fit minmax(8rem,1fr)` — tiap sel dapat lebar SAMA
    * (border box, termasuk padding tombol Hapus), dan otomatis turun ke baris
-   * sendiri saat kartu menyempit. `flex-1` TIDAK dipakai: flex membagi
-   * content box, lalu padding 10px tombol ditambahkan di atasnya sehingga
-   * Hapus tampil 22px lebih lebar dari Unggah foto.
+   * sendiri saat kartu menyempit. Tombol X (hapus file terpilih di FileInput)
+   * DIKELOMPOKKAN di bar ini: sel ketiga sejajar Hapus & Unggah, sehingga
+   * saat X tampil ia tidak meluber keluar kartu (regresi overflow).
    */
-  const actionBarCls = "grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2";
-
+  const actionBarCls = "grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2 items-center";
   return (
     <div className="flex min-w-56 flex-1 flex-col gap-2 rounded-lg border p-3">
       <div className="text-center text-sm font-medium">{label}</div>
@@ -222,7 +234,25 @@ function AttendanceRow({
             disabled={uploading}
             size="sm"
             className="w-full"
+            clearButton="none"
           />
+          {/* Tombol X: bagian grid yang SAMA dengan Hapus & Unggah, jadi saat
+              tampil ia mengisi sel dan tidak meluber keluar kartu. */}
+          {selectedFile ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="hapus file terpilih"
+              title="Hapus file terpilih"
+              disabled={uploading}
+              onClick={clearSelected}
+              className="w-full text-muted-foreground"
+            >
+              <X aria-hidden="true" className="size-4" />
+              Batal
+            </Button>
+          ) : null}
           {preCheckError ? (
             <p className="text-xs text-destructive" role="alert">
               {preCheckError}

@@ -352,7 +352,7 @@ export function ChangePackageDetailPage() {
               <InfoRow label="Tanggal rilis" value={impl.release_date} />
               <InfoRow label="Hasil implementasi" value={impl.implementation_result} />
               <InfoRow label="Dampak produksi" value={impl.production_impact} />
-              <InfoRow label="Effort" value={impl.required_effort} />
+              <InfoRow label="Upaya/Tindakan" value={impl.required_effort} />
               <InfoRow label="Sumber daya" value={impl.resources} />
               <InfoRow
                 label="Biaya"

@@ -107,12 +107,13 @@ describe("AppShell — Sidebar dinamis dari NAV_REGISTRY", () => {
     expect(screen.getByText("halaman outlet")).toBeTruthy();
   });
 
-  it("menampilkan menu umum (Beranda, WFH, Profil) untuk staf", () => {
+  it("menampilkan menu umum (Beranda, WFH) untuk staf — Profil Saya kini di dropdown avatar", () => {
     renderShell(userWith(["staf"], STAF_PERMISSIONS));
 
     expect(screen.getByRole("link", { name: /beranda/i })).toBeTruthy();
     expect(screen.getByRole("link", { name: /^wfh$/i })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /profil saya/i })).toBeTruthy();
+    // Profil Saya TIDAK lagi di sidebar (pindah ke dropdown avatar Header).
+    expect(screen.queryByRole("link", { name: /profil saya/i })).toBeNull();
   });
 
   it("tidak menampilkan menu monitoring/manajemen user untuk staf", () => {
@@ -134,7 +135,6 @@ describe("AppShell — Sidebar dinamis dari NAV_REGISTRY", () => {
     renderShell(userWith(["staf"], ["profile.view"]));
 
     expect(screen.queryByRole("link", { name: /^wfh$/i })).toBeNull();
-    expect(screen.getByRole("link", { name: /profil saya/i })).toBeTruthy();
   });
 
   it("menampilkan logo aplikasi di header sidebar", () => {
@@ -156,6 +156,19 @@ describe("AppShell — Header", () => {
 
     expect(screen.getByText(/budi santoso/i)).toBeTruthy();
     expect(screen.getByText(/staf bidang infrastruktur/i)).toBeTruthy();
+  });
+
+  it("dropdown avatar memuat item Profil Saya di atas Keluar", async () => {
+    renderShell(userWith(["staf"], STAF_PERMISSIONS));
+
+    await userEvent.click(screen.getByTestId("user-menu"));
+
+    const items = screen.getAllByRole("menuitem");
+    const labels = items.map((item) => item.textContent ?? "");
+    const profilIdx = labels.findIndex((l) => /profil saya/i.test(l));
+    const keluarIdx = labels.findIndex((l) => /^keluar$/i.test(l.trim()));
+    expect(profilIdx).toBeGreaterThanOrEqual(0);
+    expect(keluarIdx).toBeGreaterThan(profilIdx);
   });
 
   it("tombol keluar me-revoke sesi dan membersihkan token", async () => {

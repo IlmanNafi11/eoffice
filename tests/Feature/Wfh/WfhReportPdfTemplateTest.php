@@ -59,12 +59,35 @@ class WfhReportPdfTemplateTest extends TestCase
     {
         $html = view('pdf.wfh-report', $this->data())->render();
 
-        // Tanggal harus berada di dalam sel kanan signature-table (induk
-        // dari label "Atasan Langsung"), bukan baris full-width di luar tabel.
+        // Tanggal berada di baris tabel khusus di atas kolom kanan (sel
+        // `atasan`) — bukan di dalam sel label "Atasan Langsung".
         $this->assertMatchesRegularExpression(
-            '/<td class="atasan">\s*<div class="tanggal">Surabaya, .*?<\/div>.*?Atasan Langsung/s',
+            '/<tr>\s*<td><\/td>\s*<td class="atasan">\s*<div class="tanggal">Surabaya, .*?<\/div>\s*<\/td>\s*<\/tr>/s',
             $html,
         );
+    }
+
+    public function test_maker_and_supervisor_labels_share_one_table_row(): void
+    {
+        $html = view('pdf.wfh-report', $this->data())->render();
+
+        // Kedua label tanda tangan berada di <tr> yang SAMA: tidak ada konten
+        // apa pun di antara keduanya (regresi keselarasan horizontal).
+        $this->assertMatchesRegularExpression(
+            '/<tr>\s*<td>\s*<div class="signature-role">Yang Membuat Laporan<\/div>.*?<\/td>\s*<td>\s*<div class="signature-role">Atasan Langsung<\/div>/s',
+            $html,
+        );
+        // Tanggal harus berada SEBELUM baris label — tidak menyelip di antara
+        // keduanya.
+        // `strrpos`: kop surat juga menyebut "Surabaya," — posisi yang
+        // relevan adalah kemunculan di blok tanda tangan (akhir dokumen).
+        $datePos = strrpos($html, 'Surabaya,');
+        $makerPos = strrpos($html, 'Yang Membuat Laporan');
+        $supervisorPos = strrpos($html, 'Atasan Langsung');
+        $this->assertNotFalse($datePos);
+        $this->assertNotFalse($makerPos);
+        $this->assertNotFalse($supervisorPos);
+        $this->assertTrue($datePos < $makerPos && $makerPos < $supervisorPos);
     }
 
     public function test_template_omits_the_electronic_signature_legal_paragraph(): void

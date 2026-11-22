@@ -62,6 +62,7 @@ const mockedUpdate = changePackageApi.updatePackage as unknown as Mock;
 const mockedSubmit = changePackageApi.submitPackage as unknown as Mock;
 const mockedChangeTypes = changePackageApi.listChangeTypes as unknown as Mock;
 const mockedListFieldUsers = usersApi.listFieldUsers as unknown as Mock;
+const mockedUpload = changePackageApi.uploadPackageAttachments as unknown as Mock;
 
 const changeTypes: ChangeType[] = [
   { id: 1, name: "Hardware" },
@@ -170,7 +171,7 @@ async function fillForSubmit(opts?: { withCost?: boolean }) {
   await pickDate(screen.getByLabelText("Tanggal rilis"), "2025-12-15");
   await userEvent.type(screen.getByLabelText("Hasil implementasi"), "Migrasi selesai");
   await userEvent.type(screen.getByLabelText("Dampak produksi"), "Downtime 1 jam");
-  await userEvent.type(screen.getByLabelText("Effort yang dibutuhkan"), "3 orang-hari");
+  await userEvent.type(screen.getByLabelText("Upaya/Tindakan"), "3 orang-hari");
   await userEvent.type(screen.getByLabelText("Sumber daya"), "2 teknisi");
   if (opts?.withCost !== false) {
     await userEvent.click(screen.getByLabelText("Perlu biaya?"));
@@ -260,6 +261,68 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(mockedListFieldUsers).toHaveBeenCalled();
   });
 
+  it("kartu Lampiran tersedia sejak awal: FileInput dirender, upload tertunda saat create", async () => {
+    renderForm("/changes/new");
+
+    // Input unggah tersedia SEBELUM draft ada (regresi: dulu baru muncul
+    // setelah status draf).
+    const input = await screen.findByLabelText(/unggah lampiran/i);
+    expect(input).toBeTruthy();
+
+    // Mode create: file dipilih → masuk antrean, BELUM ada panggilan upload.
+    const file = new File(["png-bytes"], "hasil-uji.png", { type: "image/png" });
+    await userEvent.upload(input as HTMLInputElement, file);
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(await screen.findByText(/1 berkas menunggu/i)).toBeTruthy();
+  });
+
+  it("Simpan Draft di create: antrean lampiran terunggah ke paket baru sebelum navigasi", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    const file = new File(["png-bytes"], "hasil-uji.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      file,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    // Draft id 12 (mockedCreate) → upload ke 12, lalu show untuk daftar baru.
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledWith(12, [file]);
+    });
+    await waitFor(() => {
+      expect(mockedShow).toHaveBeenCalledWith(12);
+    });
+  });
+
+  it("Simpan Draft di create TANPA lampiran tertunda: tidak ada panggilan upload", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalled();
+    });
+    expect(mockedUpload).not.toHaveBeenCalled();
+  });
+
+  it("file > 10MB ditolak pre-check di form (0 panggilan upload)", async () => {
+    renderForm("/changes/new");
+
+    const big = new File([new ArrayBuffer(10 * 1024 * 1024 + 1)], "gede.png", {
+      type: "image/png",
+    });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      big,
+    );
+
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(await screen.findByText(/maksimal 10MB/i)).toBeTruthy();
+  });
+
   it('"Simpan Draft" → POST draft payload nested persis skema, lalu navigasi detail', async () => {
     renderForm("/changes/new");
     await fillInitiation();
@@ -285,7 +348,9 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
 
     // Buka combobox evaluator → pilih "Dewi Lestari" (id 27).
     await userEvent.click(screen.getByLabelText(/evaluator/i));
-    await userEvent.click(await screen.findByText("Dewi Lestari"));
+    await userEvent.click(
+      await screen.findByText("Dewi Lestari - 199503152024011002"),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /submit/i }));
 

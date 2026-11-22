@@ -154,14 +154,17 @@
             margin-top: 1px;
         }
 
-        /* === TEMPAT/TANGGAL + QR === */
+        /* === TEMPAT/TANGGAL + QR ===
+           Tanggal menempati baris tabel TERSENDIRI di atas kolom "Atasan
+           Langsung" (sel kanan), sehingga label "Yang Membuat Laporan" dan
+           "Atasan Langsung" berada di baris yang sama dan sejajar. */
         .footer-bar {
             position: relative;
             margin-top: 10px;
         }
         .tanggal {
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .qr-box {
             position: absolute;
@@ -244,9 +247,16 @@
         </div>
     </div>
 
-    {{-- BLOK TANDA TANGAN --}}
+    {{-- BLOK TANDA TANGAN — baris 1: tanggal di kolom kanan saja; baris 2:
+         kedua label di baris yang sama sehingga sejajar horizontal. --}}
     <div class="signature-area">
         <table class="signature-table">
+            <tr>
+                <td></td>
+                <td class="atasan">
+                    <div class="tanggal">Surabaya, {{ $tanggalPelaksanaan }}</div>
+                </td>
+            </tr>
             <tr>
                 <td>
                     <div class="signature-role">Yang Membuat Laporan</div>
@@ -256,8 +266,7 @@
                     <div class="signature-name">{{ $makerName }}</div>
                     <div class="signature-nip">NIP. {{ $makerNip }}</div>
                 </td>
-                <td class="atasan">
-                    <div class="tanggal">Surabaya, {{ $tanggalPelaksanaan }}</div>
+                <td>
                     <div class="signature-role">Atasan Langsung</div>
                     <div class="signature-box">
                         @if ($isApproved && $signatureSupervisorPath)

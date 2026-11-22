@@ -226,7 +226,7 @@ describe("lib/nav-registry — bentuk registry", () => {
 
 describe("lib/nav-registry — visibleNav() per role", () => {
   it("staf: tanpa monitoring, laporan tim, dan menu admin", () => {
-    expect(navIds(staf)).toEqual(["home", "wfh", "changes", "profile"]);
+    expect(navIds(staf)).toEqual(["home", "wfh", "changes"]);
   });
 
   it("kepala_tim: menambah monitoring + laporan tim", () => {
@@ -236,7 +236,6 @@ describe("lib/nav-registry — visibleNav() per role", () => {
       "monitoring",
       "team-report",
       "changes",
-      "profile",
     ]);
   });
 
@@ -257,12 +256,11 @@ describe("lib/nav-registry — visibleNav() per role", () => {
       "users",
       "roles",
       "settings",
-      "profile",
     ]);
   });
 
   it("user null: hanya entri tanpa syarat permission", () => {
-    expect(navIds(null)).toEqual(["home", "profile"]);
+    expect(navIds(null)).toEqual(["home"]);
   });
 
   it("urutan mengikuti urutan registry, bukan urutan permission user", () => {

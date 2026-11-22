@@ -6,7 +6,8 @@
  * header menampilkan placeholder — tanpa asumsi role.
  */
 
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut, UserRound } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,14 @@ export function Header() {
                 <div className="text-xs text-muted-foreground">{user.email}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {/* Profil Saya pindah dari sidebar ke dropdown avatar — item
+                  terakhir sebelum Keluar (umpan balik UX 2026-11-22). */}
+              <DropdownMenuItem asChild>
+                <Link to="/profile">
+                  <UserRound aria-hidden="true" />
+                  Profil Saya
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={runLogout} aria-busy={loggingOut || undefined}>
                 {loggingOut ? (
                   <Loader2 data-slot="spinner" aria-hidden="true" className="animate-spin" />

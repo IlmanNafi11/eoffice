@@ -19,7 +19,6 @@ import {
   Settings,
   ShieldCheck,
   UserCog,
-  UserRound,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -92,7 +91,6 @@ export const NAV_REGISTRY: NavItem[] = [
     icon: Settings,
     requiredPermission: "setting.manage",
   },
-  { id: "profile", label: "Profil Saya", path: "/profile", icon: UserRound },
 ];
 
 /**

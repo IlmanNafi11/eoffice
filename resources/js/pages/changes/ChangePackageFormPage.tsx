@@ -35,12 +35,15 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
+import { ATTACHMENT_RULE, validateUploads } from "@/lib/upload-validate";
 import { ArrowLeft, FilePlus2, Save } from "lucide-react";
 
+import { AttachmentList } from "@/components/changes/attachment-list";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import { DateInput } from "@/components/ui/date-input";
+import { FileInput } from "@/components/ui/file-input";
 import {
   Select,
   SelectContent,
@@ -49,7 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { listFieldUsers } from "@/api/users";
-import type { PickerUser } from "@/api/types";
+import type { PackageAttachment, PickerUser } from "@/api/types";
 import {
   Card,
   CardContent,
@@ -70,7 +73,10 @@ import {
   selectChangePackageCurrent,
   submitPackageThunk,
   updatePackageThunk,
+  uploadAttachmentsThunk,
+  setCurrentPackage,
 } from "@/store/changePackageSlice";
+import * as changePackageApi from "@/api/change-package";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/authSlice";
 import { can } from "@/lib/permissions";
@@ -78,6 +84,9 @@ import type {
   PackageImplementationDraftInput,
   PackageSubmitInput,
 } from "@/api/types";
+
+/** Batas kontrak `UploadChangePackageAttachmentsRequest` (max:10 file). */
+const MAX_ATTACHMENTS = 10;
 
 /** State teks form — semua string kosong; konversi payload di submit/draft. */
 interface FormState {
@@ -133,7 +142,6 @@ export function ChangePackageFormPage() {
   const [busy, setBusy] = useState(false);
   const [evaluatorId, setEvaluatorId] = useState<number | null>(null);
   const [evaluators, setEvaluators] = useState<PickerUser[]>([]);
-
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -205,6 +213,72 @@ export function ChangePackageFormPage() {
       pkg?.initiation.initiator_id === user?.id &&
       can(user, "change.initiation.submit")
     : Boolean(user?.team?.field) && can(user, "change.initiation.submit");
+
+  // ── Lampiran (hasil pengujian) — tersedia sejak awal ────────────────
+  // Server hanya menerima upload pada paket draft milik inisiator, jadi di
+  // mode create FileInput menampung file dulu; begitu draft pertama tersimpan
+  // (id lahir), berkas terpilih diunggah otomatis ke paket baru. Mode edit
+  // draft mengunggah langsung.
+  const [attachments, setAttachments] = useState<PackageAttachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  /** Sinkron daftar lampiran + prefill dari data show (edit mode). */
+  useEffect(() => {
+    if (isEdit && pkg && pkg.initiation.id === id) {
+      setAttachments(pkg.implementation?.attachments ?? []);
+    }
+  }, [isEdit, pkg, id]);
+
+  /**
+   * Unggah berkas ke paket yang SUDAH ada, lalu segarkan daftar lampiran.
+   * Melempar error agar pemanggil (create: setelah draft lahir; edit:
+   * langsung) bisa mensurfacing pesan tanpa menelan kegagalan.
+   */
+  async function uploadFiles(packageId: number, files: File[]) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await dispatch(uploadAttachmentsThunk({ packageId, files })).unwrap();
+      const fresh = await changePackageApi.showPackage(packageId);
+      dispatch(setCurrentPackage(fresh));
+      setAttachments(fresh.implementation?.attachments ?? []);
+      setPendingFiles([]);
+    } catch (err) {
+      const message = toUiError(err).message;
+      setUploadError(message);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /** Pilih berkas: edit draft → unggah langsung; create → antre sampai ada id. */
+  function handleFilesChange(files: File[]) {
+    if (files.length === 0) return;
+    const invalid = validateUploads(files, ATTACHMENT_RULE);
+    if (invalid !== null) {
+      setUploadError(invalid);
+      return;
+    }
+    setUploadError(null);
+    if (isEdit) {
+      void uploadFiles(id, files).catch(() => undefined);
+    } else {
+      setPendingFiles((prev) => [...prev, ...files]);
+    }
+  }
+
+  /** Setelah draft create tersimpan: unggah antrean sebelum navigasi. */
+  async function flushPendingUploads(packageId: number) {
+    if (pendingFiles.length === 0) return;
+    try {
+      await uploadFiles(packageId, pendingFiles);
+    } catch {
+      // Paket tetap tersimpan; pesan sudah tampil di kartu Lampiran.
+    }
+  }
 
   /** Bangun payload implementation draft (semua prop nullable). */
   function implementationDraft(): PackageImplementationDraftInput {
@@ -311,6 +385,7 @@ export function ChangePackageFormPage() {
       const result = isEdit
         ? await dispatch(updatePackageThunk({ packageId: id, input })).unwrap()
         : await dispatch(createPackageThunk(input)).unwrap();
+      if (!isEdit) await flushPendingUploads(result.initiation.id);
       toast.success(result.message);
       navigate(`/changes/${result.initiation.id}`);
     } catch (err) {
@@ -469,16 +544,35 @@ export function ChangePackageFormPage() {
                   : (user?.team?.field?.name ?? "-")}
               </p>
             </Field>
-            <Field orientation="vertical">
-              <FieldLabel htmlFor="change-package-needed-by">
-                Tanggal dibutuhkan
-              </FieldLabel>
-              <DateInput
-                id="change-package-needed-by"
-                value={form.neededByDate}
-                onChange={(v) => set("neededByDate", v)}
-              />
-            </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field orientation="vertical">
+                <FieldLabel htmlFor="change-package-needed-by">
+                  Tanggal dibutuhkan
+                </FieldLabel>
+                <DateInput
+                  id="change-package-needed-by"
+                  value={form.neededByDate}
+                  onChange={(v) => set("neededByDate", v)}
+                />
+              </Field>
+              <Field orientation="vertical">
+                <FieldLabel htmlFor="change-package-evaluator">Evaluator</FieldLabel>
+                <Combobox
+                  aria-label="Evaluator"
+                  items={evaluators.map((u) => ({
+                    value: String(u.id),
+                    label: `${u.name} - ${u.nip}`,
+                  }))}
+                  value={evaluatorId === null ? null : String(evaluatorId)}
+                  onValueChange={(v) =>
+                    setEvaluatorId(v === null ? null : Number(v))
+                  }
+                  placeholder="Pilih evaluator"
+                  searchPlaceholder="Cari nama / NIP…"
+                  emptyMessage="Tidak ada evaluator aktif"
+                />
+              </Field>
+            </div>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-description">Deskripsi</FieldLabel>
               <Textarea
@@ -493,24 +587,6 @@ export function ChangePackageFormPage() {
                 id="change-package-reason"
                 value={form.reason}
                 onChange={(e) => set("reason", e.target.value)}
-              />
-            </Field>
-            <Field orientation="vertical">
-              <FieldLabel htmlFor="change-package-evaluator">Evaluator</FieldLabel>
-              <Combobox
-                aria-label="Evaluator"
-                items={evaluators.map((u) => ({
-                  value: String(u.id),
-                  label: u.name,
-                  hint: u.nip,
-                }))}
-                value={evaluatorId === null ? null : String(evaluatorId)}
-                onValueChange={(v) =>
-                  setEvaluatorId(v === null ? null : Number(v))
-                }
-                placeholder="Pilih evaluator"
-                searchPlaceholder="Cari nama / NIP…"
-                emptyMessage="Tidak ada evaluator aktif"
               />
             </Field>
           </div>
@@ -649,7 +725,7 @@ export function ChangePackageFormPage() {
             </Field>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-required-effort">
-                Effort yang dibutuhkan
+                Upaya/Tindakan
               </FieldLabel>
               <Input
                 id="change-package-required-effort"
@@ -689,6 +765,48 @@ export function ChangePackageFormPage() {
                 </Field>
               ) : null}
             </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Lampiran</CardTitle>
+          <CardDescription>
+            {attachments.length} dari maksimal {MAX_ATTACHMENTS} berkas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3">
+            <Field orientation="vertical">
+              <FieldLabel htmlFor="change-package-attachment-input" className="sr-only">
+                Unggah Lampiran
+              </FieldLabel>
+              <FileInput
+                id="change-package-attachment-input"
+                data-testid="change-package-attachment-input"
+                multiple
+                className="w-72"
+                disabled={uploading}
+                placeholder="Pilih lampiran…"
+                onFileChange={() => undefined}
+                onFilesChange={handleFilesChange}
+              />
+              {uploadError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {uploadError}
+                </p>
+              ) : null}
+              {pendingFiles.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {pendingFiles.length} berkas menunggu — terunggah otomatis
+                  setelah draft disimpan.
+                </p>
+              ) : null}
+            </Field>
+            {attachments.length > 0 ? (
+              <AttachmentList attachments={attachments} />
+            ) : null}
           </div>
         </CardContent>
       </Card>
