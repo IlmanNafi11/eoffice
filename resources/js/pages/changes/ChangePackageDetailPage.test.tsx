@@ -655,4 +655,21 @@ describe("ChangePackageDetailPage — spinner pending + toast (T7a)", () => {
       expect(submit.getAttribute("aria-busy")).toBe("true");
     });
   });
+
+  it("Hapus sukses saat 204 tanpa body → toast pesan statis, bukan kosong (ship #13)", async () => {
+    // Backend `ApiResponse::deleted()` = 204 no-content; thunk wajib
+    // menyisipkan pesan statis agar toast tidak dirender kosong.
+    mockedDelete.mockResolvedValue("");
+    renderDetail(staf);
+    await screen.findByText("001/9/1.1/114/2025");
+
+    await userEvent.click(screen.getByRole("button", { name: /hapus/i }));
+    await userEvent.click(screen.getByRole("button", { name: /ya, hapus/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Paket perubahan berhasil dihapus.");
+    });
+  });
 });

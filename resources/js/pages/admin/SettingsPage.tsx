@@ -14,7 +14,7 @@
  * - gate halaman `setting.manage` → kontrol disabled + tombol "Simpan"
  *   hilang bila dipangkas (permission sintetik, bukan role name).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -265,12 +265,17 @@ export function SettingsPage() {
   } | null>(null);
   /** Key yang sedang disimpan — sumber prop `pending` tombol Simpan. */
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  // Guard double-submit: ref sinkron menolak dua klik sebelum re-render
+  // sempat men-disable tombol (state `savingKey` saja terlambat).
+  const savingRef = useRef(false);
 
   useEffect(() => {
     dispatch(fetchSettings());
   }, [dispatch]);
 
   async function doSave(key: string, value: SettingSaveValue) {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSavingKey(key);
     try {
       const res = await dispatch(updateSettingThunk({ key, value })).unwrap();
@@ -281,6 +286,7 @@ export function SettingsPage() {
       // Banner inline tetap dirender (current.error dari reducer).
       toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
+      savingRef.current = false;
       setSavingKey(null);
     }
   }

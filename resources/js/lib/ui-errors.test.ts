@@ -59,6 +59,13 @@ describe("toUiError — abstraksi error", () => {
     expect(ui.message).toBe("Email atau password salah.");
   });
 
+  it("409 → conflict dengan copy muat-ulang (kunci kind+copy, ship #13 gap)", () => {
+    const technical = toUiError(
+      new ApiError("http", "Request failed with status code 409", { status: 409 }),
+    );
+    expect(technical.kind).toBe("conflict");
+    expect(technical.message).toBe(UI_ERROR_COPY.conflict);
+  });
 
   it("403 → forbidden; 404 → notFound; 429 → rateLimited", () => {
     expect(toUiError(new ApiError("http", "x", { status: 403 })).kind).toBe("forbidden");

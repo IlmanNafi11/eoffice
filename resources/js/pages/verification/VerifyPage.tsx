@@ -13,6 +13,7 @@ import { useParams } from "react-router-dom";
 import { FileCheck2, FileWarning, Loader2 } from "lucide-react";
 
 import { verifyQrToken } from "@/api/verification";
+import { toUiError } from "@/lib/ui-errors";
 import type { QrVerification } from "@/api/types";
 import {
   Card,
@@ -24,10 +25,9 @@ import {
 
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
-/** Pesan server (status 404/429 dari seam transport) — fallback pesan generik Indonesia. */
+/** Pesan server via seam `toUiError` (T10: ApiError tak boleh tembus ke UI mentah). */
 function verifyErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return "Gagal memverifikasi dokumen. Coba lagi.";
+  return toUiError(error).message;
 }
 
 type VerifyState =

@@ -73,7 +73,7 @@ export async function updateWfhReportMetadata(reportId: number, reportDate: stri
   return { ...requireData(res.data, "updateWfhReportMetadata"), message: res.message ?? "" };
 }
 
-/** DELETE /wfh/reports/{report} — SuccessResponse tanpa `data`; kembalikan message. */
+/** DELETE /wfh/reports/{report} — 204 tanpa body; pesan tidak dipakai UI. */
 export async function deleteWfhReport(reportId: number): Promise<string> {
   const res = await api.del(`/wfh/reports/${reportId}`);
   return res.message ?? "";

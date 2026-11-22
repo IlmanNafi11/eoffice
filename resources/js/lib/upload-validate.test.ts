@@ -61,6 +61,27 @@ describe("validateUploads — tipe", () => {
     );
   });
 
+  it("menolak file dengan ekstensi benar tapi MIME palsu di luar allowlist", () => {
+    // evil.png dengan type palsu tidak boleh lolos pre-check hanya karena
+    // ekstensinya benar (ship review #13: pre-check harus mirror server).
+    const evil = fileOfSize(8, "evil.png", "application/x-httpd-php");
+    expect(validateUploads([evil], ATTENDANCE_RULE)).toBe(
+      "Format foto absensi harus JPG, JPEG, atau PNG.",
+    );
+  });
+
+  it("menerima file dengan ekstensi benar dan MIME kosong", () => {
+    const png = fileOfSize(8, "foto.png", "");
+    expect(validateUploads([png], ATTENDANCE_RULE)).toBeNull();
+  });
+
+  it("menolak file tanpa ekstensi walau MIME benar", () => {
+    const noExt = fileOfSize(8, "foto", "image/png");
+    expect(validateUploads([noExt], ATTENDANCE_RULE)).toBe(
+      "Format foto absensi harus JPG, JPEG, atau PNG.",
+    );
+  });
+
   it("menerima jpg/jpeg/png (ketiga varian rule attendance)", () => {
     expect(
       validateUploads(

@@ -74,7 +74,12 @@ import {
   selectWfhMonitoringList,
 } from "@/store/wfhMonitoringSlice";
 
-/** Pesan server (status 422/403 dari PDF tim, via seam transport) — fallback pesan generik. */
+/**
+ * Pesan dari `exportTeamWfhPdf` SUDAH lewat seam: API membungkus pesan
+ * blob ter-dekode ke `ApiError` dengan copy aman ("Gagal mengunduh PDF.")
+ * dan fallback generik di bawah menutup non-Error. T10 dipenuhi — ApiError
+ * yang sampai di sini tidak membawa teks axios mentah.
+ */
 function pdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "Gagal mengunduh PDF. Coba lagi.";

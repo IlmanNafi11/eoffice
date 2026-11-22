@@ -173,12 +173,13 @@ export const updatePackageThunk = createAsyncThunk<
   },
 );
 
-/** DELETE /changes/{id} — kembalikan message sukses untuk feed UI. */
+/** DELETE /changes/{id} — 204 tanpa body; pesan sukses statis untuk toast. */
 export const deletePackageThunk = createAsyncThunk<string, number>(
   "changePackage/deletePackage",
   async (packageId, { rejectWithValue }) => {
     try {
-      return await changePackageApi.deletePackage(packageId);
+      return (await changePackageApi.deletePackage(packageId)) ||
+        "Paket perubahan berhasil dihapus.";
     } catch (error) {
       return rejectWithValue(messageOf(error));
     }

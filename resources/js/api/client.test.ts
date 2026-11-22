@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { api, decodeBlobEnvelope, fieldErrorMessages, FIELD_LABELS, httpClient, setAuthToken, getStoredToken, onUnauthorized } from "@/api/client";
+import { UI_ERROR_COPY } from "@/lib/ui-errors";
 
 type Recorded = { method?: string; url?: string; headers: AxiosHeaders; params?: unknown; data?: unknown };
 
@@ -295,6 +296,45 @@ describe("api/client — blob decode + tanpa teks axios + label field (ui-feedba
 
     const raw = await decodeBlobEnvelope(new Blob(["<html>oops</html>"], { type: "text/html" }));
     expect(raw).toEqual({ message: "", errors: null });
+  });
+
+  it("decodeBlobEnvelope: body kosong → {message:'', errors:null} (degraded, ship #13)", async () => {
+    const empty = await decodeBlobEnvelope(new Blob([], { type: "application/json" }));
+    expect(empty).toEqual({ message: "", errors: null });
+  });
+
+  it("decodeBlobEnvelope: JSON non-object (42, null, string) → {message:'', errors:null}", async () => {
+    for (const body of ["42", "null", '"teks"', "true"]) {
+      const decoded = await decodeBlobEnvelope(new Blob([body], { type: "application/json" }));
+      expect(decoded).toEqual({ message: "", errors: null });
+    }
+  });
+
+  it("decodeBlobEnvelope: errors malformed (nilai non-array) → errors null, tak meledak", async () => {
+    const decoded = await decodeBlobEnvelope(
+      new Blob([JSON.stringify({ message: "Gagal.", errors: { photo: "bukan-array" } })], {
+        type: "application/json",
+      }),
+    );
+    expect(decoded).toEqual({ message: "Gagal.", errors: null });
+  });
+
+  it("decodeBlobEnvelope: errors berisi elemen non-string → errors null", async () => {
+    const decoded = await decodeBlobEnvelope(
+      new Blob([JSON.stringify({ message: "Gagal.", errors: { photo: [42] } })], {
+        type: "application/json",
+      }),
+    );
+    expect(decoded).toEqual({ message: "Gagal.", errors: null });
+  });
+
+  it("blob 5xx (HTML error page) → copy server, bukan teks axios (degraded)", async () => {
+    queue.push({ status: 500, body: new Blob(["<html>Whoops</html>"], { type: "text/html" }) });
+
+    const err = await api.get("/wfh/reports/7/pdf").catch((e: unknown) => e);
+
+    expect(err).toMatchObject({ kind: "http", status: 500, message: UI_ERROR_COPY.server });
+    expect(err instanceof Error && err.message).not.toMatch(/Request failed/);
   });
 
   it("fieldErrorMessages: kunci internal → label Indonesia; files.N → 'Lampiran N+1'; kunci tak dikenal dijatuhkan", () => {

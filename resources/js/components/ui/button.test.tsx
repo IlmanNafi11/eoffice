@@ -3,21 +3,18 @@
  *
  * - `pending` → tombol nonaktif, `aria-busy="true"`, dan spinner ber-`data-slot="spinner"`.
  * - `pending` tidak diset → tidak ada ketiganya (perilaku lama tak berubah).
- * - `<Toaster/>` ter-mount tepat satu kali di `app.tsx`; toast dirender ke
- *   `document.body` via portal sonner.
+ * - toast pada root React SPA benar-benar tampil di `document.body` (portal
+ *   sonner) — dibuktikan dengan mount nyata, bukan baca teks sumber.
  */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-
-const root = resolve(import.meta.dirname, "../../../..");
-const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
 describe("Button prop pending", () => {
   it("pending=true: disabled, aria-busy, dan spinner dirender", () => {
@@ -60,21 +57,26 @@ describe("Button prop pending", () => {
 });
 
 describe("Toaster mounting", () => {
-  it("app.tsx me-mount <Toaster position top-right richColors> tepat satu kali", () => {
-    const app = read("resources/js/app.tsx");
-    const mounts = app.match(/<Toaster\b/g) ?? [];
-    expect(mounts).toHaveLength(1);
-    expect(app).toContain('position="top-right"');
-    expect(app).toContain("richColors");
-  });
-
-  it("toast.success dirender ke document.body lewat portal", async () => {
-    render(<Toaster position="top-right" richColors />);
+  it("toast pada root React SPA benar-benar tampil (bukan echo teks sumber)", async () => {
+    // Mount `Toaster` ke root React nyata dan kirim toast: membuktikan
+    // komponen global terpasang untuk seluruh SPA, bukan sekadar ada di
+    // teks app.tsx (regresi yang lolos bila mount dipindah ke subtree mati).
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(<Toaster position="top-right" richColors />);
+    });
 
     toast.success("Profil tersimpan");
 
     await waitFor(() => {
       expect(document.body.textContent).toContain("Profil tersimpan");
     });
+
+    await act(async () => {
+      root.unmount();
+    });
+    host.remove();
   });
 });

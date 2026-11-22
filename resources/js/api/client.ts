@@ -124,7 +124,12 @@ export async function decodeBlobEnvelope(
     const errors =
       "errors" in parsed &&
       typeof parsed.errors === "object" &&
-      parsed.errors !== null
+      parsed.errors !== null &&
+      // Setiap nilai harus array of string — body malformed (nilai string/
+      // angka) tidak boleh membuat `firstMessages` mengindeks karakter.
+      Object.values(parsed.errors).every(
+        (v) => Array.isArray(v) && v.every((m) => typeof m === "string"),
+      )
         ? (parsed.errors as Record<string, string[]>)
         : null;
     return { message, errors };
@@ -137,8 +142,9 @@ export async function decodeBlobEnvelope(
 function firstMessages(errors: Record<string, string[]> | null): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [field, messages] of Object.entries(errors ?? {})) {
-    const first = messages[0];
-    if (first) out[field] = first;
+    // Pertahanan: nilai non-array (body malformed) dilewati, bukan diindeks.
+    const first = Array.isArray(messages) ? messages[0] : undefined;
+    if (typeof first === "string" && first) out[field] = first;
   }
   return out;
 }

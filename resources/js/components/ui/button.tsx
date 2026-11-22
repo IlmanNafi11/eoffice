@@ -70,7 +70,9 @@ function Button({
     >
       {pending ? (
         <>
-          <Loader2 data-slot="spinner" aria-hidden="true" className="animate-spin" />
+          {/* Spinner menempati slot ikon inline-start (gap + padding sudah
+              diatur varian) — lebar tombol stabil saat pending toggles. */}
+          <Loader2 data-slot="spinner" data-icon="inline-start" aria-hidden="true" className="animate-spin" />
           {children}
         </>
       ) : (

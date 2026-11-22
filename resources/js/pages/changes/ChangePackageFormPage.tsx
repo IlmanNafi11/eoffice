@@ -317,6 +317,11 @@ export function ChangePackageFormPage() {
       // Pesan error sudah di slice (current.error) → banner tetap; toast
       // menambah notifikasi sesaat (payload slice string `messageOf`).
       toast.error(typeof err === "string" && err ? err : toUiError(err).message);
+    } finally {
+      // Reset busy pada SEMUA jalur: tanpa ini, gagal simpan draft membiarkan
+      // "Simpan Draft" + "Submit" nonaktif permanen sampai reload halaman
+      // (regresi ship-review #13; pola `handleSubmit` di bawah).
+      setBusy(false);
     }
   }
 

@@ -16,6 +16,22 @@ class PdfImageTest extends TestCase
         $this->assertGreaterThan(1000, strlen($uri));
     }
 
+    public function test_doc_logo_is_downscaled_to_render_resolution(): void
+    {
+        // Sumber 1400x1960 (~304KB WebP); template merender 74px. Bitmap yang
+        // di-embed harus jauh lebih kecil dari byte sumber — tanpa penurunan
+        // skala, dompdf menyematkan PNG ~1.8MB per logo dan test suite menembus
+        // memory_limit (akar regresi ship #13). 148px (2x) menutup ketajaman.
+        $uri = PdfImage::dataUri('images/logo-doc.webp');
+        $bytes = strlen(base64_decode(substr($uri, strpos($uri, ',') + 1)));
+
+        $this->assertLessThan(
+            filesize(public_path('images/logo-doc.webp')),
+            $bytes,
+            'Embedded logo bitmap must be smaller than the source asset.',
+        );
+    }
+
     public function test_webp_logo_renders_as_an_embedded_pdf_image(): void
     {
         $uri = PdfImage::dataUri('images/logo-doc.webp');
@@ -36,6 +52,22 @@ class PdfImageTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         PdfImage::dataUri('../composer.json');
+    }
+
+    public function test_symlink_escaping_the_public_root_is_rejected(): void
+    {
+        // dataUri mengikuti symlink (`is_file`); tanpa cek realpath, symlink
+        // di public/images/ yang menunjuk ke luar root bisa terbaca.
+        $target = base_path('.env.example');
+        $link = public_path('images/escape-test.webp');
+        $this->assertTrue(@symlink($target, $link));
+
+        try {
+            $this->expectException(\InvalidArgumentException::class);
+            PdfImage::dataUri('images/escape-test.webp');
+        } finally {
+            @unlink($link);
+        }
     }
 
     public function test_missing_asset_throws_instead_of_returning_a_broken_uri(): void

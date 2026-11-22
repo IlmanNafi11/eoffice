@@ -529,6 +529,8 @@ export function ChangePackageDetailPage() {
                 void (async () => {
                   setDeletingPackage(true);
                   try {
+                    // Thunk mengembalikan pesan statis saat 204 tanpa body
+                    // (server tidak mengirim envelope) — toast tidak kosong.
                     const message = await dispatch(deletePackageThunk(id)).unwrap();
                     navigate("/changes");
                     toast.success(message);

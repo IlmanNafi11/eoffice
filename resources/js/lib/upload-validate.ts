@@ -75,10 +75,14 @@ export function validateUploads(files: File[], rule: UploadRule): string | null 
       return `Ukuran ${rule.label.toLowerCase()} maksimal ${maxMb(rule.maxBytes)}MB.`;
     }
     const ext = extensionOf(file.name);
-    const mimeOk =
-      file.type !== "" && rule.mimeTypes.includes(file.type.toLowerCase());
     const extOk = ext !== "" && ACCEPTED_EXTENSIONS.has(ext);
-    if (!mimeOk && !extOk) {
+    // MIME hadir tapi di luar allowlist → tolak (bisa dibuat-buat klien,
+    // `application/x-httpd-php` bernama .png tidak boleh lolos pre-check).
+    // MIME kosong (beberapa browser/agent) → ekstensi jadi satu-satunya
+    // sinyal. Mirror server: `mimes` sniff isi, otoritas final tetap server.
+    const mimePresent = file.type !== "";
+    const mimeOk = mimePresent && rule.mimeTypes.includes(file.type.toLowerCase());
+    if (!extOk || (mimePresent && !mimeOk)) {
       return `Format ${rule.label.toLowerCase()} harus JPG, JPEG, atau PNG.`;
     }
   }

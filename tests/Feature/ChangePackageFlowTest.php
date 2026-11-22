@@ -318,6 +318,13 @@ class ChangePackageFlowTest extends TestCase
             'errors' => ['files.0' => ['Format file harus JPG, JPEG, atau PNG.']],
         ]);
 
+        // 11MB > max:10240KB — pesan `files.*.max` terkunci (ship #13 gap).
+        $this->postJson("/api/changes/{$pkg['id']}/attachments", [
+            'files' => [UploadedFile::fake()->create('besar.png', 11 * 1024, 'image/png')],
+        ])->assertStatus(422)->assertJson([
+            'errors' => ['files.0' => ['Ukuran file maksimal 10MB.']],
+        ]);
+
         $this->postJson("/api/changes/{$pkg['id']}/attachments", [
             'files' => array_map(
                 fn ($i) => UploadedFile::fake()->image("f{$i}.png"),

@@ -621,4 +621,37 @@ describe("ChangePackageFormPage — spinner pending + toast (T7a)", () => {
     expect(draft.getAttribute("aria-busy")).toBe("true");
     expect((draft as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("Simpan Draft gagal → kedua tombol aktif kembali (regresi finally, ship #13)", async () => {
+    // Tanpa `finally { setBusy(false) }`, busy tersangkut true dan kedua
+    // tombol nonaktif permanen sampai reload — bug yang dikunci test ini.
+    mockedCreate.mockRejectedValueOnce(
+      new ApiError("http", "Deskripsi wajib diisi.", { status: 422 }),
+    );
+    renderForm("/changes/new");
+    await waitFor(() => expect(mockedChangeTypes).toHaveBeenCalled());
+
+    await fillInitiation();
+    const draft = screen.getByRole("button", { name: /simpan draft/i });
+    await userEvent.click(draft);
+
+    await waitFor(() => expect(draft.getAttribute("aria-busy")).not.toBe("true"));
+    expect((draft as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("klik kedua saat in-flight → hanya SATU dispatch submit (double-submit guard)", async () => {
+    // disabled di-assert test lain; di sini klik-nyata kedua saat in-flight
+    // harus diabaikan handler (busy guard) — bukan cuma atribut.
+    mockedUpdate.mockResolvedValue({ ...editPkg, message: "Draft disimpan." });
+    mockedSubmit.mockImplementation(() => new Promise(() => {}));
+    renderForm("/changes/12/edit");
+    await waitFor(() => expect(mockedShow).toHaveBeenCalled());
+
+    const submit = screen.getByRole("button", { name: /submit/i });
+    await userEvent.click(submit);
+    await waitFor(() => expect(submit.getAttribute("aria-busy")).toBe("true"));
+    await userEvent.click(submit);
+
+    expect(mockedSubmit).toHaveBeenCalledTimes(1);
+  });
 });

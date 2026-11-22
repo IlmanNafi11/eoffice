@@ -68,7 +68,7 @@ export async function updateUser(userId: number, input: UpdateUserInput): Promis
   return { ...requireData(res.data, "updateUser"), message: res.message ?? "" };
 }
 
-/** DELETE /admin/users/{id} — mengembalikan pesan envelope "User berhasil dihapus.". */
+/** DELETE /admin/users/{id} — 204 tanpa body; pesan sukses dari fallback client (adminSlice). */
 export async function deleteUser(userId: number): Promise<string | null> {
   const res = await api.del<null>(`/admin/users/${userId}`);
   return res.message;

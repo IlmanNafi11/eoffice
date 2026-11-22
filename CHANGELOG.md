@@ -5,7 +5,64 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-22 — tindak lanjut ship-review #13)
+- `ChangePackageFormPage`: `handleSaveDraft` kehilangan `finally { setBusy(false) }`
+  (terhapus saat refactor T7a) — gagal simpan draft membiarkan tombol
+  "Simpan Draft" + "Submit" nonaktif permanen sampai reload. `finally`
+  dipulihkan; regresi dikunci test "Simpan Draft gagal → kedua tombol aktif
+  kembali" (diverifikasi gagal tanpa fix via mutasi).
+- Toast sukses hapus paket dirender kosong: `DELETE /changes/{id}` membalas
+  204 tanpa body sementara UI membaca `res.message` dari envelope. Thunk kini
+  menyisipkan pesan statis "Paket perubahan berhasil dihapus." (pola yang sama
+  dengan fallback user-delete); komentar kontrak di `admin.ts`/`change-package.ts`/
+  `wfh.ts` dikoreksi (204, bukan envelope).
+- Export PDF OOM pada test suite: `PdfImage::dataUri` semula menyematkan
+  bitmap 1400×1960 penuh (~1.8MB PNG internal dompdf per logo); kini bitmap
+  diturunkan ke lebar render (2× dari 74px) via GD — data URI ~12KB. MIME
+  diambil dari isi (`getimagesize`), symlink keluar root `public/` ditolak
+  (`realpath` containment), dan Dockerfile menetapkan `memory_limit=256M`
+  plus `php.ini-development` (sebelumnya tanpa config file, default 128M).
+- Test `POST /api/profile/signature` ditambahkan (sebelumnya tanpa test sama
+  sekali): PNG valid dinormalisasi + persist, PHP tersamar `.png` ditolak
+  (sniff isi, bukan nama), pesan Indonesia untuk oversize (2MB) dan dimensi
+  (>2000px), file kosong ditolak. Pesan `files.*.max` (10MB) dan `photo.max`
+  (2MB) juga dikunci test.
+- Pre-check upload client kini menolak file dengan MIME palsu di luar
+  allowlist walau ekstensinya benar (`application/x-httpd-php` bernama
+  `.png` tidak lolos); MIME kosong tetap diterima lewat ekstensi.
+- `SettingsPage.doSave` diberi guard double-submit (`savingRef` sinkron) —
+  satu-satunya jalur mutasi tanpa guard.
+- `VerifyPage` melalui seam `toUiError` (T10); `MonitoringPage.pdfErrorMessage`
+  didokumentasikan sebagai pemakai `ApiError` yang sudah terkurasi.
+- `decodeBlobEnvelope` + `firstMessages` memvalidasi bentuk `errors`
+  (harus array of string) — body malformed tidak lagi diindeks sebagai
+  karakter; branch degraded (body kosong, JSON non-object, errors malformed,
+  blob 5xx) dikunci test.
+- `Button pending`: spinner memakai slot `data-icon="inline-start"` — lebar
+  tombol tidak bergeser saat pending toggles.
+- Test Toaster mount diganti dari baca teks sumber `app.tsx` menjadi mount
+  React nyata + toast sampai DOM; copy `conflict`/409 dikunci test.
+- `composer:latest` di Dockerfile dipin ke `composer:2`.
 
+### Changed (frontend, 2026-11-10 — inisiatif ui-feedback T1–T10)
+- Seam error tunggal `UiError` (`lib/ui-errors.ts`) dengan tabel copy per
+  kind (validation/auth/forbidden/notFound/conflict/rateLimited/server/
+  network/unknown); semua slice dan halaman melalui `toUiError` — teks
+  teknis axios tidak pernah sampai ke UI (T1, T10).
+- Mutasi API mengembalikan envelope berpesan (`Messaged<T>`, T4); decode
+  blob untuk respons PDF/upload 4xx/5xx dengan fallback copy per status
+  (T2); `Button` prop `pending` + `<Toaster/>` global sonner (T3); spinner
+  pending + toast di seluruh halaman mutasi (T7a/b); pre-check upload
+  client (ukuran/tipe/jumlah) sebelum request (T9); pesan validasi mimes
+  Indonesia di FormRequest (T10). Lihat `SPEC-ui-feedback.md`.
+
+### Changed (backend+frontend, 2026-11-08 — rebuild layout PDF)
+- Tiga template PDF dibangun ulang dengan kop surat + logo dokumen WebP:
+  laporan WFH personal & tim (legal clause digugurkan), form inisiasi dan
+  implementasi paket perubahan (checkbox grid per opsi, kolom identitas
+  3-kolom, tanda tangan di dalam box tanpa trik `top:-55px`, form implementasi
+  dua halaman). `PdfImage::dataUri` menyematkan logo; `productionImpact`
+  dirender pada form implementasi. Lihat `SPEC-pdf-signature.md`.
 
 ### Fixed (backend, 2026-11-20 — dukungan WebP pada GD container)
 - Gambar logo dokumen (`logo-doc.webp`) disematkan sebagai data URI `image/webp`

@@ -111,7 +111,6 @@ class WfhReportPdfDataTest extends TestCase
         );
     }
 
-
     public function test_report_builder_formats_activity_time_as_h_i(): void
     {
         $field = Field::create(['name' => 'Bidang Test']);
@@ -138,7 +137,6 @@ class WfhReportPdfDataTest extends TestCase
 
         $this->assertSame('08:00 – 10:00', $data['kegiatan'][0]['waktu']);
     }
-
 
     public function test_report_builder_sets_qr_code_only_for_approved_reports(): void
     {

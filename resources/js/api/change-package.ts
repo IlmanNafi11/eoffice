@@ -75,7 +75,7 @@ export async function updatePackage(
   return { ...requireData(res.data, "updatePackage"), message: res.message ?? "" };
 }
 
-/** DELETE /changes/{id} — `SuccessResponse` tanpa `data`; kembalikan message. */
+/** DELETE /changes/{id} — 204 tanpa body; pesan sukses dari fallback client (changePackageSlice). */
 export async function deletePackage(packageId: number): Promise<string> {
   const res = await api.del(`/changes/${packageId}`);
   return res.message ?? "";

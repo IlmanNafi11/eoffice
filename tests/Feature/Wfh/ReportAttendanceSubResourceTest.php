@@ -193,6 +193,27 @@ class ReportAttendanceSubResourceTest extends TestCase
         $response->assertJsonPath('errors.photo.0', 'Format foto harus JPG, JPEG, atau PNG.');
     }
 
+    public function test_attendance_photo_oversize_gets_indonesian_message(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-28'));
+
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user, '2026-07-28');
+
+        // 3MB > max:2048KB — pesan kustom server terkunci (ship #13: pesan
+        // `photo.max` sebelumnya tanpa test, drift copy tidak terdeteksi).
+        $response = $this->postJson("/api/wfh/reports/{$report->id}/attendances", [
+            'photo' => UploadedFile::fake()->create('foto.png', 3 * 1024, 'image/png'),
+            'session' => 'pagi',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('errors.photo.0', 'Ukuran foto maksimal 2MB.');
+    }
+
     // === DELETE ===
 
     public function test_delete_attendance_on_draft_report(): void
