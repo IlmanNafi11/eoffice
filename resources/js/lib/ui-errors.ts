@@ -8,6 +8,90 @@
 
 import { ApiError } from "@/api/client";
 
+/** Label Indonesia untuk kunci field internal yang dikenal UI (spec ui-feedback S6). */
+export const FIELD_LABELS: Record<string, string> = {
+  photo: "Foto absensi",
+  signature: "Tanda tangan",
+  files: "Lampiran",
+  session: "Sesi absensi",
+  value: "Nilai setting",
+  name: "Nama",
+  email: "Email",
+  nip: "NIP",
+  role: "Peran",
+  phone: "Telepon",
+  position: "Jabatan",
+  rank: "Pangkat",
+  team_id: "Tim",
+  // Label unik per kunci: `FIELD_KEYS` memetakan balik label → kunci, jadi
+  // dua kunci berlabel sama akan saling menimpa.
+  roles: "Daftar peran",
+  permissions: "Permission",
+  password: "Kata sandi",
+};
+
+
+/**
+ * Kebalikan `FIELD_LABELS` untuk pemetaan balik label → kunci internal (halaman
+ * memegang state field-error dengan kunci server, label hanya untuk tampilan).
+ */
+export const FIELD_KEYS: Record<string, string> = Object.fromEntries(
+  Object.entries(FIELD_LABELS).map(([key, label]) => [label, key]),
+);
+
+/**
+ * `UiError.fields` (berlabel Indonesia) → `{kunci internal: pesan}` untuk
+ * komponen form yang merender error per field. Bentuk `"Lampiran N"` dipulihkan
+ * ke `files.N-1` agar tetap cocok dengan validator server.
+ */
+export function fieldErrorsByKey(
+  fields: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [label, message] of Object.entries(fields ?? {})) {
+    const indexed = /^Lampiran (\d+)$/.exec(label);
+    if (indexed?.[1]) {
+      out[`files.${Number(indexed[1]) - 1}`] = message;
+    } else {
+      const key = FIELD_KEYS[label];
+      if (key) out[key] = message;
+    }
+  }
+  return out;
+}
+/** Ambil pesan pertama tiap field; entri tanpa pesan dijatuhkan. */
+function firstMessages(errors: Record<string, string[]> | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [field, messages] of Object.entries(errors ?? {})) {
+    // Pertahanan: nilai non-array (body malformed) dilewati, bukan diindeks.
+    const first = Array.isArray(messages) ? messages[0] : undefined;
+    if (typeof first === "string" && first) out[field] = first;
+  }
+  return out;
+}
+
+/**
+ * Kunci field internal → label manusia. `files.N` → "Lampiran N+1"; kunci
+ * tidak dikenal DIBUANG (tidak diteruskan mentah ke UI — spec ui-feedback S6).
+ */
+export function fieldErrorMessages(
+  errors: Record<string, string[]> | null,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [field, message] of Object.entries(firstMessages(errors))) {
+    const indexed = /^(.+)\.(\d+)$/.exec(field);
+    if (indexed) {
+      const [, base, index] = indexed;
+      const label = base ? FIELD_LABELS[base] : undefined;
+      if (label && index) out[`${label} ${Number(index) + 1}`] = message;
+    } else {
+      const label = FIELD_LABELS[field];
+      if (label) out[label] = message;
+    }
+  }
+  return out;
+}
+
 export type UiErrorKind =
   | "validation"
   | "auth"
@@ -78,15 +162,13 @@ export function toUiError(error: unknown): UiError {
       ? UI_ERROR_COPY[kind]
       : error.message;
 
-  const entries = Object.entries(error.errors ?? {})
-    .map(([field, messages]) => [field, messages[0]] as const)
-    .filter((entry): entry is readonly [string, string] => Boolean(entry[1]));
-  const fields = entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  // Kunci internal → label Indonesia (spec ui-feedback S6): `files.0` →
+  // "Lampiran 1", kunci tak dikenal DIJATUHKAN — tidak pernah diteruskan
+  // mentah ke UI. Bila semua kunci tak dikenal, `fields` tidak diset.
+  const labeled = fieldErrorMessages(error.errors);
+  const fields =
+    Object.keys(labeled).length > 0 ? labeled : undefined;
 
   return fields ? { kind, message, fields } : { kind, message };
 }
 
-/** Pesan field yang sudah diamankan, atau null bila field tidak dikirim server. */
-export function fieldMessage(ui: UiError, field: string): string | null {
-  return ui.fields?.[field] ?? null;
-}

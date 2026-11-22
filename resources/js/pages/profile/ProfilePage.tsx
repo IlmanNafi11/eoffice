@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { toUiError } from "@/lib/ui-errors";
+import { toUiError, fieldErrorsByKey } from "@/lib/ui-errors";
 import { SIGNATURE_RULE, validateUploads } from "@/lib/upload-validate";
 
 import { Button } from "@/components/ui/button";
@@ -103,21 +103,26 @@ export function ProfilePage() {
         position: position.trim() === "" ? null : position.trim(),
         rank: rank.trim() === "" ? null : rank.trim(),
       });
-      dispatch(setUser(result));
+      // `message` milik envelope toast — jangan bocor ke cache `auth.user`.
+      const { message: _message, ...profile } = result;
+      dispatch(setUser(profile));
       // Sukses → toast saja; elemen inline role="status" sukses dihapus (S8).
       toast.success(result.message);
     } catch (err) {
       const ui = toUiError(err);
       if (ui.fields && Object.keys(ui.fields).length > 0) {
+        const byKey = fieldErrorsByKey(ui.fields);
         setFieldErrors(
           Object.fromEntries(
-            Object.entries(ui.fields).map(([field, m]) => [field, [m]]),
+            Object.entries(byKey).map(([field, m]) => [field, [m]]),
           ),
         );
       } else {
         setMessage(ui.message);
-        toast.error(ui.message);
       }
+      // Selalu terlihat: 422 dengan kunci field yang tak dirender halaman
+      // tidak boleh gagal senyap (ship#14 F4) — banner inline tetap dirender.
+      toast.error(ui.message);
     } finally {
       setSaving(false);
     }
@@ -155,15 +160,18 @@ export function ProfilePage() {
     } catch (err) {
       const ui = toUiError(err);
       if (ui.fields && Object.keys(ui.fields).length > 0) {
+        const byKey = fieldErrorsByKey(ui.fields);
         setFieldErrors(
           Object.fromEntries(
-            Object.entries(ui.fields).map(([field, m]) => [field, [m]]),
+            Object.entries(byKey).map(([field, m]) => [field, [m]]),
           ),
         );
       } else {
         setMessage(ui.message);
-        toast.error(ui.message);
       }
+      // Selalu terlihat — kunci field yang tak punya <FieldError> di halaman
+      // tidak boleh gagal senyap (ship#14 F4).
+      toast.error(ui.message);
     } finally {
       setUploading(false);
     }

@@ -26,7 +26,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
-import { toUiError } from "@/lib/ui-errors";
+import { toUiError, fieldErrorsByKey } from "@/lib/ui-errors";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -281,11 +281,12 @@ export function UserFormPage() {
       navigate("/admin/users");
     } catch (err) {
       const ui = toUiError(err);
-      // Field error server (via seam `UiError.fields`) tetap inline; banner
-      // inline hanya bila server tidak mengirim field error.
-      if (ui.fields) {
+      // Field error server (via seam `UiError.fields`, berlabel S6) dipetakan
+      // balik ke kunci internal untuk state per-field halaman.
+      const byKey = fieldErrorsByKey(ui.fields);
+      if (Object.keys(byKey).length > 0) {
         setFieldErrors(
-          Object.fromEntries(Object.entries(ui.fields).map(([k, v]) => [k, [v]])),
+          Object.fromEntries(Object.entries(byKey).map(([k, v]) => [k, [v]])),
         );
       } else {
         setMessage(ui.message);

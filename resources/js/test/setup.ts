@@ -111,3 +111,10 @@ afterEach(() => {
   // selesai di jsdom, jadi kunci bocor antar-test. Reset di sini.
   document.body.style.pointerEvents = "";
 });
+
+// Sonner menyimpan toast di store modul-level; bersihkan antar test agar
+// asersi "toast X muncul / tidak muncul" tidak melihat toast test sebelumnya
+// (ship#14: pola yang tadinya hanya dipanggil manual di ProfilePage.test).
+afterEach(() => {
+  document.querySelectorAll("[data-sonner-toast]").forEach((el) => el.remove());
+});

@@ -81,21 +81,6 @@ export function requireData<T>(value: T | null, endpoint: string): T {
   return value;
 }
 
-/** Label Indonesia untuk kunci field internal yang dikenal UI (spec ui-feedback S6). */
-export const FIELD_LABELS: Record<string, string> = {
-  photo: "Foto absensi",
-  signature: "Tanda tangan",
-  files: "Lampiran",
-  session: "Sesi absensi",
-  value: "Nilai setting",
-  name: "Nama",
-  email: "Email",
-  nip: "NIP",
-  role: "Peran",
-  phone: "Telepon",
-  position: "Jabatan",
-  rank: "Pangkat",
-};
 
 /** Baca body Blob sebagai teks (FileReader, agar jalan di jsdom juga). */
 function blobToText(blob: Blob): Promise<string> {
@@ -138,38 +123,6 @@ export async function decodeBlobEnvelope(
   }
 }
 
-/** Ambil pesan pertama tiap field; entri tanpa pesan dijatuhkan. */
-function firstMessages(errors: Record<string, string[]> | null): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [field, messages] of Object.entries(errors ?? {})) {
-    // Pertahanan: nilai non-array (body malformed) dilewati, bukan diindeks.
-    const first = Array.isArray(messages) ? messages[0] : undefined;
-    if (typeof first === "string" && first) out[field] = first;
-  }
-  return out;
-}
-
-/**
- * Kunci field internal → label manusia. `files.N` → "Lampiran N+1"; kunci
- * tidak dikenal DIBUANG (tidak diteruskan mentah ke UI — spec ui-feedback S6).
- */
-export function fieldErrorMessages(
-  errors: Record<string, string[]> | null,
-): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [field, message] of Object.entries(firstMessages(errors))) {
-    const indexed = /^(.+)\.(\d+)$/.exec(field);
-    if (indexed) {
-      const [, base, index] = indexed;
-      const label = base ? FIELD_LABELS[base] : undefined;
-      if (label && index) out[`${label} ${Number(index) + 1}`] = message;
-    } else {
-      const label = FIELD_LABELS[field];
-      if (label) out[label] = message;
-    }
-  }
-  return out;
-}
 
 export const httpClient: AxiosInstance = axios.create({
   baseURL: "/api",

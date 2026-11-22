@@ -5,12 +5,12 @@
  * - toUiError menerima ApiError dari lapisan api/ dan memetakan ke kind UI + copy aman;
  * - pesan domain server terkurasi diteruskan apa adanya;
  * - teks transport teknis tidak pernah sampai ke UI;
- * - field error dipetakan ke pesan pertama, fieldMessage mengembalikan null bila tak ada.
+ * - field error berlabel S6 dipetakan di seam; fieldErrorsByKey memulihkan kunci internal.
  */
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/api/client";
-import { UI_ERROR_COPY, fieldMessage, toUiError } from "@/lib/ui-errors";
+import { UI_ERROR_COPY, fieldErrorsByKey, toUiError } from "@/lib/ui-errors";
 
 describe("toUiError — abstraksi error", () => {
   it("422 dengan errors → kind validation, fields dipetakan", () => {
@@ -23,7 +23,8 @@ describe("toUiError — abstraksi error", () => {
 
     expect(ui.kind).toBe("validation");
     expect(ui.message).toBe("Data yang diberikan tidak valid.");
-    expect(ui.fields).toEqual({ photo: "Ukuran foto maksimal 2MB." });
+    // S6: kunci internal dipetakan ke label Indonesia sebelum sampai halaman.
+    expect(ui.fields).toEqual({ "Foto absensi": "Ukuran foto maksimal 2MB." });
   });
 
   it("message axios teknis pada http tanpa body → copy per kind", () => {
@@ -89,15 +90,33 @@ describe("toUiError — abstraksi error", () => {
     expect(toUiError(undefined).message).toBe(UI_ERROR_COPY.unknown);
   });
 
-  it("fieldMessage: field dikenal → pesannya; field tak ada → null", () => {
+  it("fieldErrorsByKey: label → kunci internal; 'Lampiran N' → files.N-1; kunci asing dijatuhkan", () => {
     const ui = toUiError(
       new ApiError("validation", "invalid", {
         status: 422,
-        errors: { "files.0": ["Format file harus PNG, JPG, atau JPEG."] },
+        errors: {
+          "files.0": ["Format file harus JPG, JPEG, atau PNG."],
+          photo: ["Ukuran foto maksimal 2MB."],
+          signature_dimensions: ["terlalu kecil"],
+        },
       }),
     );
 
-    expect(fieldMessage(ui, "files.0")).toBe("Format file harus PNG, JPG, atau JPEG.");
-    expect(fieldMessage(ui, "files.9")).toBeNull();
+    expect(fieldErrorsByKey(ui.fields)).toEqual({
+      "files.0": "Format file harus JPG, JPEG, atau PNG.",
+      photo: "Ukuran foto maksimal 2MB.",
+    });
+    expect(fieldErrorsByKey(undefined)).toEqual({});
+  });
+
+  it("kunci field yang TAK dikenal dijatuhkan — fields tidak diset (S6)", () => {
+    const ui = toUiError(
+      new ApiError("validation", "invalid", {
+        status: 422,
+        errors: { signature_dimensions: ["terlalu kecil"], photo: [] },
+      }),
+    );
+
+    expect(ui.fields).toBeUndefined();
   });
 });

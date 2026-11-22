@@ -151,6 +151,27 @@ describe("ProfilePage — save profil", () => {
       expect(screen.getByText(/format telepon tidak valid/i)).toBeTruthy(),
     );
   });
+
+  it("422 dengan kunci field yang TAK dirender halaman → tetap toast error (tidak gagal senyap)", async () => {
+    // Server bisa mengirim kunci internal yang halaman profil tidak punya
+    // <FieldError>-nya; ship#14 F4: toast tetap menyampaikan pesan server,
+    // banner inline tidak menghilang.
+    mockedUpdate.mockRejectedValueOnce(
+      new ApiError("validation", "Data profil tidak valid.", {
+        status: 422,
+        errors: { signature_dimensions: ["terlalu kecil"] },
+      }),
+    );
+    renderProfile();
+
+    await userEvent.click(screen.getByTestId("profile-save"));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Data profil tidak valid.");
+    });
+  });
 });
 
 describe("ProfilePage — upload tanda tangan", () => {
@@ -305,7 +326,7 @@ describe("ProfilePage — spinner pending + toast (T7b)", () => {
     });
   });
 
-  it("save gagal 422 per-field → field error inline, TANPA toast", async () => {
+  it("save gagal 422 per-field → field error inline DAN toast pesan server (S8)", async () => {
     mockedUpdate.mockRejectedValueOnce(
       new ApiError("validation", "Gagal validasi.", {
         status: 422,
@@ -317,7 +338,12 @@ describe("ProfilePage — spinner pending + toast (T7b)", () => {
     await userEvent.click(screen.getByTestId("profile-save"));
 
     await waitFor(() => expect(screen.getByText(/format telepon tidak valid/i)).toBeTruthy());
-    expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+    // S8: field error inline TETAP, dan kegagalan juga dikirim via toast.
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Gagal validasi.");
+    });
   });
 
   it("tombol Simpan profil aria-busy selama updateProfile in-flight", async () => {

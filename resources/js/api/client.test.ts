@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
-import { api, decodeBlobEnvelope, fieldErrorMessages, FIELD_LABELS, httpClient, setAuthToken, getStoredToken, onUnauthorized } from "@/api/client";
+import { api, decodeBlobEnvelope, httpClient, setAuthToken, getStoredToken, onUnauthorized } from "@/api/client";
 import { UI_ERROR_COPY } from "@/lib/ui-errors";
 
 type Recorded = { method?: string; url?: string; headers: AxiosHeaders; params?: unknown; data?: unknown };
@@ -337,21 +337,4 @@ describe("api/client — blob decode + tanpa teks axios + label field (ui-feedba
     expect(err instanceof Error && err.message).not.toMatch(/Request failed/);
   });
 
-  it("fieldErrorMessages: kunci internal → label Indonesia; files.N → 'Lampiran N+1'; kunci tak dikenal dijatuhkan", () => {
-    expect(
-      fieldErrorMessages({ photo: ["Ukuran foto maksimal 2MB."], "files.0": ["Format file harus JPG, JPEG, atau PNG."] }),
-    ).toEqual({
-      "Foto absensi": "Ukuran foto maksimal 2MB.",
-      "Lampiran 1": "Format file harus JPG, JPEG, atau PNG.",
-    });
-    // Kunci tak dikenal tidak diteruskan mentah; entri tanpa pesan juga dijatuhkan.
-    expect(fieldErrorMessages({ "signature.dimensions": ["terlalu kecil"], photo: [] })).toEqual({});
-    expect(fieldErrorMessages(null)).toEqual({});
-  });
-
-  it("FIELD_LABELS memuat kunci field yang dipakai form", () => {
-    for (const key of ["photo", "signature", "files", "session", "value", "name", "email", "nip", "role", "phone", "position", "rank"]) {
-      expect(FIELD_LABELS[key]).toBeTruthy();
-    }
-  });
 });
