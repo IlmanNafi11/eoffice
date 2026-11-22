@@ -26,6 +26,7 @@ vi.mock("@/api/wfh", () => ({
 }));
 
 import * as wfhApi from "@/api/wfh";
+import { ApiError } from "@/api/client";
 import {
   wfhReducer,
   fetchWfhReports,
@@ -116,7 +117,7 @@ describe("wfhSlice — thunks", () => {
   });
 
   it("fetchWfhReports gagal men-set status failed + error, items tetap kosong", async () => {
-    mockedList.mockRejectedValueOnce(new Error("Server sibuk"));
+    mockedList.mockRejectedValueOnce(new ApiError("api", "Server sibuk"));
     const store = makeStore();
 
     await store.dispatch(fetchWfhReports({}));
@@ -141,7 +142,7 @@ describe("wfhSlice — thunks", () => {
   });
 
   it("fetchWfhReport gagal men-set current failed + error", async () => {
-    mockedGet.mockRejectedValueOnce(new Error("404"));
+    mockedGet.mockRejectedValueOnce(new ApiError("http", "404", { status: 404 }));
     const store = makeStore();
 
     await store.dispatch(fetchWfhReport(999));
@@ -151,6 +152,18 @@ describe("wfhSlice — thunks", () => {
     expect(current.error).toBe("404");
     expect(current.report).toBeNull();
   });
+
+  it("fetch gagal teks teknis axios → copy aman, bukan teks mentah (seam toUiError)", async () => {
+    mockedGet.mockRejectedValueOnce(
+      new ApiError("http", "Request failed with status code 500", { status: 500 }),
+    );
+    const store = makeStore();
+
+    await store.dispatch(fetchWfhReport(999));
+
+    expect(selectWfhCurrent(store.getState()).error).toBe("Terjadi kesalahan pada server.");
+  });
+
 
   it("submit sukses meng-update current.report dan baris di list (konsisten)", async () => {
     mockedList.mockResolvedValueOnce({ reports: [reportPending, reportDraft], meta });
@@ -307,7 +320,7 @@ describe("wfhSlice — thunks", () => {
     const store = makeStore();
     await store.dispatch(fetchWfhReport(1));
 
-    mockedSubmit.mockRejectedValueOnce(new Error("Forbidden"));
+    mockedSubmit.mockRejectedValueOnce(new ApiError("http", "Forbidden", { status: 403 }));
     await store.dispatch(submitWfhReport(1));
 
     const current = selectWfhCurrent(store.getState());

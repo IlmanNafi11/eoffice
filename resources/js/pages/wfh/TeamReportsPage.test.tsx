@@ -163,7 +163,9 @@ describe("TeamReportsPage — fetch awal & render", () => {
   });
 
   it("fetch gagal → pesan error tampil", async () => {
-    mockedList.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedList.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     renderPage();
 
     expect(await screen.findByText("This action is unauthorized.")).toBeTruthy();
@@ -271,7 +273,7 @@ describe("TeamReportsPage — create journey", () => {
     await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-10");
 
     mockedCreate.mockRejectedValueOnce(
-      new Error("Laporan untuk tim dan tanggal ini sudah ada."),
+      new ApiError("http", "Laporan untuk tim dan tanggal ini sudah ada.", { status: 422 }),
     );
     await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
 
@@ -410,7 +412,7 @@ describe("TeamReportsPage — approve/reject journey", () => {
     await screen.findByTestId("team-report-row-1");
 
     mockedApprove.mockRejectedValueOnce(
-      new Error("Laporan tidak berada dalam bidang Anda."),
+      new ApiError("http", "Laporan tidak berada dalam bidang Anda.", { status: 403 }),
     );
     await userEvent.click(
       within(screen.getByTestId("team-report-row-1")).getByRole("button", {
@@ -447,7 +449,7 @@ describe("TeamReportsPage — approve/reject journey", () => {
     await userEvent.type(input, "Alasan lintas bidang.");
 
     mockedReject.mockRejectedValueOnce(
-      new Error("Laporan tidak berada dalam bidang Anda."),
+      new ApiError("http", "Laporan tidak berada dalam bidang Anda.", { status: 403 }),
     );
     await userEvent.click(within(dialog).getByRole("button", { name: /tolak laporan/i }));
 

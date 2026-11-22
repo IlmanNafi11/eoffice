@@ -20,6 +20,7 @@ vi.mock("@/api/wfh-team", () => ({
   rejectWfhTeamReport: vi.fn(),
 }));
 
+import { ApiError } from "@/api/client";
 import * as wfhTeamApi from "@/api/wfh-team";
 import {
   wfhTeamReducer,
@@ -95,7 +96,9 @@ describe("wfhTeamSlice — fetch list", () => {
   });
 
   it("fetchWfhTeamReports gagal men-set status failed + error", async () => {
-    mockedList.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedList.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     const store = makeStore();
 
     await store.dispatch(fetchWfhTeamReports({}));
@@ -105,6 +108,18 @@ describe("wfhTeamSlice — fetch list", () => {
     expect(list.error).toBe("This action is unauthorized.");
     expect(list.items).toEqual([]);
   });
+
+  it("fetch gagal teks teknis axios → copy aman, bukan teks mentah (seam toUiError)", async () => {
+    mockedList.mockRejectedValueOnce(
+      new ApiError("http", "Request failed with status code 500", { status: 500 }),
+    );
+    const store = makeStore();
+
+    await store.dispatch(fetchWfhTeamReports({}));
+
+    expect(selectWfhTeamList(store.getState()).error).toBe("Terjadi kesalahan pada server.");
+  });
+
 
   it("respons fetch basi (out-of-order) tidak menimpa hasil terbaru", async () => {
     let resolveSlow!: (value: { reports: WfhTeamReport[]; meta: PaginationMeta }) => void;
@@ -204,7 +219,9 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     const store = makeStore();
     await store.dispatch(fetchWfhTeamReports({}));
 
-    mockedApprove.mockRejectedValueOnce(new Error("Laporan tidak berada dalam bidang Anda."));
+    mockedApprove.mockRejectedValueOnce(
+      new ApiError("api", "Laporan tidak berada dalam bidang Anda."),
+    );
     await store.dispatch(approveWfhTeamReport(1));
 
     expect(mockedList).toHaveBeenCalledTimes(1); // hanya fetch awal — tak ada refetch
@@ -220,7 +237,9 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     const store = makeStore();
     await store.dispatch(fetchWfhTeamReports({}));
 
-    mockedApprove.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedApprove.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     await store.dispatch(approveWfhTeamReport(1));
     expect(selectWfhTeamActionError(store.getState())).toBe("This action is unauthorized.");
 
@@ -242,7 +261,7 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     const store = makeStore();
     await store.dispatch(fetchWfhTeamReports({}));
 
-    mockedApprove.mockRejectedValueOnce(new Error("Gagal"));
+    mockedApprove.mockRejectedValueOnce(new ApiError("api", "Gagal"));
     await store.dispatch(approveWfhTeamReport(1));
     expect(selectWfhTeamActionError(store.getState())).toBe("Gagal");
 
@@ -262,7 +281,7 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     const approved: WfhTeamReport = { ...reportPending, status: "approved" };
     mockedApprove.mockResolvedValueOnce(approved);
     // Refetch pasca-mutasi gagal — tidak boleh mengubah hasil mutasi (sudah sukses).
-    mockedList.mockRejectedValueOnce(new Error("refetch gagal"));
+    mockedList.mockRejectedValueOnce(new ApiError("http", "refetch gagal", { status: 500 }));
 
     const result = await store.dispatch(approveWfhTeamReport(1));
 

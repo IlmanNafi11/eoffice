@@ -24,7 +24,7 @@ import {
 
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
-/** Pesan server (ApiError 404/429) — fallback pesan generik Indonesia. */
+/** Pesan server (status 404/429 dari seam transport) — fallback pesan generik Indonesia. */
 function verifyErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "Gagal memverifikasi dokumen. Coba lagi.";

@@ -14,6 +14,7 @@
  */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+import { toUiError } from "@/lib/ui-errors";
 import type { Messaged } from "@/api/client";
 import * as wfhTeamApi from "@/api/wfh-team";
 import type {
@@ -56,11 +57,12 @@ export function initialWfhTeamState(): WfhTeamState {
   };
 }
 
-/** Pesan error siap tampil; `ApiError`/`Error` sama-sama punya `message`. */
+/**
+ * Pesan error siap tampil lewat seam `toUiError` (detail transport tidak
+ * pernah sampai ke UI; pesan domain server tetap diteruskan apa adanya).
+ */
 function messageOf(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error === "string" && error) return error;
-  return "Terjadi kesalahan. Coba lagi.";
+  return toUiError(error).message;
 }
 
 /** Bentuk state minimal untuk membaca query aktif saat refetch pasca-mutasi. */

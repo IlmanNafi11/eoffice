@@ -291,7 +291,9 @@ describe("ProfilePage — spinner pending + toast (T7b)", () => {
   });
 
   it("save gagal non-validation → toast error pesan server", async () => {
-    mockedUpdate.mockRejectedValueOnce(new ApiError("http", "Sesi berakhir.", { status: 401 }));
+    mockedUpdate.mockRejectedValueOnce(
+      new ApiError("http", "Request failed with status code 401", { status: 401 }),
+    );
     renderProfile();
 
     await userEvent.click(screen.getByTestId("profile-save"));

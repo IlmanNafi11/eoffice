@@ -37,6 +37,7 @@ vi.mock("@/api/change-package", () => ({
   listChangeTypes: vi.fn(),
 }));
 
+import { ApiError } from "@/api/client";
 import * as changePackageApi from "@/api/change-package";
 import { ChangesPage } from "@/pages/changes/ChangesPage";
 import { makeStore } from "@/store";
@@ -178,7 +179,7 @@ describe("ChangesPage — fetch awal & render", () => {
   });
 
   it("fetch gagal → pesan error tampil", async () => {
-    mockedList.mockRejectedValueOnce(new Error("Server sibuk"));
+    mockedList.mockRejectedValueOnce(new ApiError("http", "Server sibuk", { status: 500 }));
     renderPage();
 
     expect(await screen.findByText("Server sibuk")).toBeTruthy();

@@ -37,6 +37,7 @@ vi.mock("@/api/change-package", () => ({
   listChangeTypes: vi.fn(),
 }));
 
+import { ApiError } from "@/api/client";
 import * as changePackageApi from "@/api/change-package";
 import {
   fetchPackages,
@@ -172,7 +173,7 @@ describe("changePackageSlice — fetchPackages", () => {
   });
 
   it("gagal men-set status failed + error siap tampil", async () => {
-    mockedList.mockRejectedValueOnce(new Error("422 validation"));
+    mockedList.mockRejectedValueOnce(new ApiError("validation", "422 validation", { status: 422 }));
     const store = makeStore();
 
     await store.dispatch(fetchPackages({}));
@@ -182,6 +183,20 @@ describe("changePackageSlice — fetchPackages", () => {
     expect(list.error).toBe("422 validation");
     expect(list.items).toEqual([]);
   });
+
+  it("fetch gagal teks teknis axios → copy aman, bukan teks mentah (seam toUiError)", async () => {
+    mockedList.mockRejectedValueOnce(
+      new ApiError("http", "Request failed with status code 500", { status: 500 }),
+    );
+    const store = makeStore();
+
+    await store.dispatch(fetchPackages({}));
+
+    expect(selectChangePackageList(store.getState()).error).toBe(
+      "Terjadi kesalahan pada server.",
+    );
+  });
+
 
   it("respons fetch basi (out-of-order) tidak menimpa hasil terbaru", async () => {
     let resolveSlow!: (value: { packages: ChangePackage[]; meta: PaginationMeta }) => void;
@@ -221,7 +236,9 @@ describe("changePackageSlice — fetchPackage", () => {
   });
 
   it("gagal men-set status failed + error siap tampil", async () => {
-    mockedShow.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedShow.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     const store = makeStore();
 
     await store.dispatch(fetchPackage(12));
@@ -237,7 +254,9 @@ describe("changePackageSlice — fetchPackage", () => {
     mockedShow.mockResolvedValueOnce(pkg);
     const store = makeStore();
     await store.dispatch(fetchPackage(12));
-    mockedSubmit.mockRejectedValueOnce(new Error("Setidaknya satu lampiran harus diisi."));
+    mockedSubmit.mockRejectedValueOnce(
+      new ApiError("validation", "Setidaknya satu lampiran harus diisi.", { status: 422 }),
+    );
     await store.dispatch(submitPackageThunk({ packageId: 12, input: submitInput }));
     expect(selectChangePackageCurrent(store.getState()).error).toBe(
       "Setidaknya satu lampiran harus diisi.",
@@ -370,7 +389,9 @@ describe("changePackageSlice — mutations", () => {
   });
 
   it("mutasi gagal menyimpan error siap tampil", async () => {
-    mockedSubmit.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedSubmit.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     const store = makeStore();
 
     await store.dispatch(submitPackageThunk({ packageId: 12, input: submitInput }));
@@ -426,7 +447,7 @@ describe("changePackageSlice — fetchChangeTypes", () => {
   });
 
   it("gagal → status failed, dan tetap bisa refetch (belum succeeded)", async () => {
-    mockedChangeTypes.mockRejectedValueOnce(new Error("Network error"));
+    mockedChangeTypes.mockRejectedValueOnce(new ApiError("network", "Network Error"));
     const store = makeStore();
     await store.dispatch(fetchChangeTypes());
     expect(selectChangePackageChangeTypes(store.getState()).status).toBe("failed");

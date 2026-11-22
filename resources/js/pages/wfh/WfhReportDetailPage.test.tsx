@@ -167,7 +167,7 @@ describe("WfhReportDetailPage — mount & render", () => {
   });
 
   it("fetch gagal → pesan error tampil", async () => {
-    mockedGet.mockRejectedValue(new Error("Laporan tidak ditemukan."));
+    mockedGet.mockRejectedValue(new ApiError("http", "Laporan tidak ditemukan.", { status: 404 }));
     renderDetail();
 
     expect(await screen.findByText("Laporan tidak ditemukan.")).toBeTruthy();
@@ -298,7 +298,7 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
 
   it("gagal 422 saat reject → pesan envelope tampil ke user", async () => {
     mockedReject.mockRejectedValue(
-      new Error("Laporan dengan status draft tidak dapat ditolak."),
+      new ApiError("http", "Laporan dengan status draft tidak dapat ditolak.", { status: 422 }),
     );
     renderDetail("kepala", detail("pending"));
 
@@ -316,7 +316,7 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     // refetch() pasca-mutasi (fetchWfhReport.pending) membersihkan
     // current.error sebelum pesan sempat terlihat.
     mockedSubmit.mockRejectedValue(
-      new Error("Laporan kosong: minimal satu kegiatan atau absensi."),
+      new ApiError("http", "Laporan kosong: minimal satu kegiatan atau absensi.", { status: 422 }),
     );
     renderDetail("staf", detail("draft"));
 
@@ -456,7 +456,9 @@ describe("WfhReportDetailPage — dispatch mutasi", () => {
     renderDetail("staf", detail("draft"));
 
     await waitFor(() => expect(screen.getByText("Kerja A")).toBeTruthy());
-    mockedAddActivity.mockRejectedValueOnce(new Error("Gagal tambah kegiatan."));
+    mockedAddActivity.mockRejectedValueOnce(
+      new ApiError("http", "Gagal tambah kegiatan.", { status: 500 }),
+    );
     await userEvent.click(screen.getByRole("button", { name: /tambah kegiatan/i }));
     await userEvent.type(await screen.findByLabelText(/^kegiatan$/i), "Kerja X");
     await userEvent.click(screen.getByRole("button", { name: /^simpan$/i }));

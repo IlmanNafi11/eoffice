@@ -156,13 +156,13 @@ describe("WfhReportsPage — fetch awal & render", () => {
   });
 
   it("fetch gagal → pesan error tampil", async () => {
-    mockedList.mockRejectedValueOnce(new Error("Server sibuk"));
+    mockedList.mockRejectedValueOnce(new ApiError("http", "Server sibuk", { status: 500 }));
     renderPage();
 
     expect(await screen.findByText("Server sibuk")).toBeTruthy();
   });
   it("session-config gagal → fallback tiga sesi default tetap tampil", async () => {
-    mockedSessionConfig.mockRejectedValueOnce(new Error("gagal"));
+    mockedSessionConfig.mockRejectedValueOnce(new ApiError("http", "gagal", { status: 500 }));
     renderPage();
 
     await screen.findByText("2026-08-10");

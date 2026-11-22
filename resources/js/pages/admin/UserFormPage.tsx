@@ -7,7 +7,7 @@
  *
  * Alur (plan Task 5 + spec):
  * - NIP/nama/email wajib + format email (validasi klien); 422 duplikat
- *   nip/email dirender per field (`ApiError.errors`, pola profile);
+ *   nip/email dirender per field (`UiError.fields` via `toUiError`, pola profile);
  * - tim dropdown dari `listTeams` (pinjaman — semua tim, tanpa `field_id`);
  * - role checkbox 4 nama kontrak (`admin`, `kepala_bidang`, `kepala_tim`,
  *   `staf`);
@@ -56,7 +56,6 @@ import {
 } from "@/store/adminSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/authSlice";
-import { ApiError } from "@/api/client";
 import { createUser, updateUser } from "@/api/admin";
 import { listTeams } from "@/api/wfh-team";
 import { can } from "@/lib/permissions";
@@ -281,17 +280,18 @@ export function UserFormPage() {
       toast.success(res.message);
       navigate("/admin/users");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setFieldErrors(err.errors ?? {});
-        if (!err.errors || Object.keys(err.errors).length === 0) {
-          setMessage(err.message);
-        }
-        // Pesan server (bukan teks axios) ke toast; field error tetap inline.
-        toast.error(toUiError(err).message);
+      const ui = toUiError(err);
+      // Field error server (via seam `UiError.fields`) tetap inline; banner
+      // inline hanya bila server tidak mengirim field error.
+      if (ui.fields) {
+        setFieldErrors(
+          Object.fromEntries(Object.entries(ui.fields).map(([k, v]) => [k, [v]])),
+        );
       } else {
-        setMessage("Gagal menyimpan user.");
-        toast.error(toUiError(err).message);
+        setMessage(ui.message);
       }
+      // Pesan server (bukan teks axios) ke toast; field error tetap inline.
+      toast.error(ui.message);
     } finally {
       setBusy(false);
     }

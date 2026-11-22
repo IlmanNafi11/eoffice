@@ -48,6 +48,7 @@ vi.mock("@/api/users", () => ({
   listFieldUsers: vi.fn(),
 }));
 
+import { ApiError } from "@/api/client";
 import * as changePackageApi from "@/api/change-package";
 import { Toaster } from "@/components/ui/sonner";
 import * as usersApi from "@/api/users";
@@ -513,7 +514,7 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
   });
 
   it("submit ditolak server 422 → pesan error tampil dengan role alert", async () => {
-    mockedSubmit.mockRejectedValue(new Error("Paket sudah diproses."));
+    mockedSubmit.mockRejectedValue(new ApiError("http", "Paket sudah diproses.", { status: 422 }));
     renderForm("/changes/12/edit");
     await waitFor(() => {
       expect(mockedShow).toHaveBeenCalled();
@@ -587,7 +588,9 @@ describe("ChangePackageFormPage — spinner pending + toast (T7a)", () => {
   });
 
   it("Submit gagal → toast pesan server + banner inline tetap", async () => {
-    mockedSubmit.mockRejectedValueOnce(new Error("Paket sudah diproses."));
+    mockedSubmit.mockRejectedValueOnce(
+      new ApiError("http", "Paket sudah diproses.", { status: 422 }),
+    );
     renderForm("/changes/12/edit");
     await waitFor(() => expect(mockedShow).toHaveBeenCalled());
 

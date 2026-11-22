@@ -31,6 +31,7 @@ vi.mock("@/api/auth", () => ({
   verifyOtp: vi.fn(),
   resetPassword: vi.fn(),
 }));
+import { ApiError } from "@/api/client";
 
 import * as authApi from "@/api/auth";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
@@ -149,7 +150,7 @@ describe("LoginPage — submit", () => {
 
   it("menampilkan pesan error envelope (401 kredensial salah) dan tetap di /login", async () => {
     vi.mocked(authApi.login).mockRejectedValueOnce(
-      Object.assign(new Error("Email atau password salah."), { kind: "http" }),
+      new ApiError("http", "Email atau password salah.", { status: 401 }),
     );
 
     renderLogin();
@@ -165,7 +166,7 @@ describe("LoginPage — submit", () => {
   it("membersihkan pesan error lama begitu submit berikutnya dimulai", async () => {
     const retry = Promise.withResolvers<{ token: string; user: AuthUser }>();
     vi.mocked(authApi.login)
-      .mockRejectedValueOnce(new Error("Email atau password salah."))
+      .mockRejectedValueOnce(new ApiError("http", "Email atau password salah.", { status: 401 }))
       .mockReturnValueOnce(retry.promise);
 
     renderLogin();

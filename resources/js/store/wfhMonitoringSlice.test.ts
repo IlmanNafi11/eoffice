@@ -25,6 +25,7 @@ vi.mock("@/api/wfh-monitoring", () => ({
 }));
 
 import * as wfhMonitoringApi from "@/api/wfh-monitoring";
+import { ApiError } from "@/api/client";
 import {
   wfhMonitoringReducer,
   fetchWfhBoard,
@@ -120,7 +121,9 @@ describe("wfhMonitoringSlice — fetchWfhBoard", () => {
   });
 
   it("gagal men-set status failed + error siap tampil", async () => {
-    mockedBoard.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedBoard.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     const store = makeStore();
     await store.dispatch(fetchWfhBoard({}));
 
@@ -129,6 +132,20 @@ describe("wfhMonitoringSlice — fetchWfhBoard", () => {
     expect(board.error).toBe("This action is unauthorized.");
     expect(board.data).toBeNull();
   });
+
+  it("fetch gagal teks teknis axios → copy aman, bukan teks mentah (seam toUiError)", async () => {
+    mockedBoard.mockRejectedValueOnce(
+      new ApiError("http", "Request failed with status code 500", { status: 500 }),
+    );
+    const store = makeStore();
+
+    await store.dispatch(fetchWfhBoard({}));
+
+    expect(selectWfhMonitoringBoard(store.getState()).error).toBe(
+      "Terjadi kesalahan pada server.",
+    );
+  });
+
 });
 
 describe("wfhMonitoringSlice — fetchAdminReports", () => {
@@ -185,7 +202,7 @@ describe("wfhMonitoringSlice — fetchAdminReports", () => {
   });
 
   it("gagal men-set status failed + error siap tampil", async () => {
-    mockedList.mockRejectedValueOnce(new Error("422 validation"));
+    mockedList.mockRejectedValueOnce(new ApiError("validation", "422 validation", { status: 422 }));
     const store = makeStore();
 
     await store.dispatch(fetchAdminReports({}));

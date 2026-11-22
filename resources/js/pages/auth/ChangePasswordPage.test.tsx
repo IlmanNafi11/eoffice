@@ -28,6 +28,7 @@ vi.mock("@/api/auth", () => ({
 }));
 
 import * as authApi from "@/api/auth";
+import { ApiError } from "@/api/client";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { ChangePasswordPage } from "@/pages/auth/ChangePasswordPage";
 import { makeStore } from "@/store";
@@ -113,7 +114,7 @@ describe("ChangePasswordPage — submit", () => {
 
   it("menampilkan error envelope (422 password saat ini salah) dan tetap di halaman", async () => {
     vi.mocked(authApi.changePassword).mockRejectedValueOnce(
-      new Error("Password saat ini tidak sesuai."),
+      new ApiError("api", "Password saat ini tidak sesuai."),
     );
     const store = makeStore();
     renderChangePassword(store, userWith(false));
@@ -129,7 +130,7 @@ describe("ChangePasswordPage — submit", () => {
   it("mengosongkan error lama saat submit berikutnya dimulai", async () => {
     const retry = Promise.withResolvers<void>();
     vi.mocked(authApi.changePassword)
-      .mockRejectedValueOnce(new Error("Password saat ini tidak sesuai."))
+      .mockRejectedValueOnce(new ApiError("api", "Password saat ini tidak sesuai."))
       .mockReturnValueOnce(retry.promise);
     const store = makeStore();
     renderChangePassword(store, userWith(false));

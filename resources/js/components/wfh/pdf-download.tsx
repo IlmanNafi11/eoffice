@@ -3,7 +3,7 @@
  * Sumber blob dipisah lewat `getBlob` (pemanggil menanamkan `exportWfhReportPdf`
  * atau endpoint lain); komponen tidak tahu path, tidak menyentuh interceptor JSON.
  * `getError?: (error: unknown) => string` opsional — pemanggil yang tahu bentuk
- * error domainnya (mis. ApiError 422/403 dari PDF tim) memetakan pesan server;
+ * error domainnya (mis. status 422/403 dari PDF tim) memetakan pesan server;
  * tanpa prop ini perilaku lama (pesan generik) tetap.
  * `onError?: (error: unknown) => void` opsional — pemberitahuan tambahan untuk
  * pemanggil (mis. toast dari halaman); komponen tetap yang memutuskan banner inline.

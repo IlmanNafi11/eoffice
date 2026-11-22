@@ -68,8 +68,13 @@ export function toUiError(error: unknown): UiError {
   const kind = kindFor(error);
   const technical =
     TECHNICAL_MESSAGE.test(error.message) || error.message === "Network Error";
+  // 401 pada login membawa pesan domain ("Email atau password salah."); hanya
+  // pesan teknis/generik yang diganti copy sesi. `Unauthenticated.` adalah
+  // default Laravel, bukan pesan terkurasi.
+  const genericAuth = error.status === 401 &&
+    (!error.message || error.message === "Unauthenticated.");
   const message =
-    technical || kind === "auth" || kind === "network"
+    technical || genericAuth || kind === "network"
       ? UI_ERROR_COPY[kind]
       : error.message;
 

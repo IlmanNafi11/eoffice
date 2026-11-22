@@ -31,6 +31,7 @@ vi.mock("@/api/auth", () => ({
   resetPassword: vi.fn(),
 }));
 
+import { ApiError } from "@/api/client";
 import * as authApi from "@/api/auth";
 import {
   ForgotPasswordPage,
@@ -89,7 +90,7 @@ describe("ForgotPasswordPage", () => {
   it("menampilkan error envelope (429 throttle) dan tetap di halaman forgot", async () => {
     const user = userEvent.setup();
     vi.mocked(authApi.forgotPassword).mockRejectedValueOnce(
-      new Error("Terlalu banyak percobaan. Coba lagi nanti."),
+      new ApiError("http", "Terlalu banyak percobaan. Coba lagi nanti.", { status: 429 }),
     );
 
     renderFlow("/forgot-password");
@@ -162,7 +163,7 @@ describe("OtpVerificationPage", () => {
   it("menampilkan error envelope OTP salah (422) dan TIDAK menyimpan reset_token", async () => {
     const user = userEvent.setup();
     vi.mocked(authApi.verifyOtp).mockRejectedValueOnce(
-      new Error("Kode OTP tidak valid atau telah kedaluwarsa."),
+      new ApiError("http", "Kode OTP tidak valid atau telah kedaluwarsa.", { status: 422 }),
     );
 
     renderFlow("/verify-otp?email=staf@kominfo.go.id");
@@ -215,7 +216,7 @@ describe("ResetPasswordPage", () => {
     const user = userEvent.setup();
     sessionStorage.setItem(RESET_TOKEN_KEY, "d".repeat(60));
     vi.mocked(authApi.resetPassword).mockRejectedValueOnce(
-      new Error("Token reset tidak valid atau telah kedaluwarsa."),
+      new ApiError("http", "Token reset tidak valid atau telah kedaluwarsa.", { status: 422 }),
     );
 
     renderFlow("/reset-password");

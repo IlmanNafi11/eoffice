@@ -74,7 +74,7 @@ import {
   selectWfhMonitoringList,
 } from "@/store/wfhMonitoringSlice";
 
-/** Pesan server (ApiError 422/403 dari PDF tim) — fallback pesan generik. */
+/** Pesan server (status 422/403 dari PDF tim, via seam transport) — fallback pesan generik. */
 function pdfErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "Gagal mengunduh PDF. Coba lagi.";

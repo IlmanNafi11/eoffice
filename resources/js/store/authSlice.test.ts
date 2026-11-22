@@ -21,7 +21,7 @@ vi.mock("@/api/auth", () => ({
   resetPassword: vi.fn(),
 }));
 
-import { httpClient, AUTH_TOKEN_KEY } from "@/api/client";
+import { httpClient, AUTH_TOKEN_KEY, ApiError } from "@/api/client";
 import * as authApi from "@/api/auth";
 import {
   authReducer,
@@ -112,7 +112,7 @@ describe("authSlice — thunks", () => {
   });
 
   it("login gagal mencatat pesan error tanpa menyimpan token", async () => {
-    mockedLogin.mockRejectedValueOnce(new Error("Kredensial salah"));
+    mockedLogin.mockRejectedValueOnce(new ApiError("api", "Kredensial salah"));
     const store = makeStore();
 
     await store.dispatch(login({ email: "rover@eoffice.test", password: "wrong" }));
@@ -124,12 +124,32 @@ describe("authSlice — thunks", () => {
     expect(window.localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
   });
 
+  it("login 401 → copy sesi berakhir, teks teknis tidak bocor ke UI (seam toUiError)", async () => {
+    mockedLogin.mockRejectedValueOnce(
+      new ApiError("http", "Request failed with status code 401", { status: 401 }),
+    );
+    const store = makeStore();
+
+    await store.dispatch(login({ email: "rover@eoffice.test", password: "wrong" }));
+
+    expect(selectAuth(store.getState()).error).toBe("Sesi berakhir, silakan masuk kembali.");
+  });
+
+  it("login gagal non-transport (Error biasa) → copy aman, bukan pesan mentah", async () => {
+    mockedLogin.mockRejectedValueOnce(new Error("boom internal"));
+    const store = makeStore();
+
+    await store.dispatch(login({ email: "rover@eoffice.test", password: "wrong" }));
+
+    expect(selectAuth(store.getState()).error).toBe("Terjadi kesalahan. Coba lagi.");
+  });
+
   it("logout membersihkan state meski request revoke gagal", async () => {
     mockedLogin.mockResolvedValueOnce({ token: "tok-abc", user });
     const store = makeStore();
     await store.dispatch(login({ email: "rover@eoffice.test", password: "secret" }));
 
-    mockedLogout.mockRejectedValueOnce(new Error("network"));
+    mockedLogout.mockRejectedValueOnce(new ApiError("network", "Network Error"));
     await store.dispatch(logout());
 
     expect(selectToken(store.getState())).toBeNull();
@@ -162,7 +182,7 @@ describe("authSlice — thunks", () => {
 
   it("forgotPassword pending→fulfilled menggeser status loading dan membersihkan error lama", async () => {
     // Seed error lama (mis. 429 dari percobaan sebelumnya).
-    mockedLogin.mockRejectedValueOnce(new Error("stale"));
+    mockedLogin.mockRejectedValueOnce(new ApiError("http", "stale", { status: 429 }));
     const store = makeStore();
     await store.dispatch(login({ email: "rover@eoffice.test", password: "wrong" }));
     expect(selectAuth(store.getState()).error).toBe("stale");
@@ -183,7 +203,7 @@ describe("authSlice — thunks", () => {
     const store = makeStore();
     await store.dispatch(forgotPassword({ email: "rover@eoffice.test" }));
 
-    mockedReset.mockRejectedValueOnce(new Error("Token kedaluwarsa"));
+    mockedReset.mockRejectedValueOnce(new ApiError("api", "Token kedaluwarsa"));
     await store.dispatch(
       resetPassword({
         reset_token: "x".repeat(60),

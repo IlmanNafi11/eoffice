@@ -50,6 +50,16 @@ describe("toUiError — abstraksi error", () => {
     expect(ui.message).toBe(UI_ERROR_COPY.auth);
   });
 
+  it("401 dengan pesan domain server (login gagal) → pesan diteruskan, bukan copy sesi", () => {
+    const ui = toUiError(
+      new ApiError("http", "Email atau password salah.", { status: 401 }),
+    );
+
+    expect(ui.kind).toBe("auth");
+    expect(ui.message).toBe("Email atau password salah.");
+  });
+
+
   it("403 → forbidden; 404 → notFound; 429 → rateLimited", () => {
     expect(toUiError(new ApiError("http", "x", { status: 403 })).kind).toBe("forbidden");
     expect(toUiError(new ApiError("http", "x", { status: 404 })).kind).toBe("notFound");

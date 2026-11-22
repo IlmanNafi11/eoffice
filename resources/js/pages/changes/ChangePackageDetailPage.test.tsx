@@ -43,7 +43,7 @@ vi.mock("@/api/change-package", () => ({
 }));
 
 import * as changePackageApi from "@/api/change-package";
-import { httpClient } from "@/api/client";
+import { httpClient, ApiError } from "@/api/client";
 import { ChangePackageDetailPage } from "@/pages/changes/ChangePackageDetailPage";
 import { makeStore } from "@/store";
 import { Toaster } from "@/components/ui/sonner";
@@ -364,7 +364,9 @@ describe("ChangePackageDetailPage — aksi mutasi", () => {
   });
 
   it("Tolak → rejectPackage tanpa dialog alasan; pesan server 422 tetap tampil", async () => {
-    mockedReject.mockRejectedValueOnce(new Error("Inisiator tidak dapat menolak paketnya sendiri."));
+    mockedReject.mockRejectedValueOnce(
+      new ApiError("http", "Inisiator tidak dapat menolak paketnya sendiri.", { status: 422 }),
+    );
     renderDetail(kepalaTim, pendingPkg());
     await screen.findByText("001/9/1.1/114/2025");
 
@@ -499,7 +501,7 @@ describe("ChangePackageDetailPage — PDF + lampiran (blob, bearer)", () => {
 
   it("PDF 422 tanda tangan tersaji via getError", async () => {
     mockedInitiationPdf.mockRejectedValueOnce(
-      new Error("Budi belum mengatur tanda tangan."),
+      new ApiError("http", "Budi belum mengatur tanda tangan.", { status: 422 }),
     );
     renderDetail(kepalaBidang, approvedPkg());
     await screen.findByText("001/9/1.1/114/2025");
@@ -544,7 +546,7 @@ describe("ChangePackageDetailPage — regresi error pasca-refetch (a602c46)", ()
   it("mutasi gagal → pesan error tampil dan TIDAK lenyap (tak ada refetch otomatis)", async () => {
     // Tolak ditolak server 422:
     mockedReject.mockRejectedValueOnce(
-      new Error("Inisiator tidak dapat menolak paketnya sendiri."),
+      new ApiError("http", "Inisiator tidak dapat menolak paketnya sendiri.", { status: 422 }),
     );
     renderDetail(kepalaTim, pendingPkg());
     await screen.findByText("001/9/1.1/114/2025");
@@ -622,7 +624,7 @@ describe("ChangePackageDetailPage — spinner pending + toast (T7a)", () => {
 
   it("Tolak gagal → toast pesan server + banner inline tetap", async () => {
     mockedReject.mockRejectedValueOnce(
-      new Error("Inisiator tidak dapat menolak paketnya sendiri."),
+      new ApiError("http", "Inisiator tidak dapat menolak paketnya sendiri.", { status: 422 }),
     );
     renderDetail(kepalaTim, pendingPkg());
     await screen.findByText("001/9/1.1/114/2025");

@@ -498,7 +498,9 @@ describe("MonitoringPage — Semua Laporan", () => {
 
 describe("MonitoringPage — regresi visibilitas error (a602c46)", () => {
   it("board 403 → pesan tampil dan TETAP tampil setelah pindah tab & kembali", async () => {
-    mockedBoard.mockRejectedValueOnce(new Error("This action is unauthorized."));
+    mockedBoard.mockRejectedValueOnce(
+      new ApiError("http", "This action is unauthorized.", { status: 403 }),
+    );
     renderPageAs();
 
     const alert = await screen.findByTestId("monitoring-board-error");
@@ -515,7 +517,7 @@ describe("MonitoringPage — regresi visibilitas error (a602c46)", () => {
 
   it("list 422 → pesan server tampil dan selamat dari pindah tab", async () => {
     mockedList.mockRejectedValueOnce(
-      new Error("User tidak terhubung dengan bidang manapun."),
+      new ApiError("http", "User tidak terhubung dengan bidang manapun.", { status: 422 }),
     );
     renderPageAs();
     await openReportsTab();
