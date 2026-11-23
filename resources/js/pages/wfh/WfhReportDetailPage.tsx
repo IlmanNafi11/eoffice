@@ -3,9 +3,10 @@
  * (frontend-phase2, Phase 3 task "WfhReportDetailPage + wiring route").
  *
  * Kontrak (spec §Code Style + Acceptance; plan Task detail page):
- * - gate editability via helper TUNGGAL `canEditReport(status)` (draft|rejected)
- *   — dipakai SEMUA aksi edit di halaman ini dan test-nya;
- * - aksi owner (kegiatan/absensi/tanggal/submit/revisi) disembunyikan untuk
+ * - gate editability via helper TUNGGAL `canEditReport(status)` (draft saja;
+ *   rejected terminal — revisi dihapus 2026-11-23) — dipakai SEMUA aksi edit
+ *   di halaman ini dan test-nya;
+ * - aksi owner (kegiatan/absensi/tanggal/submit) disembunyikan untuk
  *   non-owner; approve/reject butuh `wfh.report.approve|reject` dan hanya
  *   untuk status `pending` (route middleware `routes/api.php` sumber kebenaran
  *   otorisasi; UI hanya menyembunyikan aksi yang mustahil lolos);
@@ -62,7 +63,6 @@ import {
   fetchWfhReport,
   rejectWfhReport,
   reorderReportActivities,
-  reviseWfhReport,
   selectWfhCurrent,
   submitWfhReport,
   updateReportActivity,
@@ -73,7 +73,7 @@ import { selectUser } from "@/store/authSlice";
 
 /** Satu pintu gate edit — dipakai semua aksi edit (spec §Risks). */
 export function canEditReport(status: WfhReport["status"]): boolean {
-  return status === "draft" || status === "rejected";
+  return status === "draft";
 }
 
 export function WfhReportDetailPage() {
@@ -160,7 +160,6 @@ export function WfhReportDetailPage() {
   const editable = canEditReport(report.status);
 
   const canSubmit = isOwner && report.status === "draft" && can(user, "wfh.report.submit");
-  const canRevise = isOwner && report.status === "rejected" && can(user, "wfh.report.update");
   const canApprove = report.status === "pending" && can(user, "wfh.report.approve");
   const canReject = report.status === "pending" && can(user, "wfh.report.reject");
   const canUpdateReport = editable && isOwner && can(user, "wfh.report.update");
@@ -430,17 +429,6 @@ export function WfhReportDetailPage() {
             onClick={() => void runMutation(dispatch(submitWfhReport(report.id)))}
           >
             Ajukan untuk disetujui
-          </Button>
-        </div>
-      ) : null}
-
-      {canRevise ? (
-        <div>
-          <Button
-            disabled={pendingMutation}
-            onClick={() => void runMutation(dispatch(reviseWfhReport(report.id)))}
-          >
-            Revisi laporan
           </Button>
         </div>
       ) : null}

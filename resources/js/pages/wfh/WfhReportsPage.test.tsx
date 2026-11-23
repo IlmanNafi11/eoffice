@@ -26,7 +26,6 @@ vi.mock("@/api/wfh", () => ({
   submitWfhReport: vi.fn(),
   approveWfhReport: vi.fn(),
   rejectWfhReport: vi.fn(),
-  reviseWfhReport: vi.fn(),
   updateWfhReportMetadata: vi.fn(),
   deleteWfhReport: vi.fn(),
 }));

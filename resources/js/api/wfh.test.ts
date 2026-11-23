@@ -15,7 +15,6 @@ import {
   submitWfhReport,
   approveWfhReport,
   rejectWfhReport,
-  reviseWfhReport,
   addReportActivity,
   updateReportActivity,
   deleteReportActivity,
@@ -239,7 +238,6 @@ describe("api/wfh — transisi status", () => {
   it.each([
     ["submitWfhReport", submitWfhReport, "/wfh/reports/23/submit"],
     ["approveWfhReport", approveWfhReport, "/wfh/reports/23/approve"],
-    ["reviseWfhReport", reviseWfhReport, "/wfh/reports/23/revise"],
   ])("%s POST tanpa body → requireData resource", async (_name, fn, url) => {
     ok({ success: true, data: { ...report, status: "pending" }, message: "Laporan berhasil disubmit untuk persetujuan." });
 

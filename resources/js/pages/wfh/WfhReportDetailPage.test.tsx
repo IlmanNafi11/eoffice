@@ -2,9 +2,10 @@
  * Unit test WfhReportDetailPage (frontend-phase2 — Phase 3 task detail page).
  * Kontrak yang dijaga (plan Task "WfhReportDetailPage + wiring route"):
  * - mount → GET /wfh/reports/{id} (id dari route) + GET /wfh/session-config;
- * - gate editability via helper TUNGGAL `canEditReport(status)` (draft|rejected);
- * - aksi owner (submit/revisi/edit tanggal/aktivitas/absensi) disembunyikan
- *   untuk non-owner; approve/reject butuh `wfh.report.approve|reject`;
+ * - gate editability via helper TUNGGAL `canEditReport(status)` (draft saja;
+ *   rejected terminal — revisi dihapus 2026-11-23);
+ * - aksi owner (edit tanggal/aktivitas/absensi/submit) disembunyikan untuk
+ *   non-owner; approve/reject butuh `wfh.report.approve|reject`;
  * - PDF hanya `pending|approved` + `wfh.report.export_pdf`;
  * - aksi tak diizinkan disembunyikan (bukan disabled);
  * - reject wajib lewat dialog alasan;
@@ -28,7 +29,6 @@ vi.mock("@/api/wfh", () => ({
   submitWfhReport: vi.fn(),
   approveWfhReport: vi.fn(),
   rejectWfhReport: vi.fn(),
-  reviseWfhReport: vi.fn(),
   updateWfhReportMetadata: vi.fn(),
   deleteWfhReport: vi.fn(),
   addReportActivity: vi.fn(),
@@ -134,9 +134,9 @@ beforeEach(() => {
 // ── Helper tunggal editability ──────────────────────────────────────
 
 describe("canEditReport — satu pintu gate edit (spec §Risks)", () => {
-  it("draft dan rejected boleh diedit", () => {
+  it("draft boleh diedit; rejected terminal (tidak bisa diedit)", () => {
     expect(canEditReport("draft")).toBe(true);
-    expect(canEditReport("rejected")).toBe(true);
+    expect(canEditReport("rejected")).toBe(false);
   });
 
   it("pending dan approved terkunci", () => {
@@ -201,15 +201,14 @@ describe("WfhReportDetailPage — aksi owner (staf)", () => {
     expect(screen.queryByLabelText(/tanggal laporan/i)).toBeNull();
   });
 
-  it("rejected: alasan penolakan tampil + tombol revisi; editor aktif lagi (canEditReport)", async () => {
+  it("rejected: alasan penolakan tampil, TANPA tombol revisi, editor mati (terminal)", async () => {
     renderDetail("staf", { ...detail("rejected"), reject_reason: "Terlalu singkat." });
 
     expect(await screen.findByText("Terlalu singkat.")).toBeTruthy();
-    expect(await screen.findByRole("button", { name: /revisi/i })).toBeTruthy();
-    // canEditReport("rejected") === true → editor & unggah aktif lagi.
-    expect(screen.getByRole("button", { name: /tambah kegiatan/i })).toBeTruthy();
-    expect(screen.getAllByLabelText(/unggah foto/i)).toHaveLength(3);
-    // Submit hanya untuk draft — setelah revisi status kembali ke draft.
+    expect(screen.queryByRole("button", { name: /revisi/i })).toBeNull();
+    // canEditReport("rejected") === false → editor & unggah mati.
+    expect(screen.queryByRole("button", { name: /tambah kegiatan/i })).toBeNull();
+    expect(screen.queryByLabelText(/unggah foto/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /ajukan untuk disetujui/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /unduh pdf/i })).toBeNull();
   });

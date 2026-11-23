@@ -140,18 +140,6 @@ export const rejectWfhReport = createAsyncThunk<WfhReport, { reportId: number; r
   },
 );
 
-/** POST /wfh/reports/{report}/revise. */
-export const reviseWfhReport = createAsyncThunk<WfhReport, number>(
-  "wfh/reviseReport",
-  async (reportId, { rejectWithValue }) => {
-    try {
-      return await wfhApi.reviseWfhReport(reportId);
-    } catch (error) {
-      return rejectWithValue(messageOf(error));
-    }
-  },
-);
-
 /** PUT /wfh/reports/{report} — metadata only. */
 export const updateWfhReportMetadata = createAsyncThunk<
   WfhReport,
@@ -276,13 +264,13 @@ export const deleteReportAttendance = createAsyncThunk<
 
 /**
  * Regex tipe aksi mutasi yang fulfilled-nya membawa `WfhReport` — dipakai
- * `addMatcher` sehingga satu handler melayani submit/approve/reject/revise/
+ * `addMatcher` sehingga satu handler melayani submit/approve/reject/
  * metadata (semuanya mengembalikan resource yang sama, update response).
  */
 const WFH_MUTATION_FULFILLED =
-  /^wfh\/(submit|approve|reject|revise)Report\/fulfilled$|^wfh\/updateReportMetadata\/fulfilled$/;
+  /^wfh\/(submit|approve|reject)Report\/fulfilled$|^wfh\/updateReportMetadata\/fulfilled$/;
 const WFH_MUTATION_SETTLED =
-  /^wfh\/(submit|approve|reject|revise)Report\/(pending|rejected)$|^wfh\/updateReportMetadata\/(pending|rejected)$/;
+  /^wfh\/(submit|approve|reject)Report\/(pending|rejected)$|^wfh\/updateReportMetadata\/(pending|rejected)$/;
 
 /** Aksi mutasi settled (pending|rejected) — payload adalah message string. */
 interface WfhMutationSettled {

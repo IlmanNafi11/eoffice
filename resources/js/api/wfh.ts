@@ -97,12 +97,6 @@ export async function rejectWfhReport(reportId: number, reason: string): Promise
   return { ...requireData(res.data, "rejectWfhReport"), message: res.message ?? "" };
 }
 
-/** POST /wfh/reports/{report}/revise. */
-export async function reviseWfhReport(reportId: number): Promise<Messaged<WfhReport>> {
-  const res = await api.post<WfhReport>(`/wfh/reports/${reportId}/revise`);
-  return { ...requireData(res.data, "reviseWfhReport"), message: res.message ?? "" };
-}
-
 /** POST /wfh/reports/{report}/activities — tambah satu kegiatan (JSON). */
 export async function addReportActivity(reportId: number, input: ActivityInput): Promise<Messaged<WfhReportActivity>> {
   const res = await api.post<WfhReportActivity>(`/wfh/reports/${reportId}/activities`, input);

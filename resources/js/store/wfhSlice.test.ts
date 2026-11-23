@@ -20,7 +20,6 @@ vi.mock("@/api/wfh", () => ({
   submitWfhReport: vi.fn(),
   approveWfhReport: vi.fn(),
   rejectWfhReport: vi.fn(),
-  reviseWfhReport: vi.fn(),
   updateWfhReportMetadata: vi.fn(),
   deleteWfhReport: vi.fn(),
 }));
@@ -34,7 +33,6 @@ import {
   submitWfhReport,
   approveWfhReport,
   rejectWfhReport,
-  reviseWfhReport,
   updateWfhReportMetadata,
   deleteWfhReport,
   setListQuery,
@@ -52,7 +50,6 @@ const mockedGet = wfhApi.getWfhReport as unknown as Mock;
 const mockedSubmit = wfhApi.submitWfhReport as unknown as Mock;
 const mockedApprove = wfhApi.approveWfhReport as unknown as Mock;
 const mockedReject = wfhApi.rejectWfhReport as unknown as Mock;
-const mockedRevise = wfhApi.reviseWfhReport as unknown as Mock;
 const mockedMetadata = wfhApi.updateWfhReportMetadata as unknown as Mock;
 const mockedDelete = wfhApi.deleteWfhReport as unknown as Mock;
 
@@ -212,21 +209,6 @@ describe("wfhSlice — thunks", () => {
     expect(selectWfhCurrentReport(store.getState())).toEqual(rejected);
   });
 
-  it("revise sukses mengembalikan current ke status draft", async () => {
-    const rejected: WfhReport = { ...reportPending, status: "rejected" };
-    mockedList.mockResolvedValueOnce({ reports: [rejected], meta });
-    const store = makeStore();
-    await store.dispatch(fetchWfhReports({}));
-    mockedGet.mockResolvedValueOnce(rejected);
-    await store.dispatch(fetchWfhReport(1));
-
-    const revised: WfhReport = { ...rejected, status: "draft" };
-    mockedRevise.mockResolvedValueOnce(revised);
-    await store.dispatch(reviseWfhReport(1));
-
-    expect(selectWfhCurrentReport(store.getState())?.status).toBe("draft");
-    expect(selectWfhListItems(store.getState()).find((r) => r.id === 1)?.status).toBe("draft");
-  });
 
   it("update metadata sukses mengganti report_date tanpa mengubah status", async () => {
     mockedGet.mockResolvedValueOnce(reportDraft);
