@@ -2,7 +2,6 @@
 
 namespace App\Domains\ChangeManagement\Http\Requests;
 
-use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -32,7 +31,6 @@ class ChangePackageRules
         'release_date',
         'implementation_result',
         'review_response',
-        'evaluator_id',
     ];
 
     /**
@@ -123,7 +121,6 @@ class ChangePackageRules
             'implementation.review_status' => ['prohibited'],
             'implementation.reviewer_signed_at' => ['prohibited'],
             'implementation.responsible_signed_at' => ['prohibited'],
-            'implementation.evaluator_signed_at' => ['prohibited'],
         ];
     }
 
@@ -171,37 +168,6 @@ class ChangePackageRules
             }],
             'implementation.implementation_result' => [$presence, 'string'],
             'implementation.review_response' => ['nullable', 'string'],
-            'implementation.evaluator_id' => self::evaluatorRule(),
         ]);
-    }
-
-    /** @return array<int, mixed> */
-    private static function evaluatorRule(): array
-    {
-        return [
-            'nullable',
-            'integer',
-            'exists:users,id',
-            function (string $attribute, mixed $value, Closure $fail) {
-                if (! $value || ! request()->user() || $value === request()->user()->id) {
-                    return;
-                }
-
-                $evaluator = User::with('team')->find($value);
-
-                if (! $evaluator?->is_active) {
-                    $fail('Evaluator tidak ditemukan atau tidak aktif.');
-
-                    return;
-                }
-
-                $creatorFieldId = request()->user()->team?->field_id;
-                $evaluatorFieldId = $evaluator->team?->field_id;
-
-                if ($creatorFieldId !== $evaluatorFieldId) {
-                    $fail('Evaluator harus berada dalam bidang yang sama.');
-                }
-            },
-        ];
     }
 }

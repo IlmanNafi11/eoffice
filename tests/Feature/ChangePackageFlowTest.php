@@ -438,8 +438,10 @@ class ChangePackageFlowTest extends TestCase
 
     public function test_implementation_pdf_rejected_if_signature_unset(): void
     {
-        // evaluator unset (skipped by guard). reviewer = responsible =
-        // kepalaTim — intentionally left without signature.
+        // Evaluator = initiator: staf (initiator) HAS a signature, so the
+        // guard must still reject because reviewer = responsible = kepalaTim
+        // is intentionally left without one.
+        $this->setUserSignature($this->staf);
 
         [$initId] = $this->createSubmittedPackage();
         Sanctum::actingAs($this->kepalaTim);
@@ -448,6 +450,49 @@ class ChangePackageFlowTest extends TestCase
         $this->getJson("/api/changes/{$initId}/pdf/implementation")
             ->assertStatus(422)
             ->assertJsonPath('success', false);
+    }
+
+    public function test_implementation_pdf_rejected_when_initiator_signature_unset(): void
+    {
+        // Evaluator = initiator: an initiator without a signature blocks the
+        // implementation PDF export even though reviewer/responsible have one.
+        $this->setUserSignature($this->kepalaTim);
+
+        [$initId] = $this->createSubmittedPackage();
+        Sanctum::actingAs($this->kepalaTim);
+        $this->postJson("/api/changes/{$initId}/approve");
+        Sanctum::actingAs($this->admin);
+        $this->getJson("/api/changes/{$initId}/pdf/implementation")
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_submit_payload_with_evaluator_id_is_ignored(): void
+    {
+        Sanctum::actingAs($this->staf);
+        $pkg = $this->postJson('/api/changes', $this->validDraftWithAll())->json('data.initiation');
+
+        $payload = $this->validSubmitPayload();
+        $payload['implementation']['evaluator_id'] = $this->otherStaf->id;
+
+        $response = $this->postJson("/api/changes/{$pkg['id']}/submit", $payload);
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+        $this->assertArrayNotHasKey('evaluator_id', $response->json('data.implementation'));
+        $this->assertArrayNotHasKey('evaluator_signed_at', $response->json('data.implementation'));
+    }
+
+    public function test_create_payload_with_evaluator_id_is_ignored(): void
+    {
+        Sanctum::actingAs($this->staf);
+
+        $payload = $this->validDraftWithAll();
+        $payload['implementation']['evaluator_id'] = $this->otherStaf->id;
+
+        $response = $this->postJson('/api/changes', $payload);
+
+        $response->assertStatus(201)->assertJsonPath('success', true);
+        $this->assertArrayNotHasKey('evaluator_id', $response->json('data.implementation'));
     }
 
     public function test_pdf_before_approve_returns_422(): void

@@ -86,9 +86,9 @@ class ChangeFormPdfTemplateTest extends TestCase
             'implementationResult' => 'Rilis',
             'attachmentImages' => [],
             'releaseDate' => '19 Maret 2026',
-            'evaluatorName' => 'EVALUATOR',
-            'evaluatorNip' => '1',
-            'evaluatorPosition' => 'Aptika',
+            'evaluatorName' => 'I WAYAN RUDY ARTHA',
+            'evaluatorNip' => '197705172009011005',
+            'evaluatorPosition' => 'Pranata Komputer Ahli Muda',
             'evaluatorSig' => 'data:image/png;base64,AAAA',
             'reviewerName' => 'REVIEWER',
             'reviewerNip' => '2',
@@ -178,7 +178,7 @@ class ChangeFormPdfTemplateTest extends TestCase
             $this->assertStringContainsString($label, $html);
         }
 
-        $this->assertStringContainsString('EVALUATOR', $html);
+        $this->assertStringContainsString('I WAYAN RUDY ARTHA', $html);
         $this->assertStringContainsString('REVIEWER', $html);
         $this->assertStringContainsString('PENANGGUNG', $html);
         $this->assertSame(3, substr_count($html, 'Tanda Tangan'));

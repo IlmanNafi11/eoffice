@@ -28,7 +28,6 @@ class ChangeImplementation extends Model
         'cost_amount',
         'resources',
         'test_plan',
-        'evaluator_id',
         'review_response',
         'execution_date',
         'implementation_result',
@@ -40,7 +39,6 @@ class ChangeImplementation extends Model
         'cost_amount' => 'decimal:2',
         'execution_date' => 'date',
         'release_date' => 'date',
-        'evaluator_signed_at' => 'datetime',
         'reviewer_signed_at' => 'datetime',
         'responsible_signed_at' => 'datetime',
     ];
@@ -48,11 +46,6 @@ class ChangeImplementation extends Model
     public function initiation(): BelongsTo
     {
         return $this->belongsTo(ChangeInitiation::class, 'change_initiation_id');
-    }
-
-    public function evaluator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'evaluator_id');
     }
 
     public function reviewer(): BelongsTo

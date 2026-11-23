@@ -56,6 +56,7 @@ class ChangePackagePdfData
     public function forImplementation(ChangeInitiation $package): array
     {
         $field = $package->field;
+        $initiator = $package->initiator;
         $impl = $package->implementation;
 
         return [
@@ -72,7 +73,7 @@ class ChangePackagePdfData
             'resources' => $impl->resources ?? '-',
             'testPlan' => $impl->test_plan ?? '-',
             'changeTypes' => $impl->changeTypes->pluck('name')->all(),
-            'evaluatorBidang' => $impl->evaluator?->team?->field?->name ?? '-',
+            'evaluatorBidang' => $initiator?->team?->field?->name ?? '-',
             'reviewerBidang' => $impl->reviewer?->team?->field?->name ?? '-',
             'responsibleBidang' => $impl->responsible?->team?->field?->name ?? '-',
             'reviewStatus' => $impl->review_status ?? '-',
@@ -82,10 +83,10 @@ class ChangePackagePdfData
             'implementationResult' => $impl->implementation_result ?? '-',
             'attachmentImages' => $this->resolveAttachmentImages($impl),
             'releaseDate' => $impl->release_date?->isoFormat('D MMMM Y') ?? '-',
-            'evaluatorName' => $impl->evaluator ? strtoupper($impl->evaluator->name) : '-',
-            'evaluatorNip' => $impl->evaluator?->nip ?? '-',
-            'evaluatorPosition' => $impl->evaluator?->position ?? '-',
-            'evaluatorSig' => $this->resolveSignature($impl->evaluator?->signature_path),
+            'evaluatorName' => $initiator ? strtoupper($initiator->name) : '-',
+            'evaluatorNip' => $initiator?->nip ?? '-',
+            'evaluatorPosition' => $initiator?->position ?? '-',
+            'evaluatorSig' => $this->resolveSignature($initiator?->signature_path),
             'reviewerName' => $impl->reviewer ? strtoupper($impl->reviewer->name) : '-',
             'reviewerNip' => $impl->reviewer?->nip ?? '-',
             'reviewerPosition' => $impl->reviewer?->position ?? '-',

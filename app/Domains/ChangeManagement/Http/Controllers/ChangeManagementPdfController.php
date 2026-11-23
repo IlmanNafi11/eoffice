@@ -72,9 +72,10 @@ class ChangeManagementPdfController extends Controller
         }
 
         // PDF embeds real signatures; refuse export when any involved user
-        // has not configured theirs yet.
+        // has not configured theirs yet. Evaluator = initiator (design #4),
+        // so the initiator signature is required for the evaluator block.
         if ($missing = SignatureGuard::missing([
-            $impl->evaluator,
+            $package->initiator,
             $impl->reviewer,
             $impl->responsible,
         ])) {

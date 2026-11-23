@@ -82,10 +82,28 @@ class ChangeManagementPdfDataTest extends TestCase
         $this->assertSame($package->implementation->impact, $data['impact']);
         $this->assertSame('Tidak', $data['costNeeded']);
         $this->assertSame('-', $data['costAmount']);
-        $this->assertSame('', $data['evaluatorSig']);
+        // Evaluator block is sourced from the initiator (evaluator = initiator).
+        $this->assertSame(strtoupper($package->initiator->name), $data['evaluatorName']);
+        $this->assertSame($package->initiator->nip, $data['evaluatorNip']);
+        $this->assertStringStartsWith('data:image/png;base64,', $data['evaluatorSig']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['reviewerSig']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['responsibleSig']);
         $this->assertIsArray($data['attachmentImages']);
+    }
+
+    public function test_implementation_builder_renders_blank_evaluator_signature_when_initiator_has_none(): void
+    {
+        // staf (initiator) intentionally left without a signature; the PDF
+        // data must carry an empty evaluatorSig rather than a placeholder.
+        $this->setUserSignature($this->kepalaTim);
+
+        $package = app(ChangeManagementRepositoryInterface::class)->findPackage(
+            $this->createApprovedPackage()
+        );
+
+        $data = app(ChangePackagePdfData::class)->forImplementation($package);
+
+        $this->assertSame('', $data['evaluatorSig']);
     }
 
     public function test_implementation_builder_exposes_logo_and_derived_flags(): void

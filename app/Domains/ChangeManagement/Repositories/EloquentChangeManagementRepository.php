@@ -34,9 +34,10 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
     /** Relations loaded for a full package read (show / after-write return). */
     private const PACKAGE_RELATIONS = [
         'field',
-        'initiator.team',
+        // initiator.team.field feeds the evaluator block of the implementation
+        // PDF (evaluator = initiator) as well as the initiation PDF.
+        'initiator.team.field',
         'reviewer',
-        'implementation.evaluator.team.field',
         'implementation.reviewer.team.field',
         'implementation.responsible.team.field',
         'implementation.changeTypes',

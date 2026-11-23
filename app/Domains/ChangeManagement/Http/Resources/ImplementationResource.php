@@ -19,8 +19,6 @@ class ImplementationResource extends JsonResource
             'cost_amount' => $this->cost_amount,
             'resources' => $this->resources,
             'test_plan' => $this->test_plan,
-            'evaluator_id' => $this->evaluator_id,
-            'evaluator_signed_at' => $this->evaluator_signed_at,
             'review_status' => $this->review_status,
             'review_response' => $this->review_response,
             'execution_date' => $this->execution_date?->format('Y-m-d'),
