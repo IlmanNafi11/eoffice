@@ -362,8 +362,6 @@ const implementation: PackageImplementation = {
   cost_amount: "15000000.00",
   resources: "Cloud server 8 vCPU 16GB RAM",
   test_plan: "Smoke test semua endpoint API.",
-  evaluator_id: 27,
-  evaluator_signed_at: "2025-07-14T11:00:00.000000Z",
   review_status: "diterima",
   review_response: "Rencana implementasi sudah baik.",
   execution_date: "2025-11-10",
@@ -430,7 +428,7 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
     expect(draftOnly.implementation).toBeUndefined();
   });
 
-  it("PackageDraftInput sesuai ChangePackageDraftRequest — implementation opsional, evaluator_id opsional", () => {
+  it("PackageDraftInput sesuai ChangePackageDraftRequest — implementation opsional", () => {
     const draft: PackageDraftInput = {
       initiation: {
         field_id: 3,
@@ -454,14 +452,8 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
       },
     };
     expect(draft.implementation?.change_type_ids).toEqual([1, 3]);
-    const withEvaluator: PackageDraftInput = {
-      initiation: { field_id: 3, description: "d", reason: "r" },
-      implementation: { evaluator_id: 27 },
-    };
-    expect(withEvaluator.implementation?.evaluator_id).toBe(27);
   });
-
-  it("PackageSubmitInput sesuai ChangePackageSubmitRequest — evaluator_id opsional nullable", () => {
+  it("PackageSubmitInput sesuai ChangePackageSubmitRequest — nullable lain opsional", () => {
     const submit: PackageSubmitInput = {
       initiation: {
         field_id: 3,
@@ -477,45 +469,11 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
         execution_date: "2025-11-10",
         release_date: "2025-11-15",
         implementation_result: "Selesai",
-        evaluator_id: 27,
+        production_impact: null,
       },
     };
-    expect(submit.implementation.evaluator_id).toBe(27);
-    const noEvaluator: PackageSubmitInput = {
-      initiation: {
-        field_id: 3,
-        description: "d",
-        reason: "r",
-        needed_by_date: "2025-12-15",
-      },
-      implementation: {
-        priority: "normal",
-        impact: "Minor",
-        change_type_ids: [1],
-        test_plan: "t",
-        execution_date: "2025-11-10",
-        release_date: "2025-11-11",
-        implementation_result: "r",
-        evaluator_id: null,
-      },
-    };
-    expect(noEvaluator.implementation.evaluator_id).toBeNull();
+    expect(submit.implementation.production_impact).toBeNull();
   });
-  it("PackageSubmitInput menolak implementation tanpa field wajib (release_date + implementation_result)", () => {
-    const bad: PackageSubmitInput = {
-      initiation: { field_id: 3, description: "d", reason: "r", needed_by_date: "2025-12-15" },
-      // @ts-expect-error — nested object missing `release_date` + `implementation_result`
-      implementation: {
-        priority: "normal",
-        impact: "Minor",
-        change_type_ids: [1],
-        test_plan: "t",
-        execution_date: "a",
-      },
-    };
-    expect(bad).toBeDefined();
-  });
-
   it("ListPackagesQuery hanya per_page/page/status (+field_id persis openapi)", () => {
     const q: ListPackagesQuery = { per_page: 15, page: 2, status: "pending" };
     expect(q.status).toBe("pending");

@@ -1,7 +1,7 @@
 /**
  * `Combobox` (Task 5, D5): Popover animate + Command (cmdk) — generik,
- * single-select, searchable, nullable. Consumer tunggal awal: picker
- * evaluator (daftar user satu bidang bisa panjang; cari by nama/NIP).
+ * single-select, searchable, nullable. Komponen dasar generik — tetap
+ * dipertahankan (desain #9) meski consumer picker evaluator sudah dihapus.
  *
  * Kontrak: `value: string | null` (nullable), `onValueChange(value | null)`.
  * Trigger = Button ber-label menampilkan label item terpilih/placeholder;

@@ -148,7 +148,7 @@ describe("api/change-package — list + change-types (envelope)", () => {
 });
 
 describe("api/change-package — create/show/update/delete", () => {
-  it("createPackage POST draft JSON persis skema tanpa evaluator/field state", async () => {
+  it("createPackage POST draft JSON persis skema tanpa field state", async () => {
     const input: PackageDraftInput = {
       initiation: {
         field_id: 3,

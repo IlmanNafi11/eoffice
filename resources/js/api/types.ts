@@ -456,8 +456,6 @@ export interface PackageImplementation {
   cost_amount?: string | null;
   resources?: string | null;
   test_plan?: string | null;
-  evaluator_id?: number | null;
-  evaluator_signed_at?: string | null;
   review_status?: string | null;
   review_response?: string | null;
   execution_date?: string | null;
@@ -483,12 +481,9 @@ export interface ChangePackage {
 
 /**
  * `#/components/schemas/ChangePackageDraftRequest.implementation` — semua prop
- * nullable (backend `nullable`). `evaluator_id` kini jadi masukan UI (Resolved
- * #1 digugurkan): picker di SetChangePackageFormPage memilih evaluator aktif
- * sebidang; `null` = belum memilih.
+ * nullable (backend `nullable`). Evaluator otomatis inisiator (cutover Task 3).
  */
 export interface PackageImplementationDraftInput {
-  evaluator_id?: number | null;
   priority?: "normal" | "emergency" | null;
   impact?: "Minor" | "Mayor" | null;
   change_type_ids?: number[] | null;
@@ -527,11 +522,10 @@ export interface PackageDraftInput {
  * `#/components/schemas/ChangePackageSubmitRequest.implementation` — semua 7
  * field required (`priority`, `impact`, `change_type_ids`, `test_plan`,
  * `execution_date`, `release_date`, `implementation_result`) plus opsional
- * nullable lain (`evaluator_id`, `production_impact`, …); `change_type_ids`
- * minimal 1 (backend `min:1`).
+ * nullable lain (`production_impact`, …); `change_type_ids` minimal 1
+ * (backend `min:1`).
  */
 export interface PackageImplementationSubmitInput {
-  evaluator_id?: number | null;
   priority: "normal" | "emergency";
   impact: "Minor" | "Mayor";
   change_type_ids: number[];
@@ -688,20 +682,3 @@ export interface QrVerification {
   message: string;
 }
 
-// ── Picker evaluator (modul organization — GET /api/users) ──────────
-
-/** Query `GET /users` (listUsersForPicker) — admin/`user.manage` saja. */
-export interface ListFieldUsersQuery {
-  field_id?: number;
-}
-
-/**
- * Baris `GET /users` — subset `UserResource` yang dipakai picker evaluator
- * (daftar aktif satu bidang, non-paginated): identitas + tim untuk label.
- */
-export interface PickerUser {
-  id: number;
-  name: string;
-  nip: string;
-  team?: TeamNested | null;
-}
