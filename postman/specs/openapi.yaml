@@ -23,7 +23,7 @@ info:
     - QR codes on newly generated PDFs encode the SPA path
       `{app.url}/verify/{token}` directly.
     - Added `GET /api/users` — a read-only, field-scoped active-user list for
-      dropdown pickers (e.g. the change-package evaluator selector). Visible to
+      dropdown pickers. Visible to
       any authenticated user; non-admins see only their own bidang, admins /
       `user.manage` hold the same `field_id` filter as `GET /api/teams`.
 
@@ -112,8 +112,10 @@ info:
       plus `PATCH /wfh/reports/{report}/activities/reorder`.
     - `PUT /wfh/reports/{report}` narrowed to metadata (`report_date` only);
       embedded activities/attendances are ignored — use the sub-resource endpoints.
-    - `POST /wfh/reports` is get-or-create: returns the existing draft/rejected
-      report for `(user, report_date)` with `200` instead of duplicating (201).
+    - `POST /wfh/reports` is get-or-create: returns the existing draft report
+      for `(user, report_date)` with `200` instead of duplicating (201). A
+      rejected report for the same date is never returned — a new draft is
+      created and the rejected report's attendances move onto it.
     - Submit content guard moved DB-side: `POST /wfh/reports/{report}/submit`
       rejects (422) drafts with zero activities AND zero attendances.
 
@@ -1541,7 +1543,6 @@ components:
             execution_date: { type: string, format: date, nullable: true, example: "2025-11-10" }
             release_date: { type: string, format: date, nullable: true, example: "2025-11-15" }
             implementation_result: { type: string, nullable: true, example: "Migrasi berhasil dilakukan pada akhir pekan tanpa downtime, semua data telah dipindahkan ke cloud." }
-            evaluator_id: { type: integer, nullable: true, description: "Active user, same field.", example: 27 }
             production_impact: { type: string, nullable: true, example: "Aplikasi tidak dapat diakses selama 2 jam pada saat migrasi data." }
             required_effort: { type: string, nullable: true, example: "3 orang x 5 hari kerja" }
             cost_needed: { type: boolean, nullable: true, example: true }
@@ -1586,7 +1587,6 @@ components:
             execution_date: { type: string, format: date, example: "2025-11-10" }
             release_date: { type: string, format: date, example: "2025-11-15" }
             implementation_result: { type: string, example: "Migrasi berhasil dilakukan pada akhir pekan tanpa downtime, semua data telah dipindahkan ke cloud." }
-            evaluator_id: { type: integer, nullable: true, description: "Active user, same field.", example: 27 }
             production_impact: { type: string, nullable: true, example: "Aplikasi tidak dapat diakses selama 2 jam pada saat migrasi data." }
             required_effort: { type: string, nullable: true, example: "3 orang x 5 hari kerja" }
             cost_needed: { type: boolean, nullable: true, example: true }
@@ -1606,7 +1606,6 @@ components:
           execution_date: "2025-11-10"
           release_date: "2025-11-15"
           implementation_result: "Migrasi berhasil dilakukan pada akhir pekan tanpa downtime, semua data telah dipindahkan ke cloud."
-          evaluator_id: 27
     ChangePackageResource:
       type: object
       properties:
@@ -1648,8 +1647,6 @@ components:
           cost_amount: "15000000.00"
           resources: "Cloud server 8 vCPU 16GB RAM, storage 200GB SSD, bandwidth 1Gbps"
           test_plan: "Smoke test semua endpoint API, load test dengan 100 concurrent users, uji rollback ke server lama."
-          evaluator_id: 27
-          evaluator_signed_at: "2025-07-14T11:00:00.000000Z"
           review_status: diterima
           review_response: "Rencana implementasi sudah baik, disetujui untuk dilanjutkan."
           execution_date: "2025-11-10"
@@ -1726,8 +1723,6 @@ components:
         cost_amount: { type: string, nullable: true, description: "Model casts decimal:2 → serialized as STRING like '15000000.00'.", example: "15000000.00" }
         resources: { type: string, nullable: true, example: "Cloud server 8 vCPU 16GB RAM, storage 200GB SSD, bandwidth 1Gbps" }
         test_plan: { type: string, nullable: true, example: "Smoke test semua endpoint API, load test dengan 100 concurrent users, uji rollback ke server lama." }
-        evaluator_id: { type: integer, nullable: true, example: 27 }
-        evaluator_signed_at: { type: string, format: date-time, nullable: true, example: "2025-07-14T11:00:00.000000Z" }
         review_status: { type: string, nullable: true, example: diterima }
         review_response: { type: string, nullable: true, example: "Rencana implementasi sudah baik, disetujui untuk dilanjutkan." }
         execution_date: { type: string, format: date, nullable: true, example: "2025-11-10" }
@@ -3378,22 +3373,21 @@ paths:
   /api/users:
     get:
       tags: [Organization]
-      summary: List active users for dropdown (e.g. evaluator) selection
+      summary: List active users for field-scoped dropdowns
       operationId: listUsersForPicker
       security:
         - bearerAuth: []
       description: |
-        Returns active users, optionally scoped to one bidang (field) — used
-        by the change-package form's evaluator picker and similar dropdowns.
+        Returns active users, optionally scoped to one bidang (field) — for
+        field-scoped dropdowns. Former consumer (the change-package form's
+        evaluator picker) was removed 2026-11-23; the endpoint is generic.
 
         Visible to any authenticated user (no permission gate), but scoped:
         - Non-admin users (no `user.manage`): only active users of their own
           bidang; the `field_id` parameter is ignored.
         - Admin / `user.manage`: all active fields' users; `field_id` filters.
 
-        Inactive users and users without a team are never returned — the
-        evaluator validation rule only accepts active users with a team in
-        the same bidang as the package creator.
+        Inactive users and users without a team are never returned.
 
         The payload is a lean picker projection (id, name, nip, team):
         no email, roles, permissions or account-state fields — those stay
@@ -3674,7 +3668,7 @@ paths:
                   photo: <binary file upload>
       responses:
         "200":
-          description: Existing draft/rejected report returned (get-or-create)
+          description: Existing draft report returned (get-or-create)
           content:
             application/json:
               schema:
@@ -3831,8 +3825,8 @@ paths:
         v6.0.0 narrowed to metadata only (`report_date`). The full-replace
         behaviour (embedded activities/attendances arrays) is retired — use
         the row-by-row sub-resource endpoints under `/activities` and
-        `/attendances`. Status transitions go via submit/approve/reject/revise.
-        Actor must own the report; report must be `draft` or `rejected`.
+        `/attendances`. Status transitions go via submit/approve/reject.
+        Actor must own the report; report must be `draft`.
       operationId: updateWfhReport
       parameters:
         - $ref: "#/components/parameters/ReportIdPath"
@@ -3846,7 +3840,7 @@ paths:
               description: |
                 Metadata only. Embedded activities/attendances are no longer
                 accepted — use the sub-resource endpoints. Status transitions
-                go via submit/approve/reject/revise, never via PUT.
+                go via submit/approve/reject, never via PUT.
               properties:
                 report_date:
                   type: string
@@ -4162,75 +4156,15 @@ paths:
               example:
                 success: false
                 message: "Laporan dengan status draft tidak dapat ditolak."
-  /api/wfh/reports/{report}/revise:
-    post:
-      tags: [WFH Reports]
-      summary: Return report to draft for revision
-      operationId: reviseWfhReport
-      parameters:
-        - $ref: "#/components/parameters/ReportIdPath"
-      responses:
-        "200":
-          description: Report returned to draft
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [success, message, data]
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: Laporan dikembalikan ke draft untuk revisi.
-                  data:
-                    $ref: "#/components/schemas/WfhReportResource"
-        "401":
-          description: Unauthenticated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                success: false
-                message: Unauthenticated.
-        "403":
-          description: Not the report owner
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                success: false
-                message: This action is unauthorized.
-        "404":
-          description: Report not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                success: false
-                message: Laporan tidak ditemukan.
-        "422":
-          description: Invalid state transition
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                success: false
-                message: "Laporan dengan status draft tidak dapat direvisi."
   /api/wfh/reports/{report}/activities:
     post:
       tags: [WFH Reports]
-      summary: Append an activity to a draft/rejected report
+      summary: Append an activity to a draft report
       operationId: addReportActivity
       description: |
         v6.0.0 sub-resource: appends one activity (with optional inline links)
         to the report. Replaces the retired full-replace PUT activities array.
-        Guard: report must be `draft` or `rejected` (422 otherwise); actor must
+        Guard: report must be `draft` (422 otherwise); actor must
         be the report owner (403). Requires `wfh.report.create`.
       parameters:
         - $ref: "#/components/parameters/ReportIdPath"
@@ -4510,7 +4444,7 @@ paths:
       description: |
         v6.0.0 sub-resource replacing `POST /wfh/attendance`. Multipart upload
         of one session photo, scoped to the parent report. Guards: report must
-        be `draft`/`rejected` (422); `report_date` must be today (422); today
+        be `draft` (422); `report_date` must be today (422); today
         must be an allowed WFH day (422); no duplicate `(user,date,session)`
         (422); actor must own the report (403). Requires `wfh.report.create`.
       parameters:
@@ -5529,9 +5463,9 @@ paths:
       description: |
         Exports the Formulir Implementasi Perubahan as PDF. Only for packages
         where implementation status is `completed`. The three involved roles
-        (Dievaluasi Oleh, Ditinjau Oleh, Penanggungjawab) must all have set
-        their profile signature; otherwise the export is refused with 422.
-        Unassigned roles (e.g. evaluator is nullable) are gracefully skipped.
+        (Dievaluasi Oleh = the package initiator, Ditinjau Oleh,
+        Penanggungjawab) must all have set their profile signature; otherwise
+        the export is refused with 422.
       parameters:
         - $ref: "#/components/parameters/PackageIdPath"
       responses:

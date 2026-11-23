@@ -5,6 +5,23 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Changed (backend+frontend, 2026-11-23 — penutupan flow WFH & paket perubahan)
+- **Revisi laporan WFH personal dihapus.** Laporan `rejected` kini terminal &
+  immutable (PUT/DELETE/submit/approve ditolak); koreksi = laporan baru untuk
+  tanggal yang sama — absensi laporan rejected ikut berpindah ke laporan baru.
+  Route `POST /wfh/reports/{report}/revise`, method controller, thunk FE, dan
+  op OpenAPI dihapus bersih.
+- **Evaluator paket perubahan otomatis = inisiator.** Input evaluator dihapus
+  dari form; kolom `evaluator_id`/`evaluator_signed_at` di-drop dari DB
+  (migration 2026_11_23_000002); payload lama yang masih mengirim
+  `evaluator_id` diabaikan (bukan 422); blok tanda tangan evaluator di PDF
+  implementasi tetap dicetak dari data inisiator.
+- Konsumen FE `GET /users` (picker evaluator) dilepas — endpoint backend tetap;
+  `resources/js/api/users.ts` dihapus, `Combobox` tetap sebagai primitif umum.
+- Kontrak & dokumen diperbarui: `postman/specs/openapi.yaml` (tanpa op revise,
+  tanpa field evaluator), `SPEC-wfh-reports.md`, `SPEC-change-package.md`.
+  Rujukan: `docs/superpowers/specs/2026-11-23-wfh-change-flow-closeout-design.md`.
+
 ### Fixed (frontend+PDF, 2026-11-22 — umpan balik UX)
 - PDF WFH personal: label "Yang Membuat Laporan" dan "Atasan Langsung" kini
   berada di satu baris tabel yang sama (sejajar horizontal); tanggal

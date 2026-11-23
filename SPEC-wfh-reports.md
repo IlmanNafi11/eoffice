@@ -7,9 +7,8 @@
 ## Objective
 
 Membawa domain **Laporan WFH personal** ke SPA: staf membuat laporan harian dengan
-kegiatan (beserta tautan) dan absensi foto per sesi, lalu menjalankan alur status
-`draft → pending → approved / rejected → draft (revisi)`, mengambil PDF, dan menyaring
-daftar per tanggal/bulan. Success = 17 operation domain WFH Reports + WFH Settings
+`draft → pending → approved / rejected`, mengambil PDF, dan menyaring
+daftar per tanggal/bulan. Success = 16 operation domain WFH Reports + WFH Settings
 terkonsumsi dari UI dengan kontrak `openapi.yaml`, backend tak berubah.
 
 Semua permission gate adalah **data kontrak** — backend satu-satunya sumber kebenaran.
@@ -18,7 +17,7 @@ otorisasi server.
 
 ## Scope
 
-**In-scope endpoints (17 ops, tag `WFH Reports` + `WFH Settings`):**
+**In-scope endpoints (16 ops, tag `WFH Reports` + `WFH Settings`):**
 
 | Path | Op | Verb | Response data shape |
 |---|---|---|---|
@@ -30,7 +29,6 @@ otorisasi server.
 | `/wfh/reports/{report}/submit` | submit | POST | `WfhReportResource` |
 | `/wfh/reports/{report}/approve` | approve | POST | `WfhReportResource` |
 | `/wfh/reports/{report}/reject` | reject | POST | `WfhReportResource` (`{reason}`) |
-| `/wfh/reports/{report}/revise` | revise | POST | `WfhReportResource` |
 | `/wfh/reports/{report}/activities` | add | POST | `ReportActivityResponse` (`{id,activity,start_time,end_time,sort_order,links}`; links **tanpa** `sort_order`) |
 | `/wfh/reports/{report}/activities/{activity}` | update | PUT | `ReportActivityResponse` (links id-diff) |
 | `/wfh/reports/{report}/activities/{activity}` | delete | DELETE | `SuccessResponse` |
@@ -39,6 +37,10 @@ otorisasi server.
 | `/wfh/reports/{report}/attendances/{attendance}` | delete | DELETE | `SuccessResponse` |
 | `/wfh/reports/{report}/pdf` | export | GET | `application/pdf` binary (**non-envelope**, non-SPD) |
 | `/wfh/session-config` | config | GET | `{sessions: Session[], allowed_days: number[]}` (no permission gate) |
+- Catatan 2026-11-23: op `/revise` **dihapus** — laporan `rejected` bersifat
+  terminal & immutable; koreksi = laporan baru untuk tanggal yang sama
+  (absensi laporan rejected ikut berpindah). Lihat
+  `docs/superpowers/specs/2026-11-23-wfh-change-flow-closeout-design.md`.
 
 **Out of scope (belongs to sibling modules):** `wfh-team-reports`, `wfh-monitoring`
 (`/admin/wfh/*`), `change-package`, `admin`, `verification`.
@@ -71,7 +73,7 @@ npm run dev              # vite dev (backend lokal untuk E2E)
 ```
 resources/js/
   api/
-    wfh.ts               → 17 fungsi domain, semua via `api`, typed
+    wfh.ts               → 16 fungsi domain, semua via `api`, typed
     types.ts             → + WfhReport, WfhReportActivity, WfhReportLink,
                            WfhAttendance, WfhSessionConfig, CreateWfhReportInput,
                            RejectReportRequest, ActivityInput, ActivityUpdateInput,
@@ -135,11 +137,11 @@ export async function createWfhReport(input: CreateWfhReportInput):
 **Status** adalah union literal, bukan `string`: `type WfhReportStatus = "draft" | "pending" |
 "approved" | "rejected"`. Peta `status → label` bahasa Indonesia terpusat di
 `status-badge.tsx` (dipakai juga monitoring/team-reports nanti).
-
-**Editability** mengikuti kontrak: boleh edit kegiatan/absensi/reorder **hanya** saat
-`draft` atau `rejected`; aksi transisi/PDF gate per status dan permission
+**Editability** (catatan 2026-11-23): edit kegiatan/absensi/reorder **hanya**
+saat `draft` — `rejected` terminal & immutable (lihat design doc di atas).
+Aksi transisi/PDF gate per status dan permission
 (`wfh.report.submit/approve/reject/update/delete/activity.delete/attendance.delete/export_pdf`).
-Aksi yang tak diizinkan bar-status/permisi disembunyikan (bukan `disabled` yang bisa
+aksi yang tak diizinkan bar-status/permisi disembunyikan (bukan `disabled` yang bisa
 dibuka konsol) — validasi backend tetap satu-satunya pengaman.
 
 ## Testing Strategy
@@ -189,7 +191,8 @@ dibuka konsol) — validasi backend tetap satu-satunya pengaman.
 4. **Existing Phase 1 tests pass unmodified**: `npm run test` sebelum dan sesudah modul
    menambahkan test tanpa menyentuh assertion Phase 1.
 5. **E2E manual role staf + kepala tim/bidang** di browser (list → create → submit →
-   approve/reject → revisi → PDF) terverifikasi dan terdokumentasi di commit message.
+   approve/reject → laporan baru untuk tanggal sama → PDF) terverifikasi dan
+   terdokumentasi di commit message.
 
 ## Risks
 

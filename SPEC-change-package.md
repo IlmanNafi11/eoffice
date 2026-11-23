@@ -43,7 +43,7 @@ dirender bila tetap terjadi.
 | Upload lampiran | `change.implementation.update` | inisiator + `draft`, ≤10 file | ✓ | ✗ 403 (tanpa perm) | ✓ | ✓ |
 | Unduh lampiran | `change.initiation.view` | `packageVisibleTo` | ✓ | ✓ | ✓ | ✓ |
 | PDF inisiasi | `change.initiation.export_pdf` | status `approved` + 2 tanda tangan terpasang, else 422 | ✓ | ✓ | ✗ 403 | ✗ |
-| PDF implementasi | `change.implementation.export_pdf` | impl `completed` + tanda tangan terpasang (evaluator nullable di-skip), else 422 | ✓ | ✓ | ✗ 403 | ✗ |
+| PDF implementasi | `change.implementation.export_pdf` | impl `completed` + tanda tangan terpasang (evaluator = inisiator), else 422 | ✓ | ✓ | ✗ 403 | ✗ |
 | Change types | — (tanpa permission) | — | ✓ | ✓ | ✓ | ✓ |
 
 \* admin memegang permission tapi (REQuery #2) tidak diberi tombol create/edit/submit;
@@ -61,7 +61,7 @@ inisiator yang lolos guard server, jadi tombol delete pun digate `inisiator == u
 | `/changes/{id}` | `showPackage` | GET | envelope `ChangePackageResponse`; 404 vs 403 dipisah server ("Paket perubahan tidak ditemukan." / "Anda tidak memiliki akses ke paket ini.") |
 | `/changes/{id}` | `updatePackage` | PUT | envelope `ChangePackageResponse`; guard inisiator + draft |
 | `/changes/{id}` | `deletePackage` | DELETE | envelope `SuccessResponse`; guard inisiator + draft (soft-delete paket, lampiran hard-delete) |
-| `/changes/{id}/submit` | `submitPackage` | POST | envelope; body `ChangePackageSubmitRequest` — `initiation` {field_id, description, reason, **needed_by_date**} + `implementation` **wajib** {priority, impact, change_type_ids≥1, test_plan, execution_date, release_date, implementation_result} + opsional {evaluator_id, production_impact, required_effort, cost_needed, cost_amount, resources}; server persist semua field lalu transisi `draft→pending` + set `initiator_signed_at` |
+| `/changes/{id}/submit` | `submitPackage` | POST | envelope; body `ChangePackageSubmitRequest` — `initiation` {field_id, description, reason, **needed_by_date**} + `implementation` **wajib** {priority, impact, change_type_ids≥1, test_plan, execution_date, release_date, implementation_result} + opsional {production_impact, required_effort, cost_needed, cost_amount, resources}; server persist semua field lalu transisi `draft→pending` + set `initiator_signed_at` |
 | `/changes/{id}/approve` | `approvePackage` | POST | envelope; body `DecidePackageRequest` **tanpa field** (lihat Resolved #4) |
 | `/changes/{id}/reject` | `rejectPackage` | POST | envelope; body sama; transisi terminal |
 | `/changes/{id}/attachments` | `uploadPackageAttachments` | POST | multipart `files[]` (≤10), 200 `{success, message, data: AttachmentResource[]}` (`{id, url, sort_order}`); guard inisiator + draft |
@@ -78,7 +78,7 @@ seperti tabel di atas; `change-types` hanya `auth:sanctum` + `password.changed`)
 
 **Dipinjam:** tidak ada. (REQuery #1: pinjaman `listUsers` terbukti mustahil —
 `GET /admin/users` digate `permission:user.manage` yang hanya dimiliki admin, sedangkan
-pembuat paket adalah kepala tim/staf → pasti 403. Evaluator dibiarkan `null`.)
+pembuat paket adalah kepala tim/staf → pasti 403.)
 
 ## Tech Stack
 
@@ -213,7 +213,8 @@ export async function uploadPackageAttachments(packageId: number, files: File[])
 - **`field_id` create = `user.team.field.id`** (staf/kpt selalu bertim); bila kosong
   (admin) tombol "Buat Paket" tak dirender (REQuery #2). Field select tidak ada —
   tidak ada endpoint daftar bidang di kontrak.
-- **Evaluator tidak ada di form** (REQuery #1 — dicatat eksplisit di Resolved).
+- **Evaluator tidak ada di form** — sejak 2026-11-23 evaluator otomatis =
+  **inisiator** (kolom DB di-drop; REQuery #1 ditutup sebagai digugurkan).
 - **Submit dari form edit terisi penuh**: form mengumpulkan seluruh
   `PackageSubmitInput` lalu POST `/submit` sekali; PUT draft hanya untuk "Simpan Draft".
 - **Tombol PDF hanya bila status cocok** (`approved` / impl `completed`) — mencegah
@@ -231,7 +232,7 @@ export async function uploadPackageAttachments(packageId: number, files: File[])
   - `change-package.test.ts` — query params `status`/`page`/`per_page` hanya bila
     terisi; pemetaan envelope `{success, data[], meta}` → `{packages, meta}`;
     payload create/update/submit nested persis skema (termasuk `cost_amount` string,
-    `change_type_ids`, omit evaluator); FormData `files[]`; 2 PDF blob bypass unwrap
+    `change_type_ids`); FormData `files[]`; 2 PDF blob bypass unwrap
     + decode pesan 422 dari blob error; `listChangeTypes` envelope.
   - `changePackageSlice.test.ts` — reducer + thunk (list per filter, pagination
     mempertahankan filter aktif, detail setelah aksi, cache change-types sekali).
@@ -280,7 +281,8 @@ export async function uploadPackageAttachments(packageId: number, files: File[])
   `verification_token`, dll.) — backend `prohibited` (state-tampering rules).
 - Mengirim `reason` pada approve/reject — `DecideChangePackageRequest` tanpa rules;
   backend mengabaikannya (REQuery #4).
-- Mengirim `evaluator_id` dari form — REQuery #1 (biarkan null, catatan terbuka).
+- Mengirim `evaluator_id` dari form — sejak 2026-11-23 diabaikan server
+  (evaluator = inisiator; kolom DB di-drop).
 - Meng-unwrap blob PDF/lampiran sebagai JSON atau menjalankannya lewat interceptor `api`.
 - Menyentuh file backend/Laravel; endpoint di luar 12 op kontrak.
 
@@ -298,31 +300,29 @@ export async function uploadPackageAttachments(packageId: number, files: File[])
    (`change.initiation.view/create/update/delete/submit/approve/reject/export_pdf`,
    `change.implementation.update/export_pdf`).
 4. **REQuery terkunci test**: admin tanpa tim → tanpa tombol "Buat Paket"; form tanpa
-   input evaluator; approve/reject tanpa dialog alasan; `field_id` create bersumber
-   `user.team.field.id`.
+   picker evaluator (evaluator = inisiator, 2026-11-23); approve/reject tanpa dialog
+   alasan; `field_id` create bersumber `user.team.field.id`.
 5. **E2E manual 4 peran** di browser sesuai daftar di atas, terdokumentasi di commit.
 
 ## Risks
 
 | Risiko | Mitigasi |
 |---|---|
-| Payload submit 2-bagian besar; 422 validasi (7 field wajib + evaluator same-field + tanggal) terasa seperti bug | Validasi required sebelum kirim; pesan server dirender per field/pesan global + testid regresi |
-| `evaluator_id` pernah dibutuhkan alur kerja nyata (REQuery #1) | Catatan terbuka di Resolved; field sudah ada di tipe + payload builder — menambah picker = 1 perubahan lokal bila endpoint daftar user satu-bidang muncul di kontrak |
+| Payload submit 2-bagian besar; 422 validasi (7 field wajib + tanggal) terasa seperti bug | Validasi required sebelum kirim; pesan server dirender per field/pesan global + testid regresi |
+| `evaluator_id` pernah dibutuhkan alur kerja nyata (REQuery #1) | **Digugurkan 2026-11-23**: evaluator otomatis = inisiator, kolom DB di-drop; lihat design doc |
 | Admin tak punya tim → create gagal 422 `field_id` | Tombol create digate kepemilikan `user.team.field.id`; admin punya jalur view/decide/PDF |
 | Kepala bidang punya banyak permission lain tapi bukan approve/upload (tanpa `change.implementation.update`) | Matriks tombol per permission persis seeder, diuji user sintetik, bukan role |
-| 422 tanda tangan di PDF (2 signer inisiasi / 3 implementasi, evaluator di-skip) | `getError` memetakan pesan server ("X belum mengatur tanda tangan…") + testid; tombol tetap tampil karena status predikat terpenuhi |
+| 422 tanda tangan di PDF (2 signer inisiasi / 3 implementasi) | `getError` memetakan pesan server ("X belum mengatur tanda tangan…") + testid; tombol tetap tampil karena status predikat terpenuhi |
 | Lampiran `url` privat (`attachments.download`) ber-bearer — bukan `/storage` statis | Unduh via blob `httpClient`; test memverifikasi URL bearer dipakai, bukan `<a href=storage>` |
 | Bentuk list salah baca (paginator raw vs envelope) — bug `a78e547` | `ChangePackageListResponse` required `[success, data, meta]` di kontrak; test pemetaan envelope sejak awal |
 
 ## Resolved Questions (approved 2026-11-01)
 
-1. **REQuery #1 — evaluator**: **form TIDAK mengirim `evaluator_id` (biarkan null)**.
-   Pinjaman `listUsers` terbukti admin-only (`permission:user.manage`, hanya admin di
-   seeder) → 403 pasti untuk kepala tim/staf pembuat paket; + catatan acknowledge
-   dari user: keputusan ini kesempatan/utang kecil — bila alur kerja kelak mewajibkan
-   evaluator, prasyaratnya adalah **endpoint kontrak baru "daftar user satu bidang"**
-   untuk non-admin; saat itu picker ditambahkan di sini tanpa mengubah arsitektur
-   (tipe & payload builder sudah menyediakan field).
+1. **REQuery #1 — evaluator — DIGUGURKAN 2026-11-23**: keputusan awal "form TIDAK
+   mengirim `evaluator_id` (biarkan null)" digantikan oleh cutover: evaluator otomatis =
+   **inisiator**; kolom `evaluator_id`/`evaluator_signed_at` di-drop dari DB, payload yang
+   masih mengirim field itu diabaikan (bukan 422). Rujukan:
+   `docs/superpowers/specs/2026-11-23-wfh-change-flow-closeout-design.md`.
 2. **REQuery #2 — admin create**: admin **tidak** diberi tombol create/edit/submit
    (tanpa tim → tanpa `field_id` sumber; tidak ada endpoint daftar bidang). Admin
    view + decide + delete-inisiator-guard + 2 PDF. Disetujui user 2026-11-01.
