@@ -85,6 +85,8 @@ class ChangeManagementPdfDataTest extends TestCase
         // Evaluator block is sourced from the initiator (evaluator = initiator).
         $this->assertSame(strtoupper($package->initiator->name), $data['evaluatorName']);
         $this->assertSame($package->initiator->nip, $data['evaluatorNip']);
+        $this->assertSame($package->initiator->position ?? '-', $data['evaluatorPosition']);
+        $this->assertSame($package->initiator->team?->field?->name ?? '-', $data['evaluatorBidang']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['evaluatorSig']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['reviewerSig']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['responsibleSig']);

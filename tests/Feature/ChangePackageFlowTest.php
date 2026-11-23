@@ -281,6 +281,27 @@ class ChangePackageFlowTest extends TestCase
         $this->assertCount(1, $response->json('data'));
     }
 
+    public function test_attachment_total_cap_is_enforced_across_batches(): void
+    {
+        // The per-request `files.max:10` rule alone allows unlimited batches
+        // of 10; the spec cap (SPEC-change-package.md: "≤10 file") is on the
+        // implementation's total, so the handler must count existing rows.
+        Storage::fake('public');
+        Sanctum::actingAs($this->staf);
+        $pkg = $this->postJson('/api/changes', $this->validDraftPayload())->json('data.initiation');
+
+        $first = array_map(fn ($i) => UploadedFile::fake()->image("a{$i}.png"), range(0, 9));
+        $this->postJson("/api/changes/{$pkg['id']}/attachments", ['files' => $first])
+            ->assertStatus(200);
+
+        $second = array_map(fn ($i) => UploadedFile::fake()->image("b{$i}.png"), range(0, 4));
+        $this->postJson("/api/changes/{$pkg['id']}/attachments", ['files' => $second])
+            ->assertStatus(422)
+            ->assertJson(['success' => false, 'message' => 'Maksimal 10 lampiran.']);
+
+        $this->assertCount(10, $this->getJson("/api/changes/{$pkg['id']}")->json('data.implementation.attachments'));
+    }
+
     public function test_submit_without_testing_result_succeeds(): void
     {
         // RED: testing_result was required on submit; it is now dropped (attachments carry the result).

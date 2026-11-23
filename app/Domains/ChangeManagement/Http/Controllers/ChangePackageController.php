@@ -24,6 +24,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ChangePackageController extends Controller
 {
+    /** Spec cap (SPEC-change-package.md): total lampiran per implementasi. */
+    private const MAX_ATTACHMENTS = 10;
+
     use AuthorizesRequests;
     use ClampsPerPage;
 
@@ -239,8 +242,16 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Hanya paket draft yang dapat dilampirkan.');
         }
 
+        // The FormRequest caps ONE request at 10 files; the spec cap is on the
+        // implementation's total, so successive batches must not bypass it.
+        $incoming = $request->file('files', []);
+        $existing = $package->implementation->attachments()->count();
+        if ($existing + count($incoming) > self::MAX_ATTACHMENTS) {
+            return ApiResponse::fail('Maksimal 10 lampiran.', 422);
+        }
+
         $paths = [];
-        foreach ($request->file('files', []) as $file) {
+        foreach ($incoming as $file) {
             // Private disk: evidence must not be reachable as /storage/... (S2).
             $paths[] = $file->store('change-attachments', 'local');
         }
