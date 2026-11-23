@@ -146,13 +146,6 @@ class RouteModelBindingContractTest extends TestCase
         $this->getJson('/api/changes/1/attachments/not-a-number')->assertNotFound();
     }
 
-    public function test_revise_missing_report_by_non_numeric_segment_returns_404(): void
-    {
-        $this->staf();
-
-        $this->postJson('/api/wfh/reports/not-a-number/revise')->assertNotFound();
-    }
-
     public function test_pdf_export_missing_report_by_non_numeric_segment_returns_404(): void
     {
         $user = User::factory()->create();

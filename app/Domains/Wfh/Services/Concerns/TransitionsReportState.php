@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  * The pending guard, the approve/reject field updates, and the
  * verification-token generation each live here exactly once; the concrete
  * state machines keep only the parts that differ (the supervisor-id extra on
- * team reports, and the report-specific submit/revise flows).
+ * team reports, and the report-specific submit flow).
  */
 trait TransitionsReportState
 {

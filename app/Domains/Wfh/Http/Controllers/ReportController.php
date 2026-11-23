@@ -182,11 +182,11 @@ class ReportController extends Controller
         }
 
         if (! $this->stateMachine->canEdit($report)) {
-            return ApiResponse::fail('Laporan yang sudah disetujui tidak dapat diubah.');
+            return ApiResponse::fail('Hanya laporan draft yang dapat diubah.');
         }
 
         // Metadata-only: only report_date is writable. Status transitions go
-        // through submit/approve/reject/revise — never via PUT.
+        // through submit/approve/reject — never via PUT.
         $this->wfhRepository->updateReportMetadata($report, [
             'report_date' => $request->input('report_date', $report->report_date->format('Y-m-d')),
         ]);
@@ -206,7 +206,7 @@ class ReportController extends Controller
         }
 
         if (! $this->stateMachine->canEdit($report)) {
-            return ApiResponse::fail('Laporan yang sudah disetujui tidak dapat dihapus.');
+            return ApiResponse::fail('Hanya laporan draft yang dapat dihapus.');
         }
 
         $report->delete();

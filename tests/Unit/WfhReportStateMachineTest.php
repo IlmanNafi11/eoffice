@@ -143,38 +143,7 @@ class WfhReportStateMachineTest extends TestCase
         $this->assertEquals('Dokumen kurang lengkap', $result->reject_reason);
     }
 
-    public function test_can_revise_rejected_report(): void
-    {
-        $supervisor = User::factory()->create(['name' => 'Supervisor']);
-
-        $report = WfhReport::factory()->create([
-            'status' => 'rejected',
-            'user_id' => $this->user->id,
-            'maker_signed_at' => now()->subDay(),
-            'supervisor_id' => $supervisor->id,
-            'reject_reason' => 'Revisi',
-        ]);
-
-        $result = $this->machine->revise($report);
-
-        $this->assertEquals('draft', $result->status);
-        $this->assertNull($result->maker_signed_at);
-        $this->assertNull($result->reject_reason);
-    }
-
-    public function test_cannot_revise_non_rejected_report(): void
-    {
-        $this->expectException(\DomainException::class);
-
-        $report = WfhReport::factory()->create([
-            'status' => 'approved',
-            'user_id' => $this->user->id,
-        ]);
-
-        $this->machine->revise($report);
-    }
-
-    public function test_can_edit_only_draft_or_rejected(): void
+    public function test_can_edit_only_draft(): void
     {
         $draft = WfhReport::factory()->create(['status' => 'draft', 'user_id' => $this->user->id]);
         $rejected = WfhReport::factory()->create(['status' => 'rejected', 'user_id' => $this->user->id, 'report_date' => '2026-08-09']);
@@ -182,9 +151,18 @@ class WfhReportStateMachineTest extends TestCase
         $approved = WfhReport::factory()->create(['status' => 'approved', 'user_id' => $this->user->id, 'report_date' => '2026-08-07']);
 
         $this->assertTrue($this->machine->canEdit($draft));
-        $this->assertTrue($this->machine->canEdit($rejected));
+        $this->assertFalse($this->machine->canEdit($rejected));
         $this->assertFalse($this->machine->canEdit($pending));
         $this->assertFalse($this->machine->canEdit($approved));
+    }
+
+    public function test_rejected_is_immutable(): void
+    {
+        $rejected = WfhReport::factory()->create(['status' => 'rejected', 'user_id' => $this->user->id]);
+        $draft = WfhReport::factory()->create(['status' => 'draft', 'user_id' => $this->user->id, 'report_date' => '2026-08-09']);
+
+        $this->assertTrue($this->machine->isImmutable($rejected));
+        $this->assertFalse($this->machine->isImmutable($draft));
     }
 
     public function test_approved_is_immutable(): void

@@ -145,7 +145,6 @@ class RoutePermissionMatrixTest extends TestCase
             'report update (wfh.report.update)' => ['PUT', '/api/wfh/reports/{report}'],
             'report delete (wfh.report.delete)' => ['DELETE', '/api/wfh/reports/{report}'],
             'report submit (wfh.report.submit)' => ['POST', '/api/wfh/reports/{report}/submit'],
-            'report revise (wfh.report.update)' => ['POST', '/api/wfh/reports/{report}/revise'],
             'report approve (wfh.report.approve)' => ['POST', '/api/wfh/reports/{report}/approve'],
             'report reject (wfh.report.reject)' => ['POST', '/api/wfh/reports/{report}/reject'],
             'report pdf (wfh.report.export_pdf)' => ['GET', '/api/wfh/reports/{report}/pdf'],

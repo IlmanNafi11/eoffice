@@ -58,11 +58,11 @@ class VerificationTokenStabilityTest extends TestCase
      * row straight in 'pending' would verify nothing and the test would pass for
      * the wrong reason.
      */
-    private function pendingReport(): WfhReport
+    private function pendingReport(?string $date = null): WfhReport
     {
         $draft = WfhReport::factory()->create([
             'user_id' => $this->staff->id,
-            'report_date' => now()->toDateString(),
+            'report_date' => $date ?? now()->toDateString(),
             'status' => 'draft',
         ]);
 
@@ -89,23 +89,30 @@ class VerificationTokenStabilityTest extends TestCase
         $this->assertSame(64, strlen($token), 'Token must be 32 random bytes, hex encoded.');
     }
 
-    public function test_a_second_approval_of_the_same_report_reuses_the_token(): void
+    public function test_rejected_report_keeps_token_and_new_report_verifies_independently(): void
     {
-        // Full cycle — approve, reject, revise, re-submit, approve again — the
-        // QR codes printed in between must still verify at the end of it.
+        // Rejected is terminal: the report keeps its token so an already
+        // printed QR URL still resolves — but to a non-approved status, not
+        // "terverifikasi". Correction happens in a NEW report with its own
+        // token.
         $report = $this->pendingReport();
+        $tokenA = $this->stateMachine->approve($report, $this->kepala)->verification_token;
 
-        $first = $this->stateMachine->approve($report, $this->kepala)->verification_token;
-
-        // reject() asserts 'pending', so rewind explicitly to model the real
-        // workflow where a rejected report goes back through draft → pending.
         $report->fresh()->forceFill(['status' => 'rejected'])->save();
-        $revised = $this->stateMachine->revise($report->fresh());
-        $this->stateMachine->submit($revised->fresh(), $this->staff);
+        $this->assertSame($tokenA, $report->fresh()->verification_token, 'Rejected report must keep its token.');
 
-        $second = $this->stateMachine->approve($revised->fresh(), $this->kepala)->verification_token;
+        // The QR endpoint only resolves approved reports; a rejected one 404s
+        // instead of ever answering "terverifikasi".
+        $this->getJson('/api/verify/'.$tokenA)->assertNotFound();
 
-        $this->assertSame($first, $second, 'Re-approval must reuse the existing token.');
+        $second = $this->pendingReport(now()->subDay()->toDateString());
+        $this->stateMachine->approve($second, $this->kepala);
+        $tokenB = $second->fresh()->verification_token;
+
+        $this->assertNotSame($tokenA, $tokenB);
+        $this->getJson('/api/verify/'.$tokenB)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'terverifikasi');
     }
 
     public function test_an_existing_token_is_never_overwritten(): void
@@ -151,25 +158,6 @@ class VerificationTokenStabilityTest extends TestCase
         $response->assertJsonPath('data.doc_type', 'WFH Report');
         $response->assertJsonPath('data.status', 'terverifikasi');
         $response->assertJsonPath('data.doc_number', 'WFH-'.$approved->id);
-    }
-
-    public function test_the_token_still_verifies_after_a_rejection_cycle(): void
-    {
-        // Reproduces the regression this test class exists for: if re-approval
-        // minted a new token, the URL printed on the earlier PDF would 404.
-        $report = $this->pendingReport();
-        $first = $this->stateMachine->approve($report, $this->kepala)->verification_token;
-
-        $report->fresh()->forceFill(['status' => 'rejected'])->save();
-        $revised = $this->stateMachine->revise($report->fresh());
-        $this->stateMachine->submit($revised->fresh(), $this->staff);
-        $reapproved = $this->stateMachine->approve($revised->fresh(), $this->kepala);
-
-        $this->assertSame($first, $reapproved->verification_token);
-
-        $this->getJson('/api/verify/'.$first)
-            ->assertOk()
-            ->assertJsonPath('data.status', 'terverifikasi');
     }
 
     public function test_an_unapproved_report_does_not_verify(): void

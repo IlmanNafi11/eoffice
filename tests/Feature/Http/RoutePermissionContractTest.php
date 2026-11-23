@@ -126,20 +126,6 @@ class RoutePermissionContractTest extends TestCase
         ])->assertStatus(403);
     }
 
-    public function test_revise_report_requires_update_permission(): void
-    {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user);
-
-        $report = WfhReport::factory()->create([
-            'user_id' => $user->id,
-            'status' => 'rejected',
-        ]);
-
-        $this->postJson("/api/wfh/reports/{$report->id}/revise")
-            ->assertStatus(403);
-    }
-
     public function test_store_and_delete_admin_users_require_per_verb_permissions(): void
     {
         $manager = User::factory()->create();

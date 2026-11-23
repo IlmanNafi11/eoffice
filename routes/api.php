@@ -149,8 +149,6 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
         ->middleware('permission:wfh.report.approve');
     Route::post('/wfh/reports/{report}/reject', [ReportApprovalController::class, 'reject'])
         ->middleware('permission:wfh.report.reject');
-    Route::post('/wfh/reports/{report}/revise', [ReportApprovalController::class, 'revise'])
-        ->middleware('permission:wfh.report.update');
 
     Route::get('/admin/wfh/monitoring', [WfhMonitoringController::class, 'index'])
         ->middleware('permission:wfh.monitoring.view');

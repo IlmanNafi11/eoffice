@@ -61,29 +61,13 @@ class WfhReportStateMachine
         return $result;
     }
 
-    public function revise(WfhReport $report): WfhReport
-    {
-        if ($report->status !== 'rejected') {
-            throw new \DomainException('Hanya laporan yang ditolak yang dapat direvisi.');
-        }
-
-        $report->forceFill([
-            'status' => 'draft',
-            'maker_signed_at' => null,
-            'supervisor_id' => null,
-            'reject_reason' => null,
-        ])->save();
-
-        return $report->fresh();
-    }
-
     public function canEdit(WfhReport $report): bool
     {
-        return in_array($report->status, ['draft', 'rejected']);
+        return $report->status === 'draft';
     }
 
     public function isImmutable(WfhReport $report): bool
     {
-        return $report->status === 'approved';
+        return in_array($report->status, ['approved', 'rejected'], true);
     }
 }
