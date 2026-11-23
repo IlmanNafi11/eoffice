@@ -307,6 +307,25 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(await screen.findByText(/maksimal 10MB/i)).toBeTruthy();
   });
 
+  it("batas 10 lampiran berlaku lintas batch pilihan, bukan per batch", async () => {
+    renderForm("/changes/new");
+
+    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
+    const batch = (prefix: string, count: number) =>
+      Array.from({ length: count }, (_, i) =>
+        new File(["png-bytes"], `${prefix}-${i}.png`, { type: "image/png" }),
+      );
+
+    await userEvent.upload(input, batch("a", 8));
+    expect(await screen.findByText(/8 berkas menunggu/i)).toBeTruthy();
+
+    // Batch kedua lolos batas per-batch (3 < 10) tetapi melampaui TOTAL.
+    await userEvent.upload(input, batch("b", 3));
+
+    expect(await screen.findByText(/maksimal 10 lampiran/i)).toBeTruthy();
+    expect(screen.getByText(/8 berkas menunggu/i)).toBeTruthy();
+  });
+
   it('"Simpan Draft" → POST draft payload nested persis skema, lalu navigasi detail', async () => {
     renderForm("/changes/new");
     await fillInitiation();
@@ -440,6 +459,28 @@ describe("ChangePackageFormPage — Submit (create mode)", () => {
       expect(mockedSubmit).toHaveBeenCalledWith(12, fullSubmitInput);
     });
     expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
+  it("Submit di create: antrean lampiran terunggah ke paket baru sebelum submit", async () => {
+    renderForm("/changes/new");
+    await fillForSubmit();
+
+    const file = new File(["png-bytes"], "hasil-uji.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      file,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    // Draft id 12 → lampiran harus menempel pada paket yang sama sebelum
+    // POST /submit, bukan hilang bersama state form setelah navigasi.
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledWith(12, [file]);
+    });
+    const uploadOrder = mockedUpload.mock.invocationCallOrder[0] as number;
+    const submitOrder = mockedSubmit.mock.invocationCallOrder[0] as number;
+    expect(uploadOrder).toBeLessThan(submitOrder);
   });
 });
 

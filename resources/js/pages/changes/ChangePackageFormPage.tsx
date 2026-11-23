@@ -242,6 +242,15 @@ export function ChangePackageFormPage() {
       setUploadError(invalid);
       return;
     }
+    // Batas 10 adalah TOTAL lampiran implementasi (server menghitung baris
+    // yang sudah ada), bukan per batch pilihan — pre-check harus sama.
+    const total = attachments.length + pendingFiles.length + files.length;
+    if (total > MAX_ATTACHMENTS) {
+      setUploadError(
+        `Maksimal ${MAX_ATTACHMENTS} lampiran (${attachments.length + pendingFiles.length} sudah ada).`,
+      );
+      return;
+    }
     setUploadError(null);
     if (isEdit) {
       void uploadFiles(id, files).catch(() => undefined);
@@ -403,6 +412,9 @@ export function ChangePackageFormPage() {
           }),
         ).unwrap();
         targetId = created.initiation.id;
+        // Lampiran yang diantre sebelum draft ada harus menempel pada paket
+        // ini SEBELUM submit — setelah navigasi state form hilang.
+        await flushPendingUploads(targetId);
       }
       const submitted = await dispatch(
         submitPackageThunk({ packageId: targetId, input: buildSubmitInput() }),

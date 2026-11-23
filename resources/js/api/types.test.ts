@@ -474,6 +474,29 @@ describe("api/types — kontrak domain change-package (openapi.yaml tag Change P
     };
     expect(submit.implementation.production_impact).toBeNull();
   });
+  it("PackageSubmitInput menolak implementation tanpa field wajib (release_date)", () => {
+    // Kontrak server: full-payload submit mewajibkan setiap field non-nullable
+    // (ChangePackageRules::implementationRules(true)). Tanpa assertion
+    // compile-time ini, menghapus field wajib dari payload akan lolos tsc.
+    const missing: PackageSubmitInput = {
+      initiation: {
+        field_id: 3,
+        description: "Migrasi server",
+        reason: "Kapasitas kurang",
+        needed_by_date: "2025-12-15",
+      },
+      // @ts-expect-error — `release_date` wajib pada submit
+      implementation: {
+        priority: "normal",
+        impact: "Minor",
+        change_type_ids: [1],
+        test_plan: "Smoke test",
+        execution_date: "2025-11-10",
+        implementation_result: "Selesai",
+      },
+    };
+    expect(missing.initiation.field_id).toBe(3);
+  });
   it("ListPackagesQuery hanya per_page/page/status (+field_id persis openapi)", () => {
     const q: ListPackagesQuery = { per_page: 15, page: 2, status: "pending" };
     expect(q.status).toBe("pending");

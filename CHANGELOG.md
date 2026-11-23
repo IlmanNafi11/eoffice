@@ -5,6 +5,30 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-23 — tindak lanjut ship-review #15)
+- Slot absensi terkunci permanen: unique index `wfh_attendance_unique`
+  mencakup baris yang di-soft-delete, sehingga sesi yang dihapus dari laporan
+  draft tidak pernah bisa diunggah ulang (guard aplikasi hanya membaca baris
+  hidup → INSERT menabrak index → 500). Index kini parsial
+  `WHERE deleted_at IS NULL` (migration 2026_11_23_000003).
+- Jalur koreksi laporan rejected kini aman terhadap baris absensi yang
+  di-soft-delete: relink tetap memindahkan baris hidup, baris terhapus tetap
+  sebagai riwayat laporan rejected (tidak memblokir unggahan baru).
+- Race 23505 pada `POST /wfh/reports` yang rethrow (tanpa draft selamat)
+  kini menghapus foto absensi yang sudah tersimpan — invarian "tidak ada
+  file yatim" berlaku di semua jalur gagal, bukan hanya jalur konflik relink.
+- Batas 10 lampiran paket perubahan kini TOTAL per implementasi (server
+  menghitung baris yang ada; sebelumnya hanya per request `files.max:10`,
+  sehingga batch kedua lolos). Pre-check klien menghitung antrean + yang
+  sudah terpasang dengan batas yang sama.
+- Submit (create mode) kini mengunggah antrean lampiran ke paket baru
+  SEBELUM POST /submit — sebelumnya lampiran tertinggal bersama state form
+  saat navigasi, meski kartu menjanjikan "terunggah otomatis".
+- Regresi ditambahkan: reject-on-rejected ditolak state machine, route
+  `/revise` terverifikasi tidak ada (404), PDF evaluator (posisi & bidang)
+  di-assert dari inisiator, negative type test `PackageSubmitInput`
+  dipulihkan.
+
 ### Changed (backend+frontend, 2026-11-23 — penutupan flow WFH & paket perubahan)
 - **Revisi laporan WFH personal dihapus.** Laporan `rejected` kini terminal &
   immutable (PUT/DELETE/submit/approve ditolak); koreksi = laporan baru untuk
