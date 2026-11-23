@@ -107,10 +107,39 @@ class DuplicateRecoveryTest extends TestCase
         $this->assertSame([], $remaining, 'Duplicate attendance must not leak its photo.');
     }
 
+    /**
+     * The report-level 23505 fallback rethrows when no surviving draft exists.
+     * Attendance photos are stored BEFORE the transaction, so the rethrow
+     * path must clean them up — same invariant as the attendance endpoint.
+     */
+    public function test_report_race_rethrow_deletes_stored_attendance_photos(): void
+    {
+        $date = now()->toDateString();
+        Storage::fake('local');
+
+        $this->swapRepository(
+            (new UniqueViolatingWfhRepository(app(WfhRepositoryInterface::class)))
+                ->failWith('createReportWithRelations', '23505', 'insert into "wfh_reports"')
+                ->hideDraftUntilViolation(),
+        );
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => $date,
+            'attendances' => [
+                'pagi' => ['photo' => UploadedFile::fake()->image('absen.png')],
+            ],
+        ]);
+
+        // No surviving draft → the handler rethrows (500). The invariant under
+        // test is that the stored photo does not outlive the failed request.
+        $this->assertSame(500, $response->status(), $response->getContent());
+
+        $remaining = Storage::disk('local')->allFiles("attendances/{$this->user->id}/{$date}");
+        $this->assertSame([], $remaining, 'Race-path rethrow must not leak stored attendance photos.');
+    }
+
     public function test_non_unique_sqlstate_is_not_swallowed(): void
     {
-        // 40P01 (deadlock) is NOT recoverable: the handler must rethrow rather
-        // than answer 200 with data it cannot vouch for.
         $this->swapRepository(
             (new UniqueViolatingWfhRepository(app(WfhRepositoryInterface::class)))
                 ->failWith('createReportWithRelations', '40P01', 'insert into "wfh_reports"'),

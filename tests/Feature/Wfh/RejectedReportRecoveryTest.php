@@ -171,5 +171,70 @@ class RejectedReportRecoveryTest extends TestCase
         $field->update(['head_id' => $this->user->id]);
 
         $this->postJson("/api/wfh/reports/{$rejected->id}/approve")->assertStatus(422);
+
+        // Reject is gated on the same pending-only transition; a second reject
+        // must be refused by the state machine, not by a missing route.
+        $this->postJson("/api/wfh/reports/{$rejected->id}/reject", [
+            'reason' => 'Tolak ulang',
+        ])->assertStatus(422);
+    }
+
+    /**
+     * The revision flow is gone: the route must not resolve at all. Without
+     * this assertion a regression re-adding the route + controller method
+     * would leave the whole suite green.
+     */
+    public function test_revise_route_no_longer_exists(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-28'));
+
+        $rejected = WfhReport::factory()->status('rejected')->create([
+            'user_id' => $this->user->id,
+            'report_date' => '2026-07-28',
+        ]);
+
+        $this->postJson("/api/wfh/reports/{$rejected->id}/revise")->assertNotFound();
+    }
+
+    /**
+     * The attendance unique index is only unique among LIVE rows: a
+     * soft-deleted session must not occupy the slot forever, or the user can
+     * never upload that session again (the duplicate guard only reads live
+     * rows, so the INSERT would hit the index instead of the friendly 422).
+     */
+    public function test_soft_deleted_attendance_does_not_block_correction_upload(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-28'));
+        Storage::fake('local');
+
+        $rejected = $this->rejectedReportWithAttendance('2026-07-28', 'pagi');
+        WfhAttendance::query()->where('report_id', $rejected->id)->sole()->delete();
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+            'attendances' => [
+                'pagi' => ['photo' => UploadedFile::fake()->image('foto.jpg')],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $live = WfhAttendance::query()
+            ->where('user_id', $this->user->id)
+            ->where('date', '2026-07-28')
+            ->where('session', 'pagi')
+            ->get();
+
+        $this->assertCount(1, $live, 'The correction report must own exactly one live pagi attendance.');
+        $this->assertSame($response->json('data.id'), $live[0]->report_id);
+
+        // The trashed row stays history of the rejected report; it is not moved.
+        $trashed = WfhAttendance::withTrashed()
+            ->where('user_id', $this->user->id)
+            ->where('date', '2026-07-28')
+            ->where('session', 'pagi')
+            ->whereNotNull('deleted_at')
+            ->sole();
+        $this->assertSame($rejected->id, $trashed->report_id);
     }
 }

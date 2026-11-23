@@ -164,12 +164,20 @@ class ReportController extends Controller
             if ($e->getCode() === '23505') {
                 $existing = $this->wfhRepository->findDraftForUserDate($user->id, $date);
                 if ($existing) {
+                    $this->discardAttendancePhotos($attendances);
+
                     return ApiResponse::ok(
                         new WfhReportResource($existing->load(['activities.links', 'attendances'])),
                         'Laporan WFH sudah ada.',
                     );
                 }
             }
+
+            // Photos are stored before the transaction; every failure path
+            // (unexpected exception, unrecoverable race) leaves orphans
+            // otherwise, and their unique key is already consumed.
+            $this->discardAttendancePhotos($attendances);
+
             throw $e;
         }
 
@@ -239,5 +247,20 @@ class ReportController extends Controller
         $report->delete();
 
         return ApiResponse::deleted();
+    }
+
+    /**
+     * Delete freshly stored attendance photos after a failed create. The
+     * photos were written before the DB transaction, so any failure after
+     * that point must sweep them — otherwise the files outlive the request
+     * while their (user, date, session) key stays free.
+     *
+     * @param  array<string, array{photo_path: string}>  $attendances
+     */
+    private function discardAttendancePhotos(array $attendances): void
+    {
+        foreach ($attendances as $data) {
+            Storage::disk('local')->delete($data['photo_path']);
+        }
     }
 }
