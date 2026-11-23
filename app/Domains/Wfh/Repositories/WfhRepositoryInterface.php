@@ -44,4 +44,12 @@ interface WfhRepositoryInterface extends RepositoryInterface
     public function deleteAttendance(int $attendanceId): bool;
 
     public function findDraftForUserDate(int $userId, string $date): ?WfhReport;
+
+    /**
+     * Move live attendances owned by rejected reports for (user, date) onto
+     * the given report. Photos are untouched.
+     *
+     * @return list<string> sessions moved, e.g. ['pagi', 'sore']
+     */
+    public function relinkRejectedAttendances(int $userId, string $date, int $toReportId): array;
 }

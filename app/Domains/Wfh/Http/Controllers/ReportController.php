@@ -14,6 +14,8 @@ use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -103,7 +105,8 @@ class ReportController extends Controller
         $user = $request->user();
         $date = $request->input('report_date');
 
-        // Get-or-create: return existing draft/rejected if one exists
+        // Get-or-create: return the existing draft if one exists. Rejected is
+        // terminal and never returned here — a new draft is created below.
         $existing = $this->wfhRepository->findDraftForUserDate($user->id, $date);
         if ($existing) {
             return ApiResponse::ok(
@@ -123,17 +126,41 @@ class ReportController extends Controller
         }
 
         try {
-            $report = $this->wfhRepository->createReportWithRelations(
-                reportData: [
-                    'user_id' => $user->id,
-                    'report_date' => $date,
-                    'status' => 'draft',
-                ],
-                activities: $request->input('activities', []),
-                attendances: $attendances,
-            );
+            $report = DB::transaction(function () use ($request, $user, $date, $attendances) {
+                $report = $this->wfhRepository->createReportWithRelations(
+                    reportData: [
+                        'user_id' => $user->id,
+                        'report_date' => $date,
+                        'status' => 'draft',
+                    ],
+                    activities: $request->input('activities', []),
+                    attendances: [],
+                );
+
+                // Correction flow: attendances from the rejected report for
+                // this (user, date) move onto the new report. A session that
+                // arrives again in this request would violate the attendance
+                // unique key, so its fresh upload is dropped and the orphan
+                // photo deleted (same recovery as the attendance endpoint).
+                $moved = $this->wfhRepository->relinkRejectedAttendances($user->id, $date, $report->id);
+
+                foreach ($attendances as $session => $data) {
+                    if (in_array($session, $moved, true)) {
+                        Storage::disk('local')->delete($data['photo_path']);
+
+                        continue;
+                    }
+
+                    $this->wfhRepository->addAttendanceToReport($report, [
+                        'session' => $session,
+                        'photo_path' => $data['photo_path'],
+                    ]);
+                }
+
+                return $report;
+            });
         } catch (QueryException $e) {
-            // Race: unique index violation — fallback to existing
+            // Race: unique index violation — fallback to existing draft
             if ($e->getCode() === '23505') {
                 $existing = $this->wfhRepository->findDraftForUserDate($user->id, $date);
                 if ($existing) {
@@ -147,7 +174,7 @@ class ReportController extends Controller
         }
 
         return ApiResponse::created(
-            new WfhReportResource($report),
+            new WfhReportResource($report->load(['activities.links', 'attendances'])),
             'Laporan WFH berhasil dibuat.',
         );
     }

@@ -82,6 +82,11 @@ class UniqueViolatingWfhRepository implements RepositoryInterface, WfhRepository
         return $this->real->findDraftForUserDate($userId, $date);
     }
 
+    public function relinkRejectedAttendances(int $userId, string $date, int $toReportId): array
+    {
+        return $this->real->relinkRejectedAttendances($userId, $date, $toReportId);
+    }
+
     public function paginateReportsForUser(int $userId, int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
         return $this->real->paginateReportsForUser($userId, $perPage, $filters);

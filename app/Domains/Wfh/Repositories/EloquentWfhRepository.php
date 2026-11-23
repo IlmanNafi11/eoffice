@@ -313,8 +313,31 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
     {
         return WfhReport::where('user_id', $userId)
             ->where('report_date', $date)
-            ->whereIn('status', ['draft', 'rejected'])
+            ->where('status', 'draft')
             ->first();
+    }
+
+    public function relinkRejectedAttendances(int $userId, string $date, int $toReportId): array
+    {
+        // Rejected is terminal, so its attendances still belong to
+        // (user, date, session) and move with the correction report. The
+        // SoftDeletingScope keeps this to live rows; photos are untouched.
+        $rejectedIds = WfhReport::query()
+            ->where('user_id', $userId)
+            ->where('report_date', $date)
+            ->where('status', 'rejected')
+            ->pluck('id');
+
+        if ($rejectedIds->isEmpty()) {
+            return [];
+        }
+
+        $attendance = WfhAttendance::query()->whereIn('report_id', $rejectedIds);
+        $sessions = (clone $attendance)->pluck('session')->all();
+
+        $attendance->update(['report_id' => $toReportId]);
+
+        return $sessions;
     }
 
     // === Monitoring ===

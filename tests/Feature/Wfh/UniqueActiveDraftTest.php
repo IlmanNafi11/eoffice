@@ -37,7 +37,7 @@ class UniqueActiveDraftTest extends TestCase
         ]);
     }
 
-    public function test_reject_duplicate_rejected_report(): void
+    public function test_allow_new_draft_after_rejected(): void
     {
         $user = User::factory()->create();
 
@@ -46,13 +46,13 @@ class UniqueActiveDraftTest extends TestCase
             'report_date' => '2026-07-27',
         ]);
 
-        $this->expectException(QueryException::class);
-        $this->expectExceptionCode(23505);
-
-        WfhReport::factory()->status('draft')->create([
+        $draft = WfhReport::factory()->status('draft')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
         ]);
+
+        $this->assertDatabaseHas('wfh_reports', ['id' => $draft->id]);
+        $this->assertDatabaseCount('wfh_reports', 2);
     }
 
     public function test_allow_draft_and_approved_for_same_user_date(): void
