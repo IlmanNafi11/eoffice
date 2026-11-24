@@ -186,6 +186,9 @@ describe("UserFormPage — render form (create mode)", () => {
     for (const role of ["admin", "kepala_bidang", "kepala_tim", "staf"]) {
       expect(screen.getByRole("checkbox", { name: role })).toBeTruthy();
     }
+    // Teks tampilan human-friendly; checkbox tetap dicari lewat aria-label mentah.
+    expect(screen.getByText("Kepala Bidang")).toBeTruthy();
+    expect(screen.getByText("Kepala Tim")).toBeTruthy();
     // Toggle is_active TIDAK ada di create (edit-saja).
     expect(screen.queryByLabelText("Status aktif")).toBeNull();
   });

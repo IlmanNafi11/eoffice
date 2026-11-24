@@ -59,6 +59,13 @@ const timRole: AdminRole = {
   permissions: ["wfh.report.approve", "wfh.report.reject"],
 };
 
+// Role di luar kontrak `AdminRoleName` → fallback nama mentah, tidak crash.
+const oddRole: AdminRole = {
+  id: 9,
+  name: "superadmin",
+  permissions: [],
+};
+
 const allPermissions: AdminPermission[] = [
   { id: 1, name: "user.manage" },
   { id: 2, name: "user.create" },
@@ -130,8 +137,16 @@ describe("RolesPage — grid render & sumber kolom", () => {
 
     await waitFor(() => expect(mockedListRoles).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(rowOf(1)).toBeTruthy());
-    expect(within(rowOf(1)).getByText("admin")).toBeTruthy();
-    expect(within(rowOf(3)).getByText("kepala_tim")).toBeTruthy();
+    expect(within(rowOf(1)).getByText("Admin")).toBeTruthy();
+    expect(within(rowOf(3)).getByText("Kepala Tim")).toBeTruthy();
+  });
+
+  it("role di luar kontrak tampil dengan nama mentah (fallback), tidak crash", async () => {
+    mockedListRoles.mockResolvedValue([adminRole, oddRole]);
+    renderPageAs(["role.manage"]);
+
+    await waitFor(() => expect(rowOf(9)).toBeTruthy());
+    expect(within(rowOf(9)).getByText("superadmin")).toBeTruthy();
   });
 
   it("pemegang permission.manage → kolom dari cache listPermissions (fetchPermissions dispatched); kolom reject dari luar cache tak ada", async () => {

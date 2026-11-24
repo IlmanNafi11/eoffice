@@ -75,6 +75,17 @@ const userB: AdminUser = {
   permissions: [],
 };
 
+// Role di luar kontrak `AdminRoleName` → fallback nama mentah, tidak crash.
+const userC: AdminUser = {
+  id: 14,
+  name: "Rara Amara",
+  nip: "199701012025011001",
+  email: "rara@kominfo.go.id",
+  is_active: true,
+  roles: ["superadmin" as AdminUser["roles"][number]],
+  permissions: [],
+};
+
 const adminUser = {
   id: 1,
   name: "Admin Utama",
@@ -106,7 +117,7 @@ function renderPageAs(permissions: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedListUsers.mockResolvedValue({ users: [userA, userB], meta });
+  mockedListUsers.mockResolvedValue({ users: [userA, userB, userC], meta });
 });
 
 /** Input file tersembunyi milik `FileInput` (sr-only, id dari halaman). */
@@ -129,11 +140,14 @@ describe("UsersPage — list & pagination", () => {
     expect(within(row).getByText("199503152024011002")).toBeTruthy();
     expect(within(row).getByText("dewi@kominfo.go.id")).toBeTruthy();
     expect(within(row).getByText("Tim Aplikasi")).toBeTruthy();
-    expect(within(row).getByText("staf")).toBeTruthy();
+    expect(within(row).getByText("Staf")).toBeTruthy();
     expect(within(row).getByText("Aktif")).toBeTruthy();
 
     const rowB = screen.getByTestId("user-row-13");
     expect(within(rowB).getByText("Nonaktif")).toBeTruthy();
+
+    const rowC = screen.getByTestId("user-row-14");
+    expect(within(rowC).getByText("superadmin")).toBeTruthy();
   });
 
   it("pagination → fetch halaman 2 (per_page ikut meta efektif)", async () => {

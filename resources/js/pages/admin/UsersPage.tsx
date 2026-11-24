@@ -52,8 +52,9 @@ import {
 } from "@/store/adminSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { can } from "@/lib/permissions";
+import { ROLE_LABELS } from "@/lib/roles-meta";
 import { selectUser } from "@/store/authSlice";
-import type { AdminUser, ListUsersQuery } from "@/api/types";
+import type { AdminRoleName, AdminUser, ListUsersQuery } from "@/api/types";
 
 export function UsersPage() {
   const dispatch = useAppDispatch();
@@ -248,7 +249,7 @@ export function UsersPage() {
                         <td className="py-2 pr-4">{u.nip}</td>
                         <td className="py-2 pr-4">{u.email}</td>
                         <td className="py-2 pr-4">{u.team?.name ?? "-"}</td>
-                        <td className="py-2 pr-4">{u.roles.join(", ")}</td>
+                        <td className="py-2 pr-4">{u.roles.map((r) => ROLE_LABELS[r as AdminRoleName] ?? r).join(", ")}</td>
                         <td className="py-2 pr-4">{u.is_active ? "Aktif" : "Nonaktif"}</td>
                         {canDelete ? (
                           <td className="py-2">

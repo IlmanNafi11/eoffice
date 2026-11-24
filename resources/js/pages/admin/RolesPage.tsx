@@ -47,8 +47,9 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { can } from "@/lib/permissions";
 import { groupPermissions } from "@/lib/permissions-meta";
+import { ROLE_LABELS } from "@/lib/roles-meta";
 import { selectUser } from "@/store/authSlice";
-import type { AdminRole } from "@/api/types";
+import type { AdminRole, AdminRoleName } from "@/api/types";
 
 /** Permission kritis (server `RoleController` lockout list) — kontrak. */
 const CRITICAL_PERMISSIONS = ["user.manage", "role.manage", "permission.manage"];
@@ -209,7 +210,9 @@ export function RolesPage() {
                 className="rounded-lg border border-border"
               >
                 <div className="border-b border-border px-4 py-3">
-                  <div className="font-medium">{role.name}</div>
+                  <div className="font-medium">
+                    {ROLE_LABELS[role.name as AdminRoleName] ?? role.name}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {current.length} permission aktif
                   </div>

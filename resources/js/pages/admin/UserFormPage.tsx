@@ -59,6 +59,7 @@ import { selectUser } from "@/store/authSlice";
 import { createUser, updateUser } from "@/api/admin";
 import { listTeams } from "@/api/wfh-team";
 import { can } from "@/lib/permissions";
+import { ROLE_LABELS } from "@/lib/roles-meta";
 import type {
   AdminRoleName,
   StoreUserInput,
@@ -479,7 +480,7 @@ export function UserFormPage() {
                         checked={roles.includes(role)}
                         onCheckedChange={() => toggleRole(role)}
                       />
-                      {role}
+                      {ROLE_LABELS[role]}
                     </label>
                   ))}
                 </div>
