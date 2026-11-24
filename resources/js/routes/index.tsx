@@ -14,12 +14,11 @@
  *   dan `SessionBootstrap` (rehidrasi user via GET /auth/me). `/change-password`
  *   berada di dalam guard karena endpoint bearer; ia lolos guard via path.
  * - `/change-password` juga satunya-satunya tujuan saat guard must_change aktif.
- * - Halaman Beranda (placeholder) menunggu modul WFH/Change/fase berikutnya;
- *   outletnya tetap minimal.
+ * - `/` → `DashboardPage` (modul dashboard): beranda per-permission; route
+ *   placeholder `HomePage` sudah dihapus (cutover bersih).
  */
 import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
-import { LayoutDashboard } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { SessionBootstrap } from "@/routes/SessionBootstrap";
@@ -29,6 +28,7 @@ import { SessionBootstrap } from "@/routes/SessionBootstrap";
 // Heavy page modules load on demand; the auth/reset/verify pages stay small
 // enough to remain in the bootstrap chunk so login is never split.
 const LoginPage = lazy(() => import("@/pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })));
+const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const ChangePasswordPage = lazy(() => import("@/pages/auth/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage })));
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })));
 const OtpVerificationPage = lazy(() => import("@/pages/auth/OtpVerificationPage").then((m) => ({ default: m.OtpVerificationPage })));
@@ -47,15 +47,7 @@ const UserFormPage = lazy(() => import("@/pages/admin/UserFormPage").then((m) =>
 const RolesPage = lazy(() => import("@/pages/admin/RolesPage").then((m) => ({ default: m.RolesPage })));
 const SettingsPage = lazy(() => import("@/pages/admin/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 
-/** Placeholder outlet `/` sampai modul WFH/Change (fase berikutnya). */
-function HomePage() {
-  return (
-    <div className="flex items-center gap-2 text-muted-foreground">
-      <LayoutDashboard aria-hidden="true" className="size-5" />
-      <span>Beranda — modul menyusul di fase berikutnya.</span>
-    </div>
-  );
-}
+// Placeholder HomePage dihapus (cutover dashboard T6).
 
 export const router = createBrowserRouter([
   {
@@ -76,7 +68,7 @@ export const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { path: "/", element: <HomePage /> },
+          { path: "/", element: <DashboardPage /> },
           { path: "/profile", element: <ProfilePage /> },
           { path: "/change-password", element: <ChangePasswordPage /> },
           { path: "/wfh", element: <WfhReportsPage /> },
