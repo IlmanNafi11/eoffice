@@ -1,187 +1,259 @@
-# SPEC: Perbaikan Lintas Modul (WFH PDF/UX, Team Reports, Users, Changes)
+# SPEC: Dashboard Beranda
 
-> Module ids: `wfh-pdf`, `wfh-nav-team`, `rbac-labels`, `change-attachments`
-> (dari `CAPABILITY-MAP-cross-module-fixes.md`, Phase 0 approved 2026-11-24).
-> Intent & keputusan: `docs/superpowers/specs/2026-11-24-cross-module-fixes-design.md`.
-> Rencana: `docs/superpowers/plans/2026-11-24-cross-module-fixes.md` (9 tasks).
-> OpenAPI: `postman/specs/openapi.yaml` (kontrak existing + 1 operasi DELETE baru).
+> Module id: `dashboard` (satu modul; endpoint + satu halaman tidak bisa dipisah tanpa
+> menulis ulang kontrak, jadi Phase 0 capability map tidak diperlukan).
+> Intent & keputusan yang disetujui: `docs/superpowers/specs/2026-11-24-dashboard-design.md`
+> (approved 2026-11-24).
+> Rencana implementasi (8 task TDD): `docs/superpowers/plans/2026-11-24-dashboard.md`.
+> Kontrak API: `postman/specs/openapi.yaml` → `GET /api/dashboard`.
+>
+> Catatan penamaan root: spec initiative sebelumnya (cross-module-fixes) dipindah ke
+> `SPEC-cross-module-fixes.md` saat file ini dibuat; rujukan di `tasks/plan.md`,
+> `tasks/todo.md`, dan `CAPABILITY-MAP-cross-module-fixes.md` sudah diperbarui.
 
 ## Objective
 
-Memperbaiki 10 temuan QA yang diajukan user pada 2026-11-24, lintas 5 area aplikasi eoffice.
-Penerima manfaat: staf (pembuat laporan WFH), kepala bidang (penandatangan/approver),
-kepala tim (pembuat laporan tim), dan admin (monitoring + manajemen user + paket perubahan).
+Mengganti placeholder `HomePage` di route `/` (`resources/js/routes/index.tsx:51`) dengan dashboard
+beranda yang menjawab satu pertanyaan pada pandangan pertama: **"apa yang harus saya lakukan hari ini,
+dan bagaimana kondisi kepatuhan WFH?"** — isinya menyesuaikan role peminta.
 
-**Masalah yang diselesaikan (dari laporan user):**
+Penerima manfaat:
 
-1. PDF laporan WFH tim: logo doc & judul tidak sejajar horizontal; tanggal tidak tepat di atas
-   label "Atasan Langsung" (padahal PDF individu sudah benar → dijadikan rujukan).
-2. Saat admin mengunduh PDF tim dari papan harian, signature "Atasan Langsung" merujuk ke admin,
-   padahal selalu kepala bidang. Kolom "Yang Membuat Laporan" harus berisi pembuat laporan.
-3. Tombol back pada detail WFH individu salah arah bila detail dibuka dari menu monitoring.
-4. `/team-reports`: form "Buat Laporan Tim" masih berupa section card; harus jadi tombol + dialog
-   (dropdown Tim, Tanggal laporan, Batal, Buat).
-5. `/admin/users/new`: label role tampil programatik (`kepala_bidang`) → harus `Kepala Bidang`;
-   humanisasi juga berlaku di tabel users dan halaman roles.
-6. `/changes/new`: field "Tanggal dibutuhkan" hanya selebar setengah kolom → full-width.
-7. Lampiran paket perubahan: multi-attachment saat create & update, preview thumbnail sejak awal
-   (klik → gambar membesar), hapus/ganti attachment yang sudah terunggah.
-8. Input attachment muncul di halaman detail `/changes/:id` → hanya di form create/update.
-9. Preview baru ada di form update, tidak di create → create harus mendukung preview juga.
-10. Label "Hasil implementasi" ambigu (mengisi "Hasil Tanggapan Perubahan" di PDF) → "Tanggapan
-    Perubahan"; PDF Implementasi perlu label "Tanda Tangan" center di atas 3 image signature.
+| Role | Yang dilihat | Yang membuat berbeda |
+|---|---|---|
+| staf | absensi hari ini, status laporan hari ini, pintasan absen/buat laporan | hanya data diri |
+| kepala tim | rekap kehadiran timnya hari ini, antrean laporan tim & paket perubahan tim | `wfh.monitoring.view` + team-scoped |
+| kepala bidang | rekap seluruh bidang, antrean laporan tim, tren & daftar perhatian | field-scope |
+| admin | rekap organisasi, tren organisasi, daftar perhatian | scope all |
 
-**Success = 10 temuan di atas tertutup, dengan 4 keputusan user terkunci:**
-- "Yang Membuat Laporan" PDF tim = `created_by` laporan, bukan sesi pengunduh.
-- Tanpa `team_report_id` (papan harian hanya kirim tanggal): backend cari laporan per tim+tanggal;
-  ada → pembuat dari laporan itu; tidak ada → `—`, PDF tetap terunduh.
-- Humanisasi label role di semua lokasi.
-- Hapus/ganti attachment hanya saat paket berstatus `draft`.
+**Masalah saat ini:** `/` hanya berisi teks "Beranda — modul menyusul di fase berikutnya."; kepala
+tim/bidang dan admin tidak punya satu tempat untuk melihat beban kerja harian + kepatuhan sekaligus.
+
+**Success = semua kondisi ini benar di browser untuk keempat role:**
+
+1. `/` merender `DashboardPage`; teks placeholder lama tidak ada lagi; `HomePage` terhapus (cutover bersih).
+2. Skeleton tampil per seksi selama loading; seksi tanpa permission tidak dirender sama sekali.
+3. Data hari ini memakai zona waktu server dan setelan `wfh_allowed_days` — hari non-kerja menampilkan
+   status netral "Hari ini bukan hari WFH", bukan angka 0 yang menyesatkan.
+4. Angka rekap/tren selalu pembilang + penyebut (contoh "3 dari 12 belum absen"), bukan persen telanjang.
+5. Penyebut hanya menghitung user **aktif** dalam cakupan; user nonaktif tidak masuk penyebut, tren,
+   maupun daftar perhatian.
+6. Cakupan role: staf = diri; kepala tim = anggota tim pertama yang dipimpin (`ledTeams()->first()`);
+   kepala bidang = seluruh user field-nya; admin = semua. Kepala tanpa tim/bidang = deny-by-default
+   (seksi rekap tidak muncul, antrean change = 0).
+7. Antrean hanya berisi item yang benar-benar boleh diputuskan peminta (permission + status), dan
+   hitungannya konsisten dengan halaman list masing-masing.
+8. Tren = 14 hari kerja terakhir (asc), `compliant` = user yang punya laporan `approved` **atau**
+   `pending` hari itu; `draft`/`rejected`/tanpa laporan = tidak compliant.
+9. Daftar perhatian = maksimal 5 user dengan kepatuhan terendah (< 60%) dalam 14 hari kerja, urut terendah dulu.
+10. Tab yang difokuskan ulang me-refetch data tanpa blank (skeleton halus di atas data lama).
 
 ## Tech Stack
 
-| Layer | Stack |
-|---|---|
-| Backend | Laravel, PHP 8.4, dompdf (barryvdh), Sanctum, spatie/laravel-permission, PostgreSQL |
-| Frontend | React 19, TypeScript, Vite 8, Redux Toolkit, Radix UI (`@/components/ui/dialog`), animate-ui (Select/Checkbox), `react-photo-view` |
-| Test backend | PHPUnit (`vendor/bin/phpunit`), `RefreshDatabase`, `Storage::fake` |
-| Test frontend | vitest 5 + jsdom + @testing-library/react |
+Backend (existing, tidak ada dependensi baru):
+
+- PHP `^8.2`, Laravel `^12.69`, Spatie `spatie/laravel-permission ^6.25`.
+- Domain baru `app/Domains/Dashboard/` mengikuti pola domain existing (`Http/Controllers`,
+  `Http/Resources`, `Services`).
+- Respons envelope `ApiResponse::ok` (`App\Support\Http\ApiResponse`).
+
+Frontend (existing + satu tambahan):
+
+- React `^19.2.7`, Vite `^8.3.5`, Redux Toolkit `^2.13.0`, TypeScript, Vitest + jsdom, Tailwind + shadcn.
+- Tambahan yang disetujui design: shadcn `chart` (`npx shadcn add chart` → `recharts@3.8.0`,
+  style `radix-nova`). `animate-ui` tidak punya chart — jangan menambah library chart lain.
+- Komponen existing yang dipakai ulang: `Card`, `Skeleton`, `Badge`, `Button` dari `@/components/ui`.
 
 ## Commands
 
-```bash
-# Backend
-vendor/bin/phpunit                                    # seluruh suite PHP
-vendor/bin/phpunit tests/Feature/Wfh/                 # slice PDF WFH
-vendor/bin/phpunit tests/Feature/ChangeManagement/    # slice attachment & PDF perubahan
-php artisan test                                      # alternative runner
+Full executable, dari root repo:
+
+```
+# Backend tests (semua)
+php artisan test --compact
+
+# Backend tests (fokus modul ini)
+php artisan test --compact --filter=Dashboard
+
+# Bila host tidak punya PHP/vendor — pakai harness Docker
+# (skill: eoffice-laravel-docker-test-harness), contoh:
+docker compose exec app php artisan test --compact --filter=Dashboard
+
+# Lint backend (Pint, tidak auto-fix di CI)
+vendor/bin/pint --test
+make lint                 # = vendor/bin/pint --test
 
 # Frontend
-npm run dev                                           # Vite dev server
-npm run build                                         # produksi
-npm run test                                          # seluruh vitest
-npm run test -- resources/js/pages/changes/           # slice changes
-npm run test -- resources/js/pages/wfh/               # slice WFH
-npm run typecheck                                     # tsc --noEmit
+npm run test              # vitest run
+npm run test -- resources/js/pages/dashboard/ resources/js/api/dashboard.test.ts
+npm run typecheck         # tsc -p tsconfig.json --noEmit
+npm run dev               # vite dev server
+npm run build             # vite build
 
-# Verifikasi PDF nyata (throwaway, hapus setelahnya)
-php artisan tinker                                    # render view → PdfRendererService → file PDF
-pdftoppm -png output.pdf output                       # bila tersedia, inspeksi visual
+# Gerbang lengkap sebelum closeout
+make ci                   # lint + test + frontend-test + frontend-typecheck + frontend-build
+
+# Chart dependency (hanya sekali, Task 7)
+npx shadcn add chart
 ```
 
 ## Project Structure
 
 ```
-app/Domains/Wfh/Http/Controllers/ReportPdfController.php     exportTeam: lookup laporan + guard
-app/Domains/Wfh/Services/WfhReportPdfData.php                forTeam: assembly view-data PDF tim
-app/Domains/ChangeManagement/Http/Controllers/
-    ChangePackageController.php                              uploadAttachments + deleteAttachment baru
-app/Domains/ChangeManagement/Repositories/
-    EloquentChangeManagementRepository.php                   addAttachments + deleteAttachment baru
-    ChangeManagementRepositoryInterface.php                  kontrak repository
-app/Support/Signature/SignatureGuard.php                     guard penandatangan (dipakai ulang)
-routes/api.php                                               route DELETE attachment baru
-resources/views/pdf/wfh-report-admin.blade.php               PDF tim (kop + tanggal + maker)
-resources/views/pdf/change-implementation.blade.php          PDF implementasi (label Tanda Tangan)
-resources/js/pages/wfh/
-    MonitoringPage.tsx, WfhReportDetailPage.tsx, TeamReportsPage.tsx
-resources/js/pages/admin/
-    UserFormPage.tsx, UsersPage.tsx, RolesPage.tsx
-resources/js/pages/changes/
-    ChangePackageFormPage.tsx, ChangePackageDetailPage.tsx
-resources/js/components/changes/
-    attachment-list.tsx, pending-attachment-list.tsx (baru)
-resources/js/lib/roles-meta.ts                               kamus ROLE_LABELS (baru)
-resources/js/api/change-package.ts, store/changePackageSlice.ts
-tests/Feature/Wfh/, tests/Feature/ChangeManagement/          test backend
-resources/js/**/*.test.tsx, resources/js/**/*.test.ts        test frontend
-postman/specs/openapi.yaml                                   kontrak API (1 op baru)
-docs/superpowers/specs/, docs/superpowers/plans/             design doc & rencana (sudah ada)
-CAPABILITY-MAP-cross-module-fixes.md                         peta modul (root)
+app/Domains/Dashboard/
+  Http/Controllers/DashboardController.php     → satu endpoint GET /api/dashboard
+  Http/Resources/DashboardResource.php         → generated_at + seksi seadanya (pass-through)
+  Services/DashboardService.php                → buildFor(User): array; orkestrasi seksi
+  Services/SectionBuilders/TodaySection.php    → today.me + today.scope
+  Services/SectionBuilders/QueueSection.php    → queue (per permission)
+  Services/SectionBuilders/TrendSection.php    → trend (14 hari kerja)
+  Services/SectionBuilders/AttentionSection.php→ attention (max 5, < 60%)
+  Services/DashboardScope.php                  → resolver cakupan + label
+routes/api.php                                 → GET /dashboard di group auth:sanctum
+postman/specs/openapi.yaml                     → path /api/dashboard (sumber kebenaran kontrak)
+
+tests/Feature/Dashboard/                       → DashboardTodayTest, DashboardTodayScopeTest,
+                                                 DashboardQueueTest, DashboardTrendTest,
+                                                 DashboardAttentionTest
+
+resources/js/api/dashboard.ts (+ .test.ts)     → getDashboard()
+resources/js/api/types.ts                      → tipe Dashboard*
+resources/js/store/dashboardSlice.ts (+ .test.ts) → thunk fetchDashboard + state
+resources/js/store/index.ts                    → daftarkan reducer `dashboard`
+resources/js/pages/dashboard/
+  DashboardPage.tsx (+ .test.tsx)              → halaman + fetch-on-mount + refetch-on-focus
+  sections/TodayCards.tsx
+  sections/QueueCard.tsx
+  sections/TrendChart.tsx
+  sections/AttentionCard.tsx
+  sections/ShortcutsRow.tsx
+resources/js/lib/nav-registry.ts               → entri "Beranda" tetap (`id: home`, path `/`)
+
+docs/superpowers/specs/2026-11-24-dashboard-design.md  → intent & keputusan (approved)
+docs/superpowers/plans/2026-11-24-dashboard.md         → langkah TDD per task
+SPEC.md                                                → file ini
+CHANGELOG.md, CAPABILITY-MAP-dashboard.md              → diperbarui di Task 8
 ```
 
 ## Code Style
 
-- Kamus label eksplisit, bukan title-case otomatis (pola `WFH_STATUS_LABELS`,
-  `PERMISSION_META`):
+Backend — satu builder, satu tanggung jawab; seksi opsional = `null`, bukan array kosong:
 
-```ts
-// resources/js/lib/roles-meta.ts
-import type { AdminRoleName } from "@/api/types";
+```php
+// app/Domains/Dashboard/Services/SectionBuilders/AttentionSection.php
+final class AttentionSection
+{
+    public const THRESHOLD_PERCENT = 60;
+    public const MAX_USERS = 5;
 
-export const ROLE_LABELS: Record<AdminRoleName, string> = {
-  admin: "Admin",
-  kepala_bidang: "Kepala Bidang",
-  kepala_tim: "Kepala Tim",
-  staf: "Staf",
-};
+    public function __construct(private readonly DashboardScope $scope) {}
+
+    public function build(User $user): ?array
+    {
+        if (! $user->can('wfh.monitoring.view')) {
+            return null; // seksi tidak untuk peminta
+        }
+
+        return [
+            'users' => $this->below($user),
+            'threshold_note' => 'kepatuhan < 60% dalam 14 hari kerja terakhir',
+        ];
+    }
+}
 ```
 
-- UI dropdown/field memakai `Field` + `FieldLabel` + komponen `@/components/ui/*`;
-  dialog controlled `<Dialog open onOpenChange>` + `<DialogHeader>` + `<DialogFooter>`
-  dengan `Button variant="outline">Batal</Button>` dan aksi utama `pending={...}`.
-- `aria-label` pada checkbox role TETAP memakai value mentah (`kepala_bidang`) —
-  hanya teks tampilan yang human-friendly.
-- Copy UI Bahasa Indonesia; pesan error server ditampilkan apa adanya (sudah lewat seam `toUiError`).
-- Server adalah otoritas: setiap guard UI diulang di controller (status draft, ownership, cap 10).
-- PDF dompdf: kop table-based + `vertical-align: middle`; dilarang flex di `.kop-surat`.
-- Thunk Redux mengikuti pola `mutateAndRefetch` modul masing-masing; penamaan `...Thunk`.
+Frontend — tipe mengikuti kontrak OpenAPI; seksi opsional = `| undefined`; status warna satu peta:
+
+```tsx
+// resources/js/pages/dashboard/sections/QueueCard.tsx
+const STATUS_STYLE: Record<ReportStatus, string> = {
+  draft: "text-muted-foreground",
+  pending: "text-warning",
+  approved: "text-success",
+  rejected: "text-error",
+};
+
+export function QueueCard({ section }: { section: DashboardQueue | undefined }) {
+  if (!section) return null; // tidak punya permission → tidak dirender
+  return <Card>{/* ... */}</Card>;
+}
+```
+
+Konvensi:
+
+- Nama kelas/berkas PHP: `PascalCase`; method `camelCase`; konstanta `UPPER_SNAKE`.
+- FE: komponen `PascalCase` di `pages/dashboard/`; slice/modul `camelCase`; teks UI bahasa Indonesia.
+- Jumlah seri tren wajib menyebut pembilang + penyebut, tidak pernah persen telanjang.
+- Komentar hanya untuk keputusan non-obvious (mis. "tim pertama yang dipimpin = status quo").
 
 ## Testing Strategy
 
-| Level | Framework | Fokus |
-|---|---|---|
-| Unit view-data | PHPUnit | `forTeam` menghasilkan makerName/NIP dari `created_by`, `—` bila tanpa laporan; signature dari disk privat |
-| Feature HTTP | PHPUnit | `GET /admin/wfh/teams/{id}/pdf` (200 dengan/ tanpa `team_report_id`, 422 guard nama pembuat); `DELETE /changes/{id}/attachments/{attachment}` (204 / 403 / 404 / 422) |
-| Template PDF | PHPUnit render blade | kop table, baris tanggal di atas kolom kanan, 3× label "Tanda Tangan"; verifikasi visual sekali via render nyata |
-| Komponen UI | vitest/jsdom | dialog create laporan tim, back fallback, label role, preview pending + hapus, absence of upload input di detail |
-| Integrasi slice | vitest + PHPUnit | upload batch 10 → hapus 1 → upload 1 lolos; guard status/ownership |
-| E2E manual | browser | 5 alur smoke sesuai task final rencana |
+| Level | Framework | Lokasi | Menguji |
+|---|---|---|---|
+| Backend feature | PHPUnit (Laravel) | `tests/Feature/Dashboard/*` | kontrak JSON per role, scoping, hari non-kerja, user nonaktif, hitungan antrean, tren & attention |
+| Backend contract | PHPUnit | `tests/Feature/EnvelopeContractTest.php` (existing) | envelope + entri OpenAPI tetap valid |
+| Frontend unit | Vitest + jsdom | `*.test.ts(x)` berdampingan | modul API (stub axios), slice (pending/fulfilled/rejected), komponen seksi, refetch-on-focus |
+| Manual/E2E | browser | keempat role demo | skeleton → terisi, seksi per role, empty state |
 
-Test existing yang mengunci perilaku lama (maker = admin, label role mentah, form section,
-input upload di detail) DIPERBARUI — tidak dihapus atau di-pin ulang.
+Aturan:
+
+- Test-first per task: tulis test gagal → jalankan (pastikan gagal) → implement → hijau → commit.
+- Setiap task menambahkan test di lokasi yang sudah ada; tidak membuat harness kedua.
+- `npm run test` penuh dijalankan di Task 7/8 untuk memastikan tidak ada regresi.
+- Tanpa target coverage angka; keberadaan perilaku di Success Criteria yang menjadi ukurannya.
 
 ## Boundaries
 
-- **Always:**
-  - Baca design doc + capability map sebelum mengubah kode.
-  - TDD: tulis test gagal → implementasi → test hijau per task.
-  - Jalankan test slice + `npm run typecheck` sebelum commit; update test lama yang kini keliru.
-  - Enforce server-side setiap guard klien; hapus file attachment dari disk privat **dan** publik.
-- **Ask first:**
-  - Perubahan skema DB/migrasi baru (rencana ini tidak memerlukannya).
-  - Menambah dependency npm/composer baru (`react-photo-view` sudah terpasang).
-  - Mengubah perilaku approval WFH, kontrak endpoint selain DELETE attachment, atau storage disk.
-- **Never:**
-  - Mengubah PDF individu (`wfh-report.blade.php`) — rujukan yang sudah benar.
-  - Menyimpan/menyajikan signature atau lampiran via URL publik `/storage`.
-  - Menghapus attachment setelah status bukan `draft`.
-  - Melewati gate approval design doc / review plan sebelum implementasi.
+**Always:**
 
-## Success Criteria
+- Jalankan test yang relevan sebelum setiap commit (`php artisan test --compact --filter=...`,
+  `npm run test -- <path>`), lalu `npm run typecheck`.
+- Catat setiap perubahan kontrak di `postman/specs/openapi.yaml` pada commit yang sama.
+- Hormati cakupan role: setiap query baru menyaring lewat `DashboardScope`, dan default-nya menolak
+  (kepala tanpa tim → kosong), bukan membuka semua.
+- Sertakan pembilang + penyebut pada setiap angka kepatuhan.
+- Semua hitungan "hari kerja" membaca `settings.wfh_allowed_days`; setelan kosong = semua hari non-kerja.
+- Seksi tanpa permission tidak dirender (FE) dan tidak dikirim (BE).
+- Pakai satu peta warna status (draft/pending/approved/rejected) di seluruh halaman.
 
-1. PDF tim: `<table class="kop-surat">` + `vertical-align: middle`; tanggal di baris tersendiri
-   di atas kolom "Atasan Langsung"; dua label tanda tangan satu baris yang sama (assert regex template).
-2. PDF tim dengan laporan: `makerName` = `strtoupper(creator.name)`, `makerNip` = creator.nip,
-   signature maker dari `SignaturePath::resolve` milik creator; admin pengunduh tidak muncul.
-3. PDF tim tanpa laporan: `makerName = '-'`, `signatureMakerPath = null`, HTTP 200 tetap.
-4. Guard 422 menyebut nama pembuat laporan bila ia belum pasang signature — bukan admin.
-5. Back detail WFH: `href="/monitoring"` bila state `{from:"/monitoring"}`; `href="/wfh"` bila
-   state kosong (refresh/direct URL).
-6. `/team-reports`: tidak ada section card form; tombol "Buat laporan" membuka dialog; Buat
-   memanggil `createWfhTeamReport` lalu menutup dialog; Batal tidak memanggilnya.
-7. Label role: "Admin", "Kepala Bidang", "Kepala Tim", "Staf" tampil di form user, tabel users,
-   halaman roles; `aria-label` checkbox tetap value mentah.
-8. `/changes/new`: field Tanggal dibutuhkan full-width; label "Tanggapan Perubahan" menggantikan
-   "Hasil implementasi"; payload `implementation_result` tidak berubah.
-9. Lampiran: pilih 2 file sekaligus saat create → 2 thumbnail + lightbox sebelum draft disimpan;
-   hapus pending berfungsi; edit draft bisa hapus attachment existing (DELETE 204) lalu unggah
-   pengganti; total Cap 10 tetap berlaku; `/changes/:id` tidak punya input upload sama sekali.
-10. PDF Implementasi: tepat 3 label "Tanda Tangan" center di atas image signature; render nyata
-    2 halaman tidak berubah.
-11. Suite penuh `vendor/bin/phpunit`, `npm run test`, `npm run typecheck`, `npm run build` hijau.
+**Ask first:**
+
+- Menambah dependensi baru selain shadcn `chart`/`recharts`.
+- Mengubah skema database atau migrasi (modul ini seharusnya tidak perlu).
+- Mengubah `nav-registry` (entri "Beranda" tetap; hanya boleh bila label/path berubah).
+- Menyentuh kode di luar `app/Domains/Dashboard/`, `resources/js/{api,store,pages/dashboard}`,
+  `routes/api.php`, `postman/specs/openapi.yaml`.
+- Mengubah definisi metrik kepatuhan (compliant/pembilang/penyebut) — itu keputusan design yang sudah kunci.
+
+**Never:**
+
+- Memakai `wfh_monitoring`/`applyVisibilityScope` sebagai field-scope untuk antrean change — antrean
+  change tetap **team-scoped**.
+- Menghitung user nonaktif dalam penyebut atau daftar perhatian; `is_active = false` selalu dikecualikan.
+- Menampilkan data lintas cakupan role (kebocoran antre tim/bidang).
+- Menambah library chart selain shadcn chart/recharts.
+- Menghapus atau melemahkan test yang gagal tanpa persetujuan manusia.
+- Commit rahasia/kredensial; menyunting direktori vendor/generated shadcn secara manual.
 
 ## Open Questions
 
-Tidak ada. Keempat keputusan yang sebelumnya terbuka sudah dikunci user pada 2026-11-24
-(pembuat laporan, lookup tim+tanggal, cakupan label role, delete draft-only).
+1. **Threshold perhatian**: design mengunci `< 60%` di atas 14 hari kerja dengan maksimal 5 user. Bila
+   ternyata lebih dari 5 user melanggar, hanya 5 terendah ditampilkan — apakah perlu indikator "…dan N
+   lainnya"? Default: tidak, cukup 5 terendah (keputusan saya, mudah ditambah nanti).
+2. **`next_session`** pada hari kerja yang sesinya sudah lengkap: dikirim `null`. Apakah FE perlu teks
+   "absensi selesai" khusus? Default: ya, teks netral satu kalimat (keputusan saya).
+3. **Refetch-on-focus** memakai `visibilitychange` saja (bukan interval polling). Bila kelak butuh
+   polling, itu perubahan scope baru.
+
+## Success Criteria
+
+- [ ] `GET /api/dashboard` mengembalikan envelope `ApiResponse::ok` dengan `generated_at` ISO 8601 dan
+      seksi sesuai permission peminta; terdokumentasi di `postman/specs/openapi.yaml`.
+- [ ] Keempat role melihat seksi yang tepat di `/` (staf: hari ini; kepala tim/bidang: rekap + antrean;
+      admin: organisasi + tren + perhatian) — diverifikasi di browser.
+- [ ] Hari non-kerja dan user nonaktif berperilaku sesuai Boundaries (diuji test backend).
+- [ ] Tren 14 hari kerja membaca setelan `wfh_allowed_days` (bukan konstanta Sen–Jum) dan
+      `compliant` = `approved|pending`.
+- [ ] Daftar perhatian maksimal 5 user, `< 60%`, urut terendah dulu.
+- [ ] Skeleton per seksi saat loading; refetch-on-focus tanpa blank; empty state satu kalimat.
+- [ ] `HomePage` placeholder terhapus; `make ci` hijau.

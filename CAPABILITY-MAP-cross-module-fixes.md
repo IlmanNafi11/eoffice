@@ -3,7 +3,7 @@
 > Phase 0, approved 2026-11-24. Intent: `docs/superpowers/specs/2026-11-24-cross-module-fixes-design.md`.
 > Plan: `docs/superpowers/plans/2026-11-24-cross-module-fixes.md` (9 tasks).
 > Ini adalah update perbaikan atas 5 modul yang sudah CLOSED — bukan modul baru.
-> Spec turunan: `SPEC.md` ini (index seluruh kemampuan; tidak ada `SPEC-<id>.md` baru,
+> Spec turunan: `SPEC-cross-module-fixes.md` (index seluruh kemampuan; tidak ada `SPEC-<id>.md` baru,
 > sesuai permintaan user "buat SPEC.md di root" yang menggantikan konvensi per-modul).
 
 | Module id | Responsibility | Depends on | Backend change | Status |
