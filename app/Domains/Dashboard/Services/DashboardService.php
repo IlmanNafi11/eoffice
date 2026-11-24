@@ -2,9 +2,11 @@
 
 namespace App\Domains\Dashboard\Services;
 
+use App\Domains\Dashboard\Services\SectionBuilders\AttentionSection;
 use App\Domains\Dashboard\Services\SectionBuilders\QueueSection;
 use App\Domains\Dashboard\Services\SectionBuilders\SectionBuilder;
 use App\Domains\Dashboard\Services\SectionBuilders\TodaySection;
+use App\Domains\Dashboard\Services\SectionBuilders\TrendSection;
 use App\Models\User;
 
 /**
@@ -23,6 +25,8 @@ class DashboardService
         $this->builders = [
             new TodaySection,
             new QueueSection,
+            new TrendSection,
+            new AttentionSection,
         ];
     }
 

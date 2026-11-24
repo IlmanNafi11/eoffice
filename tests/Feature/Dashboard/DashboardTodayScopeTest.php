@@ -228,14 +228,15 @@ class DashboardTodayScopeTest extends TestCase
         \DB::disableQueryLog();
 
         // The recap costs exactly three aggregate reads over `users` (total,
-        // absent, no-report) plus one over `wfh_team_reports` — no per-user
-        // reads: any N+1 shows up as a count proportional to the 12 seeded
-        // users. Predicate is exact: a count(*) that STARTS from users.
+        // absent, no-report) and the trend roster adds exactly one more
+        // (its denominator) — four bounded counts, no per-user reads: any
+        // N+1 shows up as a count proportional to the 12 seeded users.
+        // Predicate is exact: a count(*) that STARTS from users.
         $userCounts = array_filter(
             $queries,
             fn (array $q) => str_starts_with($q['query'], 'select count(*) as aggregate from "users"'),
         );
-        $this->assertCount(3, $userCounts, $this->dumpQueries($queries));
+        $this->assertCount(4, $userCounts, $this->dumpQueries($queries));
 
         $perUserReads = array_filter(
             $queries,

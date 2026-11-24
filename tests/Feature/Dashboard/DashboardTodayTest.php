@@ -14,9 +14,8 @@ use Tests\TestCase;
 /**
  * Dashboard module (T1): GET /api/dashboard skeleton + `today.me` for staf.
  *
- * Staff only ever see their own day: two of three sessions done, the latest
- * report for today (draft included), and no queue/trend/attention keys since
- * they hold none of the monitoring permissions.
+ * Staff see their own day plus their personal 14-workday trend; no queue,
+ * `scope` or `attention` keys since they hold none of those permissions.
  */
 class DashboardTodayTest extends TestCase
 {
@@ -85,7 +84,7 @@ class DashboardTodayTest extends TestCase
             'report_id' => $report->id,
         ], $data['today']['me']['report']);
 
-        foreach (['queue', 'trend', 'attention', 'scope'] as $key) {
+        foreach (['queue', 'attention', 'scope'] as $key) {
             $this->assertArrayNotHasKey($key, $data, "staf must not receive the [{$key}] section");
             $this->assertArrayNotHasKey($key, $data['today'], "staf must not receive today.[{$key}]");
         }
