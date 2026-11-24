@@ -4,6 +4,16 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.1.0).
 Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
+### Fixed (backend+frontend, 2026-11-24 — ship-review #19 closeout)
+- Log tamper path lampiran kini satu-baris (`addcslashes`): path DB yang
+  tertamper memuat karakter kontrol tidak lagi bisa memalsukan baris log
+  di sekelilingnya (CWE-117 — formatter Monolog mengembalikan `\n` pada
+  konteks inline). Ditutup dengan test regresi yang mutation-verified.
+- Coverage ship#19: penghapusan optimistis lampiran (baris hilang saat
+  DELETE in-flight, dikembalikan bila ditolak, TIDAK dihidupkan kembali
+  saat refetch gagal), retry Submit memakai draft yang SAMA, dan unduhan
+  PDF tim tetangga oleh pemegang `wfh.monitoring.view` (positif) kini
+  punya test yang mutation-verified.
 ### Fixed (backend+frontend, 2026-11-24 — ship-review #18 closeout)
 - PDF laporan tim WFH kini butuh `wfh.monitoring.view` bila pengunduh bukan
   anggota tim itu: staf dengan `wfh.report.export_pdf` saja tidak lagi bisa
