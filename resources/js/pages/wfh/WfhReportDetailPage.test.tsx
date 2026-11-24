@@ -101,7 +101,11 @@ type Role = "staf" | "kepala";
 
 const USERS: Record<Role, AuthUser> = { staf, kepala };
 
-function renderDetail(role: Role = "staf", detailOverride?: WfhReport) {
+function renderDetail(
+  role: Role = "staf",
+  detailOverride?: WfhReport,
+  state?: { from: string },
+) {
   const store = makeStore();
   store.dispatch(setUser(USERS[role]));
   if (detailOverride) mockedGet.mockResolvedValue(detailOverride);
@@ -112,7 +116,7 @@ function renderDetail(role: Role = "staf", detailOverride?: WfhReport) {
       {/* Toaster asli: toast dirender ke document.body (portal sonner). */}
       <Toaster position="top-right" richColors />
       <Provider store={store}>
-        <MemoryRouter initialEntries={["/wfh/1"]}>
+        <MemoryRouter initialEntries={[{ pathname: "/wfh/1", state: state ?? null }]}>
           <Routes>
             <Route path="/wfh/:reportId" element={<WfhReportDetailPage />} />
             <Route path="/wfh" element={<div>wfh-list-stub</div>} />
@@ -171,6 +175,20 @@ describe("WfhReportDetailPage — mount & render", () => {
     renderDetail();
 
     expect(await screen.findByText("Laporan tidak ditemukan.")).toBeTruthy();
+  });
+
+  it("back mengikuti location.state.from, fallback /wfh tanpa state", async () => {
+    renderDetail("staf", undefined, { from: "/monitoring" });
+
+    const back = await screen.findByLabelText("Kembali ke daftar");
+    expect(back.getAttribute("href")).toBe("/monitoring");
+  });
+
+  it("refresh tanpa state → back ke /wfh", async () => {
+    renderDetail();
+
+    const back = await screen.findByLabelText("Kembali ke daftar");
+    expect(back.getAttribute("href")).toBe("/wfh");
   });
 });
 

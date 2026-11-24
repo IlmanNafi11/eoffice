@@ -568,7 +568,9 @@ export function MonitoringPage() {
                             key={r.id}
                             report={r}
                             sessions={sessions}
-                            onOpen={(reportId) => navigate(`/wfh/${reportId}`)}
+                            onOpen={(reportId) =>
+                              navigate(`/wfh/${reportId}`, { state: { from: "/monitoring" } })
+                            }
                           />
                         ))}
                       </tbody>

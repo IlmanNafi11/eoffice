@@ -22,7 +22,7 @@
  *   DELETE, urutan berubah → PATCH {ids}).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
 import { ArrowLeft, Save } from "lucide-react";
@@ -79,6 +79,11 @@ export function canEditReport(status: WfhReport["status"]): boolean {
 export function WfhReportDetailPage() {
   const dispatch = useAppDispatch();
   const { reportId } = useParams<{ reportId: string }>();
+  // Detail bisa dibuka dari /wfh (laporan sendiri) atau /monitoring (semua
+  // laporan). Pengirim menyimpan asalnya di location.state.from; refresh atau
+  // deep-link tidak punya state → fallback ke daftar WFH.
+  const location = useLocation();
+  const backTo = (location.state as { from?: string } | null)?.from ?? "/wfh";
   const id = Number.parseInt(reportId ?? "", 10);
 
   const user = useAppSelector(selectUser);
@@ -145,7 +150,7 @@ export function WfhReportDetailPage() {
           {error}
         </p>
         <Button variant="outline" asChild className="w-fit">
-          <Link to="/wfh">
+          <Link to={backTo}>
             <ArrowLeft aria-hidden="true" className="size-4" />
             Kembali ke daftar
           </Link>
@@ -282,7 +287,7 @@ export function WfhReportDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon-sm" asChild>
-            <Link to="/wfh" aria-label="Kembali ke daftar">
+            <Link to={backTo} aria-label="Kembali ke daftar">
               <ArrowLeft aria-hidden="true" className="size-4" />
             </Link>
           </Button>

@@ -25,7 +25,7 @@ import { ApiError } from "@/api/client";
 import { userEvent, pickDate, pickSelect } from "@/test/portal";
 import type { Mock } from "vitest";
 import { Provider } from "react-redux";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type {
   MonitoringUser,
   PaginationMeta,
@@ -152,6 +152,8 @@ function todayLocal(): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${day}`;
 }
+/** Probe lokasi: merekam location.state rute detail untuk asersi. */
+let detailLocationState: unknown = null;
 
 /** renderPage dengan user khusus (default: admin pemegang 2 permission). */
 function renderPageAs(user: typeof userAdmin = userAdmin) {
@@ -163,7 +165,7 @@ function renderPageAs(user: typeof userAdmin = userAdmin) {
       <MemoryRouter initialEntries={["/monitoring"]}>
         <Routes>
           <Route path="/monitoring" element={<MonitoringPage />} />
-          <Route path="/wfh/:reportId" element={<div>wfh-detail-stub</div>} />
+          <Route path="/wfh/:reportId" element={<DetailStateProbe />} />
         </Routes>
       </MemoryRouter>
     </Provider>,
@@ -316,6 +318,9 @@ describe("MonitoringPage — Semua Laporan", () => {
 
     await userEvent.click(screen.getByTestId("wfh-report-row-10"));
     expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
+
+    // Detail harus tahu dari mana ia dibuka agar tombol back kembali ke sini.
+    expect(detailLocationState).toEqual({ from: "/monitoring" });
   });
 
   it("Terapkan: status + tim + pasangan tanggal → satu query + halaman 1", async () => {
@@ -531,3 +536,9 @@ describe("MonitoringPage — regresi visibilitas error (a602c46)", () => {
     expect(screen.getByTestId("monitoring-list-error")).toBeTruthy();
   });
 });
+
+/** Komponen stub yang merekam location.state rute detail. */
+function DetailStateProbe(): React.JSX.Element {
+  detailLocationState = useLocation().state;
+  return <div>wfh-detail-stub</div>;
+}
