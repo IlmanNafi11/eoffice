@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -175,10 +176,16 @@ class AttachmentAuthorizationTest extends TestCase
         // there, so deletion must clear BOTH disks, not just the private one.
         Storage::disk('local')->put($this->attachment->path, 'private copy');
 
+        // ship#18: a successful unlink must NOT raise the stranded-bytes
+        // warning — a `delete()` returning false means the private bytes are
+        // still on disk with no row left to authorize or attribute them.
+        Log::spy();
+
         Sanctum::actingAs($this->initiator);
 
         $this->deleteJson($this->url())->assertNoContent();
 
+        Log::shouldNotHaveReceived('warning');
         Storage::disk('public')->assertMissing($this->attachment->path);
         Storage::disk('local')->assertMissing($this->attachment->path);
         $this->assertDatabaseMissing('change_implementation_attachments', ['id' => $this->attachment->id]);
@@ -255,6 +262,26 @@ class AttachmentAuthorizationTest extends TestCase
         $this->assertDatabaseHas('change_implementation_attachments', ['id' => $otherAttachment->id]);
     }
 
+    /** ship#18: nonexistent attachment id → 404 (never 500). */
+    public function test_delete_nonexistent_attachment_is_404(): void
+    {
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/999999')
+            ->assertNotFound();
+    }
+
+    /** ship#18: deleting twice → the second call is 404, not 500 (the row is
+     * gone, so the guard's not-found branch must handle it gracefully). */
+    public function test_second_delete_after_success_is_404_not_500(): void
+    {
+        Storage::disk('local')->put($this->attachment->path, 'private copy');
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson($this->url())->assertNoContent();
+        $this->deleteJson($this->url())->assertNotFound();
+    }
+
     public function test_delete_then_upload_within_cap_succeeds(): void
     {
         $implementation = $this->package->implementation;
@@ -299,10 +326,19 @@ class AttachmentAuthorizationTest extends TestCase
             'sort_order' => 2,
         ]);
 
+        // ship#18: the tamper rejection must be LOUD — a path outside
+        // change-attachments/ on a row being deleted is the fingerprint of
+        // tampering, not a routine delete, and the row (the evidence of the
+        // attempt) disappears with the request.
+        Log::spy();
+
         Sanctum::actingAs($this->initiator);
 
         $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/'.$attachment->id)
             ->assertNoContent();
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message) => str_contains($message, 'tampered'));
 
         Storage::disk('local')->assertExists('signatures/shared.png');
         Storage::disk('public')->assertExists($this->attachment->path);
@@ -326,5 +362,70 @@ class AttachmentAuthorizationTest extends TestCase
 
         Storage::disk('local')->assertExists('outside.txt');
         $this->assertDatabaseMissing('change_implementation_attachments', ['id' => $attachment->id]);
+    }
+
+    /**
+     * ship#18: both disks are non-throwing, so a failed unlink is silent. The
+     * row was already deleted, which means nobody can ever authorize or
+     * attribute those bytes again — the operator must see a warning instead
+     * of a bare 204.
+     *
+     * Skips as root: a root process ignores directory permissions, so the
+     * unlink cannot be made to fail (CI runs unprivileged).
+     */
+    public function test_delete_warns_when_private_bytes_cannot_be_unlinked(): void
+    {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $this->markTestSkipped('Root ignores directory permissions; unlink cannot fail.');
+        }
+
+        // The fake `local` disk root (framework/testing/disks/local) is SHARED
+        // by the whole suite, so it must never be touched here. Swap the disk
+        // config to a PRIVATE root for this test: the root itself is
+        // user-owned (cleanup works), while the change-attachments DIR inside
+        // it is root-owned read-only → a non-root unlink inside it fails
+        // (unlink is a directory write).
+        $root = storage_path('framework/testing/init-unremovable-'.uniqid());
+        mkdir($root, 0755, true);
+        $originalRoot = config('filesystems.disks.local.root');
+        config(['filesystems.disks.local.root' => $root]);
+        Storage::forgetDisk('local');
+
+        $path = 'change-attachments/init-owned.png';
+        Storage::disk('local')->put($path, 'private copy');
+        $dir = Storage::disk('local')->path('change-attachments');
+        $lock = 'sudo -n chown root:root '.escapeshellarg($dir).' && sudo -n chmod 555 '.escapeshellarg($dir);
+        exec($lock, $out, $code);
+        if ($code !== 0) {
+            exec('rm -rf '.escapeshellarg($root));
+            $this->markTestSkipped('Cannot chown to root (no sudo); stranded-bytes path untestable.');
+        }
+
+        $attachment = ChangeImplementationAttachment::create([
+            'change_implementation_id' => $this->package->implementation->id,
+            'path' => $path,
+            'sort_order' => 3,
+        ]);
+
+        Log::spy();
+        Sanctum::actingAs($this->initiator);
+
+        try {
+            $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/'.$attachment->id)
+                ->assertNoContent();
+
+            Log::shouldHaveReceived('warning')
+                ->withArgs(fn (string $message) => str_contains($message, 'unremovable_file'));
+        } finally {
+            // The dir inside the sandbox is root-owned read-only (that is the
+            // point), so a plain rm cannot remove it — hand it back first.
+            exec('sudo -n chown -R '.get_current_user().' '.escapeshellarg($root).' 2>/dev/null');
+            exec('chmod -R u+w '.escapeshellarg($root).' 2>/dev/null');
+            exec('rm -rf '.escapeshellarg($root));
+            // Restore the suite-wide fake disk for subsequent tests.
+            config(['filesystems.disks.local.root' => $originalRoot]);
+            Storage::forgetDisk('local');
+            Storage::fake('local');
+        }
     }
 }

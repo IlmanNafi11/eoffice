@@ -13,6 +13,7 @@ use App\Support\Media\PrivateMediaPath;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class EloquentChangeManagementRepository extends EloquentRepository implements ChangeManagementRepositoryInterface
@@ -249,11 +250,31 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
             // contained AND scoped to this directory: a tampered row pointing
             // at `signatures/...` or `../` must not be actionable, while the
             // row itself is still removed (the file is left for an operator).
-            if (PrivateMediaPath::scoped($attachment->path, self::ATTACHMENT_DIRECTORY)) {
-                // Evidence may predate the private-disk cutover and live on the
-                // public disk; clearing only one disk would leave a readable copy.
-                Storage::disk('local')->delete($attachment->path);
-                Storage::disk('public')->delete($attachment->path);
+            // The rejection is LOUD: a path outside change-attachments/ on a
+            // row being deleted is the fingerprint of tampering, and the row
+            // (the only record of the attempt) disappears with the request.
+            if (! PrivateMediaPath::scoped($attachment->path, self::ATTACHMENT_DIRECTORY)) {
+                Log::warning('change.attachment.delete.skipped_tampered_path', [
+                    'attachment_id' => $attachment->id,
+                    'path' => $attachment->path,
+                ]);
+
+                return;
+            }
+
+            // Evidence may predate the private-disk cutover and live on the
+            // public disk; clearing only one disk would leave a readable copy.
+            // Both disks are non-throwing: a failed unlink is silent, so a
+            // stranded private copy must be surfaced to the operator instead
+            // of disappearing behind a 204.
+            $localGone = Storage::disk('local')->delete($attachment->path);
+            Storage::disk('public')->delete($attachment->path);
+
+            if (! $localGone) {
+                Log::warning('change.attachment.delete.unremovable_file', [
+                    'attachment_id' => $attachment->id,
+                    'path' => $attachment->path,
+                ]);
             }
         });
     }
