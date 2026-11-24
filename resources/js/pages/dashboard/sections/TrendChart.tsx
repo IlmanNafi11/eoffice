@@ -19,7 +19,7 @@ import {
 import type { DashboardTrend } from "@/api/types";
 
 const chartConfig = {
-  compliant: { label: "Patuh", color: "var(--chart-1)" },
+  compliant: { label: "Patuh", color: "var(--primary)" },
 } satisfies ChartConfig;
 
 /** `2026-11-03` → `03/11` (label sumbu-x ringkas). */
