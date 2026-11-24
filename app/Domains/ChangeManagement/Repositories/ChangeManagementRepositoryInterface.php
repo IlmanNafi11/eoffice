@@ -2,6 +2,7 @@
 
 namespace App\Domains\ChangeManagement\Repositories;
 
+use App\Domains\ChangeManagement\Models\ChangeImplementationAttachment;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Domains\Shared\Contracts\RepositoryInterface;
 use App\Models\User;
@@ -27,4 +28,6 @@ interface ChangeManagementRepositoryInterface extends RepositoryInterface
     public function deletePackage(int $id): void;
 
     public function addAttachments(int $implementationId, array $paths): void;
+
+    public function deleteAttachment(ChangeImplementationAttachment $attachment): void;
 }

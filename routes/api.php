@@ -194,6 +194,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
         // Evidence files are private: they stream through this authorized
         // endpoint instead of a static /storage URL (ship review S2).
         ->middleware('permission:change.initiation.view')->name('attachments.download');
+    Route::delete('/changes/{id}/attachments/{attachment}', [ChangePackageController::class, 'deleteAttachment'])
+        ->middleware('permission:change.implementation.update');
     Route::get('/changes/{id}/pdf/initiation', [ChangeManagementPdfController::class, 'exportInitiation'])
         ->middleware('permission:change.initiation.export_pdf');
     Route::get('/changes/{id}/pdf/implementation', [ChangeManagementPdfController::class, 'exportImplementation'])

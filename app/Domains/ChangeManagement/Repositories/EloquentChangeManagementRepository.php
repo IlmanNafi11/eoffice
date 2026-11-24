@@ -12,6 +12,7 @@ use App\Support\Constants\Roles;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class EloquentChangeManagementRepository extends EloquentRepository implements ChangeManagementRepositoryInterface
 {
@@ -230,6 +231,18 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
 
             // One INSERT for N files: sort_order is computed once above.
             ChangeImplementationAttachment::insert($rows);
+        });
+    }
+
+    public function deleteAttachment(ChangeImplementationAttachment $attachment): void
+    {
+        DB::transaction(function () use ($attachment) {
+            $attachment->delete();
+
+            // Evidence may predate the private-disk cutover and live on the
+            // public disk; clearing only one disk would leave a readable copy.
+            Storage::disk('local')->delete($attachment->path);
+            Storage::disk('public')->delete($attachment->path);
         });
     }
 

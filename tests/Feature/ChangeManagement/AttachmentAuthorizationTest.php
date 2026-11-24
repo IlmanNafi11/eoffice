@@ -168,4 +168,91 @@ class AttachmentAuthorizationTest extends TestCase
             $this->assertStringNotContainsString('/storage/', $url, 'Evidence must not be a static storage URL.');
         }
     }
+
+    public function test_initiator_can_delete_attachment_from_own_draft(): void
+    {
+        // setUp seeds the file on the 'public' disk; pre-cutover evidence lives
+        // there, so deletion must clear BOTH disks, not just the private one.
+        Storage::disk('local')->put($this->attachment->path, 'private copy');
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson($this->url())->assertNoContent();
+
+        Storage::disk('public')->assertMissing($this->attachment->path);
+        Storage::disk('local')->assertMissing($this->attachment->path);
+        $this->assertDatabaseMissing('change_implementation_attachments', ['id' => $this->attachment->id]);
+    }
+
+    public function test_delete_attachment_requires_draft_status(): void
+    {
+        $this->package->forceFill(['status' => 'pending'])->save();
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson($this->url())->assertUnprocessable();
+        Storage::disk('public')->assertExists($this->attachment->path);
+        $this->assertDatabaseHas('change_implementation_attachments', ['id' => $this->attachment->id]);
+    }
+
+    public function test_delete_attachment_rejects_non_initiator(): void
+    {
+        // Same field, view permission held: visibility is not the gate here,
+        // ownership is.
+        Sanctum::actingAs($this->outsider);
+
+        $this->deleteJson($this->url())->assertForbidden();
+        Storage::disk('public')->assertExists($this->attachment->path);
+    }
+
+    public function test_delete_attachment_of_another_package_is_404(): void
+    {
+        $otherPackage = ChangeInitiation::factory()->create([
+            'field_id' => $this->fieldA->id,
+            'initiator_id' => $this->initiator->id,
+        ]);
+
+        $otherImplementation = ChangeImplementation::create([
+            'change_initiation_id' => $otherPackage->id,
+        ]);
+
+        $otherAttachment = ChangeImplementationAttachment::create([
+            'change_implementation_id' => $otherImplementation->id,
+            'path' => 'change-attachments/other.png',
+            'sort_order' => 1,
+        ]);
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/'.$otherAttachment->id)
+            ->assertNotFound();
+        $this->assertDatabaseHas('change_implementation_attachments', ['id' => $otherAttachment->id]);
+    }
+
+    public function test_delete_then_upload_within_cap_succeeds(): void
+    {
+        $implementation = $this->package->implementation;
+        $paths = [];
+        for ($i = 2; $i <= 10; $i++) {
+            $paths[] = "change-attachments/filler-{$i}.png";
+            ChangeImplementationAttachment::create([
+                'change_implementation_id' => $implementation->id,
+                'path' => "change-attachments/filler-{$i}.png",
+                'sort_order' => $i,
+            ]);
+        }
+        $this->assertSame(10, $implementation->attachments()->count());
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson($this->url())->assertNoContent();
+
+        // The cap is on the implementation's TOTAL, so freeing one slot must
+        // admit exactly one new file (regression: a stale count would leak).
+        $this->postJson('/api/changes/'.$this->package->id.'/attachments', [
+            'files' => [UploadedFile::fake()->image('replacement.png')],
+        ])->assertOk();
+
+        $this->assertSame(10, $implementation->fresh()->attachments()->count());
+    }
 }

@@ -5411,6 +5411,56 @@ paths:
                     type: array
                     items:
                       type: object
+  /api/changes/{id}/attachments/{attachment}:
+    delete:
+      tags: [Change Package]
+      summary: Delete an attachment (draft only, initiator only)
+      operationId: deletePackageAttachment
+      description: |
+        Removes one evidence attachment of a draft change package. The row is
+        deleted and the file is removed from BOTH storage disks (private
+        `local` and legacy `public`). Deleting an attachment frees a slot in
+        the 10-attachment cap. Only the package initiator may delete; other
+        users get 403 even when they can view the package.
+      parameters:
+        - $ref: "#/components/parameters/PackageIdPath"
+        - name: attachment
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Attachment ID
+      responses:
+        "204":
+          description: Attachment deleted
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: Not the initiator (or missing change.implementation.update permission)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Hanya inisiator yang dapat menghapus lampiran.
+        "404":
+          description: Package or attachment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Lampiran tidak ditemukan.
+        "422":
+          description: Package is not a draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Hanya paket draft yang dapat menghapus lampiran.
   /api/changes/{id}/pdf/initiation:
     get:
       tags: [Change Package]

@@ -11,6 +11,7 @@ use App\Domains\ChangeManagement\Http\Requests\UploadChangePackageAttachmentsReq
 use App\Domains\ChangeManagement\Http\Resources\AttachmentResource;
 use App\Domains\ChangeManagement\Http\Resources\ChangePackageResource;
 use App\Domains\ChangeManagement\Repositories\ChangeManagementRepositoryInterface;
+use App\Domains\ChangeManagement\Services\ChangePackageAttachmentGuard;
 use App\Domains\ChangeManagement\Services\ChangePackageDecision;
 use App\Domains\ChangeManagement\Services\DocNumberGenerator;
 use App\Support\Http\ApiResponse;
@@ -24,17 +25,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ChangePackageController extends Controller
 {
-    /** Spec cap (SPEC-change-package.md): total lampiran per implementasi. */
-    private const MAX_ATTACHMENTS = 10;
-
-    use AuthorizesRequests;
-    use ClampsPerPage;
-
     public function __construct(
         private ChangeManagementRepositoryInterface $repo,
         private ChangePackageDecision $decisions,
         private DocNumberGenerator $docNumberGenerator,
+        private ChangePackageAttachmentGuard $attachmentGuard,
     ) {}
+
+    use AuthorizesRequests;
+    use ClampsPerPage;
 
     public function index(Request $request): JsonResponse
     {
@@ -234,21 +233,12 @@ class ChangePackageController extends Controller
             return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
         }
 
-        if ($package->initiator_id !== $request->user()->id) {
-            return ApiResponse::fail('Hanya inisiator yang dapat mengunggah lampiran.', 403);
-        }
-
-        if ($package->status !== 'draft') {
-            return ApiResponse::fail('Hanya paket draft yang dapat dilampirkan.');
-        }
+        $this->attachmentGuard->assertMayMutate($package, $request->user(), 'mengunggah');
 
         // The FormRequest caps ONE request at 10 files; the spec cap is on the
         // implementation's total, so successive batches must not bypass it.
         $incoming = $request->file('files', []);
-        $existing = $package->implementation->attachments()->count();
-        if ($existing + count($incoming) > self::MAX_ATTACHMENTS) {
-            return ApiResponse::fail('Maksimal 10 lampiran.', 422);
-        }
+        $this->attachmentGuard->assertUploadFitsCap($package, count($incoming));
 
         $paths = [];
         foreach ($incoming as $file) {
@@ -308,5 +298,24 @@ class ChangePackageController extends Controller
         return response()
             ->file($full, ['Cache-Control' => 'no-store'])
             ->setPrivate();
+    }
+
+    /**
+     * Draft-only attachment removal. Guard order matches uploadAttachments:
+     * authorize → 404 package → 403 initiator → 422 draft → 404 attachment.
+     */
+    public function deleteAttachment(Request $request, int $id, int $attachmentId): Response
+    {
+        $this->authorize('change.implementation.update');
+
+        $package = $this->repo->findPackage($id);
+
+        if (! $package) {
+            return ApiResponse::fail('Paket perubahan tidak ditemukan.', 404);
+        }
+
+        $this->attachmentGuard->deleteDraftAttachment($package, $request->user(), $attachmentId);
+
+        return ApiResponse::deleted();
     }
 }
