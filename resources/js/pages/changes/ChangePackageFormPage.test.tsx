@@ -483,7 +483,7 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(screen.getByText("2 berkas menunggu — terunggah otomatis setelah draft disimpan.")).toBeTruthy();
     expect(mockedUpload).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: "Hapus bukti-a.png" }));
+    await userEvent.click(screen.getByRole("button", { name: "Hapus Lampiran#1" }));
 
     expect(screen.queryByAltText("bukti-a.png")).toBeNull();
     expect(screen.getByAltText("bukti-b.png")).toBeTruthy();

@@ -4,6 +4,13 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.1.0).
 Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
+### Fixed (frontend, 2026-11-24 — UX lampiran paket perubahan)
+- Input unggah lampiran kini tetap menampilkan "Tambah lampiran" setelah
+  berkas dipilih: daftar berkas tampil di bawah input, sehingga tombol
+  selalu jelas sebagai aksi untuk menambah berkas berikutnya.
+- Tombol hapus pada berkas antrean kini memakai "Hapus Lampiran#N" dan tidak
+  lagi menyertakan nama berkas (lebih rapi untuk nama panjang); berkas yang
+  dihapus tetap berkas pada nomor urut tersebut.
 ### Fixed (backend+frontend, 2026-11-24 — ship-review #19 closeout)
 - Log tamper path lampiran kini satu-baris (`addcslashes`): path DB yang
   tertamper memuat karakter kontrol tidak lagi bisa memalsukan baris log

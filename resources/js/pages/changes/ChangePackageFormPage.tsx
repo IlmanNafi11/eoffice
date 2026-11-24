@@ -851,9 +851,10 @@ export function ChangePackageFormPage() {
                 id="change-package-attachment-input"
                 data-testid="change-package-attachment-input"
                 multiple
+                hideSelectionLabel
                 className="w-72"
                 disabled={busy || uploading}
-                placeholder="Pilih lampiran…"
+                placeholder="Tambah lampiran"
                 onFileChange={() => undefined}
                 onFilesChange={handleFilesChange}
               />

@@ -97,6 +97,24 @@ describe("FileInput — mode multiple (Task 10)", () => {
     expect(screen.getByText("2 file dipilih")).toBeTruthy();
   });
 
+  it("setelah memilih file, tombol tetap mengundang penambahan lampiran berikutnya", async () => {
+    const user = userEvent.setup();
+    render(
+      <FileInput
+        onFileChange={vi.fn()}
+        onFilesChange={vi.fn()}
+        multiple
+        hideSelectionLabel
+        placeholder="Tambah lampiran"
+      />,
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(["a"], "satu.pdf", { type: "application/pdf" }));
+
+    expect(screen.getByRole("button", { name: /tambah lampiran/i })).toBeTruthy();
+  });
+
   it("hapus file (multi) → onFilesChange([]) dan kembali ke placeholder", async () => {
     const user = userEvent.setup();
     const onFilesChange = vi.fn();

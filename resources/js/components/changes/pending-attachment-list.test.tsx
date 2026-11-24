@@ -7,7 +7,7 @@
  * - Berkas gambar (`type` image/*) memakai objectURL lokal (`blob:`) — tanpa
  *   request jaringan, karena byte belum ada di server.
  * - Klik thumbnail membuka lightbox react-photo-view (`.PhotoView-Portal`).
- * - Tombol `Hapus <nama>` memanggil `onRemove(file)` dengan berkas yang tepat.
+ * - Tombol `Hapus Lampiran#N` memanggil `onRemove(file)` dengan berkas yang tepat.
  * - Unmount me-revoke semua objectURL yang dibuat.
  *
  * jsdom tak punya createObjectURL → stub (pola attachment-list.test.tsx).
@@ -63,9 +63,15 @@ describe("PendingAttachmentList", () => {
     const onRemove = vi.fn();
     render(<PendingAttachmentList files={[png, pdf]} onRemove={onRemove} />);
 
-    await user.click(screen.getByRole("button", { name: "Hapus laporan.pdf" }));
+    await user.click(screen.getByRole("button", { name: "Hapus Lampiran#2" }));
 
     expect(onRemove).toHaveBeenCalledWith(pdf);
+  });
+
+  it("tombol hapus tidak menyertakan nama berkas", () => {
+    render(<PendingAttachmentList files={[pdf]} onRemove={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Hapus Lampiran#1" })).toBeTruthy();
   });
 
   /** ship#18 (b0d3bb2): dua berkas bernama sama dari folder berbeda harus
@@ -80,7 +86,7 @@ describe("PendingAttachmentList", () => {
 
     expect(screen.getAllByText("bukti.png")).toHaveLength(2);
 
-    const removeButtons = screen.getAllByRole("button", { name: "Hapus bukti.png" });
+    const removeButtons = screen.getAllByRole("button", { name: /^Hapus Lampiran#\d+$/ });
     expect(removeButtons).toHaveLength(2);
     await user.click(removeButtons[1] as Element);
 

@@ -11,8 +11,8 @@
  * - berkas gambar (`type` image/*) → thumbnail + klik membuka lightbox
  *   react-photo-view;
  * - non-gambar → ikon berkas (tanpa preview);
- * - tombol `Hapus <nama>` memanggil `onRemove(file)` — pemilik state (halaman
- *   form) yang menghapus dari antrean.
+ * - tombol `Hapus Lampiran#N` memanggil `onRemove(file)` — pemilik state
+ *   (halaman form) yang menghapus dari antrean.
  */
 import { useEffect, useRef, useState } from "react";
 import { PhotoProvider, PhotoView } from "react-photo-view";
@@ -107,7 +107,7 @@ export function PendingAttachmentList({
                 disabled={disabled}
                 onClick={() => onRemove(file)}
               >
-                Hapus {file.name}
+                Hapus Lampiran#{index + 1}
               </Button>
             </li>
           );

@@ -9,6 +9,9 @@
  * sendiri) atau controlled lewat prop `file` (parent mengendalikan tampilan).
  * Input me-reset `value`-nya tiap change supaya memilih file yang sama
  * berulang kali tetap memicu callback.
+ *
+ * `hideSelectionLabel` dipakai consumer yang merender daftar berkas sendiri:
+ * tombol tetap menunjukkan aksi ("Tambah lampiran"), bukan nama berkas terakhir.
  */
 import * as React from "react";
 import { Paperclip, X } from "lucide-react";
@@ -46,6 +49,12 @@ interface FileInputProps
    * (mis. tombol X di bar aksi grid) agar layout sempit tak meluber.
    */
   clearButton?: "inline" | "none";
+  /**
+   * Sembunyikan nama/jumlah file pada tombol — dipakai consumer multi-file
+   * yang merender daftar berkasnya sendiri, agar tombol tetap mengundang
+   * penambahan berkas berikutnya. Default false (nama tetap tampil).
+   */
+  hideSelectionLabel?: boolean;
 }
 
 function FileInput({
@@ -58,6 +67,7 @@ function FileInput({
   inputLabel,
   clearable = true,
   clearButton = "inline",
+  hideSelectionLabel = false,
   disabled,
   className,
   id,
@@ -67,7 +77,7 @@ function FileInput({
   const [selected, setSelected] = React.useState<File[]>([]);
   const shown = file !== undefined ? (file ? [file] : []) : selected;
   const label =
-    shown.length === 0
+    hideSelectionLabel || shown.length === 0
       ? placeholder
       : shown.length === 1
         ? shown[0]!.name
@@ -123,7 +133,7 @@ function FileInput({
         <Paperclip className="size-4 shrink-0" />
         <span className="truncate">{label}</span>
       </Button>
-      {clearable && shown.length > 0 && !disabled ? (
+      {clearable && clearButton === "inline" && shown.length > 0 && !disabled ? (
         <Button
           type="button"
           variant="ghost"
