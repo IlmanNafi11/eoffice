@@ -337,6 +337,29 @@ describe("TeamReportsPage — create journey", () => {
     expect(mockedList).toHaveBeenCalledTimes(1);
   });
 
+  /** ship#17: pesan mutasi 422 hidup di redux dan hanya dibersihkan oleh
+   * mutasi berikutnya — membuka ulang dialog harus MEMBERSIHKANNYA, bukan
+   * menampilkan error percobaan sebelumnya. */
+  it("dialog dibuka ulang setelah create gagal → tidak ada banner error lama", async () => {
+    renderPageAs(admin);
+    await screen.findByText("Tim Jaringan");
+
+    await openCreateDialog();
+    await pickSelect("Tim", "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-10");
+    mockedCreate.mockRejectedValueOnce(
+      new ApiError("http", "Laporan untuk tim dan tanggal ini sudah ada.", { status: 422 }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
+    expect(await screen.findByTestId("team-action-error")).toBeTruthy();
+
+    // Batal menutup dialog, lalu buka lagi: state form DAN pesan harus bersih.
+    await userEvent.click(screen.getByRole("button", { name: /^batal$/i }));
+    await openCreateDialog();
+
+    expect(screen.queryByTestId("team-action-error")).toBeNull();
+  });
+
   it("Batal menutup dialog tanpa mutasi dan tanpa refetch", async () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");

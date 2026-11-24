@@ -59,6 +59,7 @@ import { WfhStatusBadge } from "@/components/wfh/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   approveWfhTeamReport,
+  clearWfhTeamActionError,
   createWfhTeamReport,
   fetchWfhTeamReports,
   rejectWfhTeamReport,
@@ -121,10 +122,15 @@ export function TeamReportsPage() {
       .catch(() => setTeams([])); // dropdown tetap tampil, pilihan kosong
   }, [canCreate]);
 
-  /** Buka dialog → reset pilihan lama + bersihkan pesan mutasi sebelumnya. */
+  /**
+   * Buka dialog → reset pilihan lama. `actionError` disimpan di redux dan
+   * HANYA dibersihkan oleh mutasi berikutnya, jadi tanpa `dispatch` ini error
+   * 422 dari percobaan sebelumnya muncul kembali di dialog baru (ship#17).
+   */
   function openCreate() {
     setTeamId("");
     setReportDate("");
+    dispatch(clearWfhTeamActionError());
     setCreateOpen(true);
   }
 

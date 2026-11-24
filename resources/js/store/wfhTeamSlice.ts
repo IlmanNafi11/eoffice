@@ -184,6 +184,10 @@ const slice = createSlice({
     setTeamListQuery(state, action: PayloadAction<ListTeamReportsQuery>) {
       state.list.query = { ...state.list.query, ...action.payload };
     },
+    /** Buang pesan mutasi lama (dipanggil saat dialog create dibuka ulang). */
+    clearWfhTeamActionError(state) {
+      state.list.actionError = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -238,6 +242,11 @@ const slice = createSlice({
       );
   },
 });
+
+/** Bersihkan pesan mutasi lama — dipanggil saat dialog create DIBUKA, agar
+ * error 422 dari percobaan sebelumnya tidak muncul kembali di dialog baru
+ * (ship#17: `openCreate` mereset pilihan form, bukan `actionError` redux). */
+export const clearWfhTeamActionError = slice.actions.clearWfhTeamActionError;
 
 export const { setTeamListQuery } = slice.actions;
 
