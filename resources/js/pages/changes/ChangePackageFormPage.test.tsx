@@ -506,6 +506,17 @@ describe("ChangePackageFormPage — validasi klien Submit", () => {
       expect(mockedSubmit).toHaveBeenCalled();
     });
   });
+
+  it("validasi submit memakai label 'Tanggapan Perubahan', bukan 'Hasil implementasi'", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    const validation = screen.getByTestId("change-package-form-validation");
+    expect(validation.textContent).toMatch(/tanggapan perubahan wajib/i);
+    expect(validation.textContent).not.toMatch(/hasil implementasi/i);
+  });
 });
 
 describe("ChangePackageFormPage — Submit (create mode)", () => {

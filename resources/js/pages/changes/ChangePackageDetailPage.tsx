@@ -338,7 +338,7 @@ export function ChangePackageDetailPage() {
               <InfoRow label="Rencana pengujian" value={impl.test_plan} />
               <InfoRow label="Tanggal eksekusi" value={impl.execution_date} />
               <InfoRow label="Tanggal rilis" value={impl.release_date} />
-              <InfoRow label="Hasil implementasi" value={impl.implementation_result} />
+              <InfoRow label="Tanggapan Perubahan" value={impl.implementation_result} />
               <InfoRow label="Dampak produksi" value={impl.production_impact} />
               <InfoRow label="Upaya/Tindakan" value={impl.required_effort} />
               <InfoRow label="Sumber daya" value={impl.resources} />

@@ -234,6 +234,9 @@ describe("ChangePackageDetailPage — render dua kartu + lampiran", () => {
     // Kartu Implementasi + jenis perubahan + lampiran.
     expect(screen.getByText("Network")).toBeTruthy();
     expect(screen.getByText("Uji migrasi di staging")).toBeTruthy();
+    // implementation_result memakai label yang sama dengan form (T9).
+    expect(screen.getByText("Tanggapan Perubahan")).toBeTruthy();
+    expect(screen.queryByText("Hasil implementasi")).toBeNull();
     // Lampiran dirender via AttachmentList (testid per lampiran).
     expect(screen.getByTestId("attachment-item-15")).toBeTruthy();
   });

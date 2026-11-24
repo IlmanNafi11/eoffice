@@ -363,7 +363,7 @@ export function ChangePackageFormPage() {
     if (form.releaseDate === "")
       errors.push("Tanggal rilis wajib diisi untuk submit.");
     if (form.implementationResult.trim() === "")
-      errors.push("Hasil implementasi wajib diisi untuk submit.");
+      errors.push("Tanggapan Perubahan wajib diisi untuk submit.");
     if (form.executionDate !== "" && form.releaseDate !== "" && form.releaseDate < form.executionDate)
       errors.push("Tanggal rilis harus setelah atau sama dengan tanggal eksekusi.");
     if (form.costNeeded && form.costAmount.trim() === "")

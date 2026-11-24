@@ -5,6 +5,25 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-24 — perbaikan lintas modul)
+- PDF laporan WFH tim: kop surat & tanggal kini sejajar dengan PDF individu;
+  kolom "Yang Membuat Laporan" diisi `created_by` laporan tim (lookup tim+tanggal
+  bila `team_report_id` tak dikirim) — bukan admin pengunduh; tanpa laporan
+  maker `—` dan PDF tetap 200.
+- Detail WFH: tombol Kembali mengarah ke `/monitoring` bila dibuka dari papan
+  monitoring, fallback `/wfh` bila state hilang. `/team-reports` kini tombol
+  "Buat laporan" + dialog (bukan section card form).
+- Label role human-friendly ("Admin", "Kepala Bidang", "Kepala Tim", "Staf")
+  di form user, tabel users, dan halaman roles; `aria-label` checkbox tetap
+  nilai mentah.
+- Lampiran paket perubahan: thumbnail + lightbox sejak pemilihan file (create),
+  hapus berkas pending, hapus/ganti attachment existing saat draft via endpoint
+  `DELETE /changes/{id}/attachments/{attachment}` (204, draft+inisiator only,
+  file dihapus dari disk `local` dan `public`); input unggah hanya di form
+  create/edit, halaman detail read-only. Label "Hasil implementasi" seragam
+  menjadi "Tanggapan Perubahan" di form & detail; PDF Implementasi dapat caption
+  "Tanda Tangan" di atas 3 image tanda tangan.
+
 ### Fixed (backend+frontend, 2026-11-23 — tindak lanjut ship-review #15)
 - Slot absensi terkunci permanen: unique index `wfh_attendance_unique`
   mencakup baris yang di-soft-delete, sehingga sesi yang dihapus dari laporan
