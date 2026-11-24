@@ -147,8 +147,41 @@ class TeamReportPdfTest extends TestCase
 
         $captured = $this->capturePdfViewData($team, null);
 
-        $this->assertSame('-', $captured['makerName']);
+        // Spec decision 4: absent maker renders the em-dash "—", not '-'.
+        $this->assertSame('—', $captured['makerName']);
+        $this->assertSame('—', $captured['makerNip']);
         $this->assertNull($captured['signatureMakerPath']);
+        $this->assertSame(200, $this->getJson("/api/admin/wfh/teams/{$team->id}/pdf?date=".now()->toDateString())->status());
+    }
+
+    /** ship#17 (test-engineer gap): the DATE-based lookup path (no
+     * `team_report_id`) must resolve the maker from the report for that
+     * team+date — the daily board only ever sends a date. */
+    public function test_team_pdf_date_path_resolves_maker_from_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $creator = User::factory()->create(['team_id' => $team->id, 'name' => 'Pembuat Tanggal']);
+        $creator->assignRole('staf');
+        $this->setUserSignature($creator);
+
+        $admin = User::factory()->create(['team_id' => $team->id]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+        $this->setUserSignature($admin);
+
+        WfhTeamReport::factory()->status('pending')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $creator->id,
+        ]);
+
+        // No team_report_id — the date path must find the report above.
+        $captured = $this->capturePdfViewData($team, null);
+
+        $this->assertSame('PEMBUAT TANGGAL', $captured['makerName']);
+        $this->assertFalse($captured['isApproved']);
         $this->assertSame(200, $this->getJson("/api/admin/wfh/teams/{$team->id}/pdf?date=".now()->toDateString())->status());
     }
 

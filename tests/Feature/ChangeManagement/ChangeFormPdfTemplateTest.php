@@ -186,6 +186,14 @@ class ChangeFormPdfTemplateTest extends TestCase
             $html,
         );
         $this->assertSame(3, substr_count($html, 'class="signature-label"'));
+
+        // ship#17: "center pada kolomnya" adalah perilaku CSS, bukan hanya
+        // keberadaan markup — aturan text-align:center harus ada, kalau tidak
+        // caption kembali rata kiri saat markup tetap lolos regex di atas.
+        $this->assertMatchesRegularExpression(
+            '/\.signature-label\s*\{\s*text-align:\s*center;/',
+            $html,
+        );
     }
 
     public function test_implementation_template_embeds_signature_image_in_each_identity_row(): void

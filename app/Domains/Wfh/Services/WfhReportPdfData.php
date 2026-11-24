@@ -128,8 +128,11 @@ class WfhReportPdfData
             'isApproved' => $isApproved,
             'tanggalPelaksanaan' => Carbon::parse($date)->isoFormat('D MMMM Y'),
             'staff' => $staff,
-            'makerName' => $maker ? strtoupper($maker->name) : '-',
-            'makerNip' => $maker?->nip ?? '-',
+            // Spec decision 4: absent maker renders the em-dash "—"
+            // (DejaVu Sans covers U+2014; same glyph already renders in
+            // change-implementation.blade.php), NOT the downloading admin.
+            'makerName' => $maker ? strtoupper($maker->name) : '—',
+            'makerNip' => $maker?->nip ?? '—',
             'signatureMakerPath' => $makerSig,
             'signatureSupervisorPath' => $supervisorSig,
             'supervisorName' => $head ? strtoupper($head->name) : '-',
