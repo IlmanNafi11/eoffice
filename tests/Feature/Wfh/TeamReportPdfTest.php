@@ -244,6 +244,58 @@ class TeamReportPdfTest extends TestCase
         $this->assertNull($captured['signatureSupervisorPath']);
     }
 
+    /**
+     * ship#18: the team PDF now carries the report creator's identity (name,
+     * NIP, signature) and, when approved, the field head's signature — data a
+     * plain staf must not harvest for a NEIGHBOURING team. The endpoint's only
+     * permission gate is wfh.report.export_pdf (which staf hold), so the
+     * non-own-team path requires wfh.monitoring.view, mirroring export().
+     */
+    public function test_staf_without_monitoring_permission_cannot_download_other_teams_pdf(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $otherTeam = Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+
+        // staf of Tim B: same bidang, holds wfh.report.export_pdf but NOT
+        // wfh.monitoring.view (RolePermissionSeeder staf block).
+        $staf = User::factory()->create(['team_id' => $otherTeam->id]);
+        $staf->assignRole('staf');
+        $this->setUserSignature($staf);
+        Sanctum::actingAs($staf);
+
+        $teamReport = WfhTeamReport::factory()->status('approved')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $staf->id,
+        ]);
+
+        $this->getJson("/api/admin/wfh/teams/{$team->id}/pdf?team_report_id={$teamReport->id}")
+            ->assertForbidden();
+    }
+
+    /** ship#18: a staf may still export THEIR OWN team's PDF (the daily board
+     * use case) — the monitoring gate applies only to other teams. */
+    public function test_staf_can_download_own_teams_pdf(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $staf = User::factory()->create(['team_id' => $team->id]);
+        $staf->assignRole('staf');
+        $this->setUserSignature($staf);
+        Sanctum::actingAs($staf);
+
+        $teamReport = WfhTeamReport::factory()->status('pending')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $staf->id,
+        ]);
+
+        $captured = $this->capturePdfViewData($team, $teamReport->id);
+        $this->assertSame(strtoupper($staf->name), $captured['makerName']);
+    }
+
     public function test_team_report_data_contains_raw_photo_path(): void
     {
         $field = Field::create(['name' => 'Bidang Test']);

@@ -85,6 +85,16 @@ class ReportPdfController extends Controller
             return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
         }
 
+        // Same visibility rule as export(): the actor's OWN team is always
+        // exportable (daily-board use case), but a NEIGHBOURING team's PDF now
+        // carries the report creator's identity (name, NIP, signature) and,
+        // when approved, the field head's signature — data a plain staf must
+        // not harvest. Anyone else needs the monitoring permission, exactly
+        // like reading the same data on the monitoring board.
+        if ($admin->team?->id !== $team->id) {
+            $this->authorize('wfh.monitoring.view');
+        }
+
         // Untrusted input: a garbage date used to reach Carbon::parse and 500.
         $validated = $request->validate([
             'date' => ['nullable', 'date'],
