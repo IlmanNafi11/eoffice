@@ -4,6 +4,7 @@ namespace Tests;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 abstract class TestCase extends BaseTestCase
@@ -24,6 +25,16 @@ abstract class TestCase extends BaseTestCase
          */
         Storage::fake('local');
         Storage::fake('public');
+
+        /*
+         * The throttle buckets (`auth` 5/min, the `api` group 60/min) live in
+         * the in-process array cache and ACCUMULATE across tests in one PHPUnit
+         * process. Any class that hammers login or /verify then poisons an
+         * unrelated later class with 429s — the suite color depended on file
+         * order. Flush per test so isolation never depends on ordering
+         * (RoutePermissionContractTest already did this locally).
+         */
+        Cache::flush();
     }
 
     /**
