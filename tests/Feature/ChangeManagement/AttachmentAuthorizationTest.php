@@ -205,6 +205,32 @@ class AttachmentAuthorizationTest extends TestCase
         Storage::disk('public')->assertExists($this->attachment->path);
     }
 
+    /**
+     * The 403 above comes from the route's `permission:` middleware, so the
+     * guard's own initiator branch is never exercised by it. A user who holds
+     * change.implementation.update (kepala_tim does) but is not the initiator
+     * must reach the guard and be refused with its own message: ownership is
+     * the gate, not the permission.
+     */
+    public function test_permission_holding_non_initiator_is_refused_by_the_guard(): void
+    {
+        $this->outsider->givePermissionTo('change.implementation.update');
+
+        Sanctum::actingAs($this->outsider);
+
+        $this->deleteJson($this->url())
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Hanya inisiator yang dapat menghapus lampiran.');
+        Storage::disk('public')->assertExists($this->attachment->path);
+        $this->assertDatabaseHas('change_implementation_attachments', ['id' => $this->attachment->id]);
+    }
+
+    public function test_delete_attachment_requires_authentication(): void
+    {
+        $this->deleteJson($this->url())->assertUnauthorized();
+        Storage::disk('public')->assertExists($this->attachment->path);
+    }
+
     public function test_delete_attachment_of_another_package_is_404(): void
     {
         $otherPackage = ChangeInitiation::factory()->create([
