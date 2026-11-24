@@ -233,72 +233,123 @@ describe("TeamReportsPage — create journey", () => {
     mockedListTeams.mockResolvedValue([teamResource]);
   });
 
-  it("form TIDAK tampil tanpa permission wfh.team_report.create", async () => {
+  /** Buka dialog "Buat laporan" dan kembalikan elemen `<dialog>`-nya. */
+  async function openCreateDialog() {
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    return screen.findByRole("dialog");
+  }
+
+  it("tidak ada section form di halaman; tombol Buat laporan membuka dialog", async () => {
+    renderPageAs(admin);
+    await screen.findByText("Tim Jaringan");
+
+    // Field create hanya hidup di dalam dialog, bukan card inline.
+    expect(screen.queryByLabelText(/tanggal laporan/i)).toBeNull();
+
+    const dialog = await openCreateDialog();
+    expect(within(dialog).getByRole("heading", { name: /buat laporan tim/i })).toBeTruthy();
+    expect(within(dialog).getByLabelText(/tanggal laporan/i)).toBeTruthy();
+  });
+
+  it("tombol Buat laporan TIDAK tampil tanpa permission wfh.team_report.create", async () => {
     renderPageAs(); // kepala bidang view-only
 
     await screen.findByText("Tim Aplikasi");
-    expect(screen.queryByLabelText(/tim/i)).toBeNull();
-    expect(screen.queryByLabelText(/tanggal laporan/i)).toBeNull();
-    expect(screen.queryByRole("button", { name: /simpan/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /buat laporan/i })).toBeNull();
   });
 
-  it("form tampil untuk admin, dropdown terisi listTeams, submit {team_id, report_date}", async () => {
+  it("dialog: dropdown terisi listTeams, Buat disabled sampai tim+tanggal terisi, submit {team_id, report_date}", async () => {
     renderPageAs(admin);
-
     await screen.findByText("Tim Jaringan");
 
-    // Dropdown terisi dari listTeams.
     await waitFor(() => {
       expect(mockedListTeams).toHaveBeenCalledTimes(1);
     });
-    // Trigger Select kosong menampilkan placeholder; opsi hidup di portal.
-    const dropdown = await screen.findByLabelText("Tim");
-    expect(dropdown.textContent).toContain("Pilih tim");
+    await openCreateDialog();
 
-    await pickSelect(/tim/i, "Tim Aplikasi");
+    // Buat mati selama tim belum dipilih (tanggal juga kosong).
+    const buat = screen.getByRole("button", { name: /^buat$/i });
+    expect((buat as HTMLButtonElement).disabled).toBe(true);
+
+    // Trigger Select kosong menampilkan placeholder; opsi hidup di portal.
+    const dropdown = screen.getByLabelText("Tim");
+    expect(dropdown.textContent).toContain("Pilih tim");
+    await pickSelect("Tim", "Tim Aplikasi");
+    expect((screen.getByRole("button", { name: /^buat$/i }) as HTMLButtonElement).disabled).toBe(true);
 
     await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
-    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    expect((screen.getByRole("button", { name: /^buat$/i }) as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
 
     await waitFor(() => {
       expect(mockedCreate).toHaveBeenCalledWith({ team_id: 3, report_date: "2026-08-12" });
     });
   });
 
-  it("create gagal 422 duplikat → pesan server tersaji apa adanya, tanpa refetch", async () => {
+  it("create sukses → dialog tertutup, daftar di-refetch, toast sukses teks server", async () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await pickSelect(/tim/i, "Tim Aplikasi");
+    await openCreateDialog();
+    await pickSelect("Tim", "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
+
+    mockedCreate.mockResolvedValueOnce({
+      ...reportA,
+      id: 9,
+      report_date: "2026-08-12",
+      message: "Laporan tim berhasil dibuat.",
+    });
+    mockedList.mockResolvedValueOnce({ reports: [reportA, reportB], meta });
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
+
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledTimes(2); // initial + refetch
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+    const toast = document.querySelector("[data-sonner-toast]");
+    expect(toast).toBeTruthy();
+    expect(toast!.textContent).toContain("Laporan tim berhasil dibuat.");
+  });
+
+  it("create gagal 422 duplikat → pesan server tersaji apa adanya, dialog tetap terbuka, tanpa refetch", async () => {
+    renderPageAs(admin);
+    await screen.findByText("Tim Jaringan");
+
+    await openCreateDialog();
+    await pickSelect("Tim", "Tim Aplikasi");
     await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-10");
 
     mockedCreate.mockRejectedValueOnce(
       new ApiError("http", "Laporan untuk tim dan tanggal ini sudah ada.", { status: 422 }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
 
-    // Banner inline tetap menyajikan pesan server apa adanya (toast menyertai).
-    expect((await screen.findByTestId("team-action-error")).textContent).toContain(
-      "Laporan untuk tim dan tanggal ini sudah ada.",
-    );
+    // Banner inline di dalam dialog menyajikan pesan server apa adanya (toast menyertai).
+    const banner = await screen.findByTestId("team-action-error");
+    expect(banner.closest('[role="dialog"]')).toBeTruthy();
+    expect(banner.textContent).toContain("Laporan untuk tim dan tanggal ini sudah ada.");
+    // DateInput popover memakai role="dialog" juga — scope ke dialog halaman.
+    expect(screen.getByRole("dialog", { name: /buat laporan tim/i })).toBeTruthy();
     // Tidak ada refetch saat gagal — pesan tidak akan tersapu (akar a602c46).
     expect(mockedList).toHaveBeenCalledTimes(1);
   });
 
-  it("create sukses → daftar di-refetch (sumber kebenaran = server)", async () => {
+  it("Batal menutup dialog tanpa mutasi dan tanpa refetch", async () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await pickSelect(/tim/i, "Tim Aplikasi");
-    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
-
-    mockedCreate.mockResolvedValueOnce({ ...reportA, id: 9, report_date: "2026-08-12" });
-    mockedList.mockResolvedValueOnce({ reports: [reportA, reportB], meta });
-    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    await openCreateDialog();
+    await pickSelect("Tim", "Tim Aplikasi");
+    await userEvent.click(screen.getByRole("button", { name: /batal/i }));
 
     await waitFor(() => {
-      expect(mockedList).toHaveBeenCalledTimes(2); // initial + refetch
+      expect(screen.queryByRole("dialog")).toBeNull();
     });
+    expect(mockedCreate).not.toHaveBeenCalled();
+    expect(mockedList).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -507,12 +558,19 @@ describe("TeamReportsPage — spinner pending + toast (T7b)", () => {
     mockedListTeams.mockResolvedValue([teamResource]);
   });
 
+  /** Buka dialog create + isi tim & tanggal (jalur bahagia). */
+  async function openAndFillCreateDialog() {
+    await userEvent.click(screen.getByRole("button", { name: /buat laporan/i }));
+    await screen.findByRole("dialog");
+    await pickSelect("Tim", "Tim Aplikasi");
+    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
+  }
+
   it("create sukses → toast sukses teks server", async () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await pickSelect(/tim/i, "Tim Aplikasi");
-    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
+    await openAndFillCreateDialog();
 
     mockedCreate.mockResolvedValueOnce({
       ...reportA,
@@ -520,7 +578,7 @@ describe("TeamReportsPage — spinner pending + toast (T7b)", () => {
       report_date: "2026-08-12",
       message: "Laporan tim berhasil dibuat.",
     });
-    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
 
     await waitFor(() => {
       const toast = document.querySelector("[data-sonner-toast]");
@@ -529,49 +587,47 @@ describe("TeamReportsPage — spinner pending + toast (T7b)", () => {
     });
   });
 
-  it("create gagal → toast error pesan server + banner inline tetap", async () => {
+  it("create gagal → toast error pesan server + banner di dalam dialog tetap", async () => {
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await pickSelect(/tim/i, "Tim Aplikasi");
-    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-10");
+    await openAndFillCreateDialog();
 
     mockedCreate.mockRejectedValueOnce(
       new ApiError("http", "Laporan untuk tim dan tanggal ini sudah ada.", { status: 422 }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /simpan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^buat$/i }));
 
     await waitFor(() => {
       const toast = document.querySelector("[data-sonner-toast]");
       expect(toast).toBeTruthy();
       expect(toast!.textContent).toContain("Laporan untuk tim dan tanggal ini sudah ada.");
     });
-    // Banner inline tetap dirender (konvensi a602c46).
+    // Banner inline di dalam dialog tetap dirender (konvensi a602c46).
     expect(screen.getByTestId("team-action-error")).toBeTruthy();
   });
 
-  it("tombol Simpan aria-busy selama create in-flight (mock never-resolves)", async () => {
+  it("tombol Buat aria-busy selama create in-flight (mock never-resolves)", async () => {
     mockedCreate.mockImplementation(() => new Promise(() => {}));
     renderPageAs(admin);
     await screen.findByText("Tim Jaringan");
 
-    await pickSelect(/tim/i, "Tim Aplikasi");
-    await pickDate(screen.getByLabelText(/tanggal laporan/i), "2026-08-12");
+    await openAndFillCreateDialog();
 
-    const simpan = screen.getByRole("button", { name: /simpan/i });
-    await userEvent.click(simpan);
+    const buat = screen.getByRole("button", { name: /^buat$/i });
+    await userEvent.click(buat);
 
     await waitFor(() => {
-      expect(simpan.getAttribute("aria-busy")).toBe("true");
+      expect(buat.getAttribute("aria-busy")).toBe("true");
     });
-    expect((simpan as HTMLButtonElement).disabled).toBe(true);
+    expect((buat as HTMLButtonElement).disabled).toBe(true);
     // Spinner milik Button pending dirender.
-    expect(simpan.querySelector('[data-slot="spinner"]')).toBeTruthy();
+    expect(buat.querySelector('[data-slot="spinner"]')).toBeTruthy();
   });
+
 
   it("tombol Setujui aria-busy selama approve in-flight; sukses → toast teks server", async () => {
     renderPageAs({
-      ...user,
       permissions: ["wfh.team_report.view", "wfh.team_report.approve", "wfh.team_report.reject"],
     });
     await screen.findByTestId("team-report-row-1");

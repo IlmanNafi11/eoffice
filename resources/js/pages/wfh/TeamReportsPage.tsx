@@ -10,11 +10,13 @@
  *   dengan `per_page` aktif supaya kombinasi query tidak berubah;
  * - per halaman → fetch ulang dari halaman 1; nilai default (15) tidak dikirim
  *   supaya query tetap ramping;
- * - form create (hanya `can(user, "wfh.team_report.create")`): dropdown tim
- *   via `listTeams` + tanggal → `createWfhTeamReport` `{team_id, report_date}`
- *   (tanpa `status` — server memaksa `pending`). Sukses → refetch daftar;
- *   gagal (mis. 422 duplikat) → pesan server dari `actionError` tampil apa
- *   adanya dan TIDAK tersapu refetch (regresi `a602c46`);
+ * - create (hanya `can(user, "wfh.team_report.create")`): tombol "Buat
+ *   laporan" membuka dialog (dropdown tim via `listTeams` + tanggal laporan;
+ *   tombol Buat mati sampai keduanya terisi; Batal tanpa mutasi) →
+ *   `createWfhTeamReport` `{team_id, report_date}` (tanpa `status` — server
+ *   memaksa `pending`). Sukses → dialog tutup + refetch daftar; gagal (mis.
+ *   422 duplikat) → dialog tetap terbuka, pesan server dari `actionError`
+ *   tampil apa adanya dan TIDAK tersapu refetch (regresi `a602c46`);
  * - aksi inline per baris `pending`, gate `can()` permission approve/reject:
  *   approve → `approveWfhTeamReport`; reject → dialog alasan wajib (kosong/
  *   whitespace → tombol mati, tidak mengirim) → `rejectWfhTeamReport`
@@ -22,7 +24,6 @@
  * - list kosong → pesan bahasa Indonesia; fetch gagal → pesan `list.error`.
  */
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
 import { UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
@@ -87,7 +88,7 @@ export function TeamReportsPage() {
   // `perPage` null = pakai default backend 15 (tidak dikirim).
   const [perPage, setPerPage] = useState<number | null>(null);
 
-  // Form create: hanya pemegang `wfh.team_report.create` (permission, bukan role).
+  // Dialog create: hanya pemegang `wfh.team_report.create` (permission, bukan role).
   const canCreate = can(user, "wfh.team_report.create");
   const canApprove = can(user, "wfh.team_report.approve");
   const canReject = can(user, "wfh.team_report.reject");
@@ -95,6 +96,7 @@ export function TeamReportsPage() {
   const [teamId, setTeamId] = useState("");
   const [reportDate, setReportDate] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Approve/reject inline: baris target + dialog alasan (kosong = tombol mati).
   const [mutatingId, setMutatingId] = useState<number | null>(null);
@@ -119,9 +121,15 @@ export function TeamReportsPage() {
       .catch(() => setTeams([])); // dropdown tetap tampil, pilihan kosong
   }, [canCreate]);
 
+  /** Buka dialog → reset pilihan lama + bersihkan pesan mutasi sebelumnya. */
+  function openCreate() {
+    setTeamId("");
+    setReportDate("");
+    setCreateOpen(true);
+  }
+
   /** Submit create: `{team_id, report_date}` — tanpa `status` (server yang memaksa). */
-  async function submitCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitCreate() {
     if (!teamId || !reportDate || creating) return;
     setCreating(true);
     try {
@@ -129,12 +137,12 @@ export function TeamReportsPage() {
       const result = await dispatch(
         createWfhTeamReport({ team_id: Number(teamId), report_date: reportDate }),
       ).unwrap();
-      setTeamId("");
-      setReportDate("");
+      setCreateOpen(false);
       toast.success(result.message);
     } catch (err) {
       // `unwrap()` melempar payload slice (string `messageOf`) — non-string
-      // tetap lewat seam. Banner inline tetap dirender (konvensi a602c46).
+      // tetap lewat seam. Banner inline di dalam dialog tetap dirender
+      // (konvensi a602c46).
       toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setCreating(false);
@@ -240,59 +248,17 @@ export function TeamReportsPage() {
             Daftar laporan WFH tingkat tim dan persetujuannya.
           </p>
         </div>
-        <UsersRound aria-hidden="true" className="size-5 text-muted-foreground" />
+        {canCreate ? (
+          <Button type="button" onClick={openCreate}>
+            <UsersRound aria-hidden="true" className="size-4" />
+            Buat laporan
+          </Button>
+        ) : (
+          <UsersRound aria-hidden="true" className="size-5 text-muted-foreground" />
+        )}
       </div>
 
-
-      {canCreate && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Buat Laporan Tim</CardTitle>
-            <CardDescription>
-              Laporan dibuat dengan status menunggu persetujuan.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="flex flex-wrap items-end gap-3" onSubmit={submitCreate}>
-              <Field className="w-56" orientation="vertical">
-                <FieldLabel htmlFor="team-report-team">Tim</FieldLabel>
-                <Select
-                  value={teamId === "" ? undefined : teamId}
-                  onValueChange={(v) => setTeamId(v ?? "")}
-                >
-                  <SelectTrigger
-                    id="team-report-team"
-                    aria-label="Tim"
-                    className="w-full"
-                  >
-                    <SelectValue placeholder="Pilih tim…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(teams ?? []).map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field className="w-44" orientation="vertical">
-                <FieldLabel htmlFor="team-report-date">Tanggal laporan</FieldLabel>
-                <DateInput
-                  id="team-report-date"
-                  value={reportDate}
-                  onChange={setReportDate}
-                />
-              </Field>
-              <Button type="submit" pending={creating}>
-                Simpan
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {actionError && !rejectOpen && (
+      {actionError && !rejectOpen && !createOpen && (
         <p
           className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           role="alert"
@@ -386,6 +352,73 @@ export function TeamReportsPage() {
           )}
         </CardContent>
       </Card>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buat Laporan Tim</DialogTitle>
+            <DialogDescription>
+              Laporan dibuat dengan status menunggu persetujuan.
+            </DialogDescription>
+          </DialogHeader>
+          <Field className="w-full" orientation="vertical">
+            <FieldLabel htmlFor="team-report-team">Tim</FieldLabel>
+            <Select
+              value={teamId === "" ? undefined : teamId}
+              onValueChange={(v) => setTeamId(v ?? "")}
+            >
+              <SelectTrigger
+                id="team-report-team"
+                aria-label="Tim"
+                className="w-full"
+              >
+                <SelectValue placeholder="Pilih tim…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(teams ?? []).map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field className="w-full" orientation="vertical">
+            <FieldLabel htmlFor="team-report-date">Tanggal laporan</FieldLabel>
+            <DateInput
+              id="team-report-date"
+              value={reportDate}
+              onChange={setReportDate}
+            />
+          </Field>
+          {actionError && (
+            <p
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+              data-testid="team-action-error"
+            >
+              {actionError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={creating}
+              onClick={() => setCreateOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              pending={creating}
+              disabled={!teamId || reportDate === ""}
+              onClick={() => void submitCreate()}
+            >
+              Buat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent>
           <DialogHeader>

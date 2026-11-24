@@ -17,15 +17,30 @@ import { screen, waitFor } from "@testing-library/react";
 export const userEvent = userEventLib.setup({ pointerEventsCheck: 0 });
 
 export async function settlePortal() {
-  // Tunggu konten portal tertutup (data-state closed)…
+  // Tunggu konten portal transient tertutup (data-state closed). Dialog
+  // sengaja TIDAK ikut: helper ini juga dipakai di dalam dialog yang tetap
+  // terbuka (Select/DateInput di form dialog).
   await waitFor(() => {
     const open = document.querySelector(
-      "[role='listbox'][data-state='open'], [role='dialog'][data-state='open'], [data-slot='popover-content'][data-state='open']",
+      "[role='listbox'][data-state='open'], [data-slot='popover-content'][data-state='open']",
     );
     expect(open).toBeNull();
   });
   // …lalu buang sisa aria-hidden/inert/pointer-events yang seharusnya dilepas
   // animasi exit (di jsdom animasi exit tidak pernah selesai).
+  // Dialog Radix: membuka Select/Popover DI DALAM dialog menandai dialog
+  // `aria-hidden` + `pointer-events: none` selama overlay terbuka; animasi
+  // exit-nya tak selesai di jsdom sehingga dialog tidak pernah kembali
+  // terlihat. Pulihkan dialog aktif secara eksplisit. (Node portal sengaja
+  // TIDAK dihapus manual: React masih memegangnya dan unmount berikutnya
+  // gagal dengan "node to be removed is not a child of this node".)
+  const activeDialog = document.querySelector("[role='dialog'][data-state='open']");
+  if (activeDialog) {
+    activeDialog.removeAttribute("aria-hidden");
+    activeDialog.removeAttribute("data-aria-hidden");
+    activeDialog.removeAttribute("inert");
+    (activeDialog as HTMLElement).style.pointerEvents = "auto";
+  }
   for (const el of Array.from(document.querySelectorAll("[aria-hidden='true']"))) {
     if (el.closest("[data-slot='select-content'], [data-slot='popover-content'], [role='listbox'], [role='dialog']")) {
       continue;
