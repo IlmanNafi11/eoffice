@@ -294,6 +294,98 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     });
   });
 
+  /** ship#18: "Simpan Draft" + antrean gagal-unggah → draft TETAP tersimpan
+   * (tanpa navigasi) dan pesan upload tampil di kartu Lampiran. Jalur Submit
+   * sudah dikunci test di atas; tanpa test ini menghapus `return` di
+   * handleSaveDraft membuat berkas antrean hilang diam-diam saat navigasi. */
+  it("Simpan Draft di create: upload antrean gagal → draft tersimpan, TIDAK navigasi, pesan tampil", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    const file = new File(["png-bytes"], "hasil-uji.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      file,
+    );
+    mockedUpload.mockRejectedValueOnce(
+      new ApiError("http", "Maksimal 10 lampiran.", { status: 422 }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledWith(12, [file]);
+    });
+    // Draft tercipta (server), tapi form tetap terpasang: berkas antrean
+    // masih dipegang state, jadi user bisa submit ulang.
+    expect(mockedCreate).toHaveBeenCalled();
+    expect(screen.queryByText("changes-detail-stub")).toBeNull();
+    expect(
+      (await screen.findAllByText("Maksimal 10 lampiran.")).length,
+    ).toBeGreaterThan(0);
+    expect(await screen.findByText(/1 berkas menunggu/i)).toBeTruthy();
+  });
+
+  /** ship#18: retry setelah flush gagal TIDAK membuat draft kedua — paket
+   * pertama dipakai ulang (createdIdRef), antrean menempel ke situ. */
+  it("retry Simpan Draft setelah flush gagal → paket SAMA, create TIDAK dipanggil dua kali", async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+
+    const file = new File(["png-bytes"], "hasil-uji.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      file,
+    );
+    mockedUpload.mockRejectedValueOnce(
+      new ApiError("http", "Maksimal 10 lampiran.", { status: 422 }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledTimes(1);
+    });
+
+    // Retry: unggah berhasil kali ini.
+    mockedUpload.mockResolvedValueOnce({ files: [], message: "" });
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledTimes(2);
+    });
+    // Draft id 12 dipakai ulang untuk batch kedua — bukan paket baru.
+    expect(mockedUpload).toHaveBeenLastCalledWith(12, [file]);
+    expect(mockedCreate).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
+  /** ship#18: pilih berkas saat Simpan Draft in-flight di edit mode →
+   * diabaikan (shared-flag race: POST yang mendarat di tengah mutasi). */
+  it("pilih berkas saat Simpan Draft in-flight (edit) → TIDAK ada panggilan upload", async () => {
+    mockedShow.mockResolvedValue(editPkg);
+    let resolveUpdate: (v?: unknown) => void = () => {};
+    mockedUpdate.mockImplementation(
+      () => new Promise((res) => { resolveUpdate = res as (v?: unknown) => void; }),
+    );
+    renderForm("/changes/12/edit");
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+
+    const file = new File(["png-bytes"], "bukti.png", { type: "image/png" });
+    await userEvent.upload(input, file);
+    expect(mockedUpload).not.toHaveBeenCalled();
+
+    resolveUpdate(editPkg);
+    expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
   it("Simpan Draft di create TANPA lampiran tertunda: tidak ada panggilan upload", async () => {
     renderForm("/changes/new");
     await fillInitiation();

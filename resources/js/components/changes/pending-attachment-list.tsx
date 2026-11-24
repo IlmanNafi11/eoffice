@@ -25,11 +25,15 @@ interface PendingAttachmentListProps {
   files: File[];
   /** Hapus berkas dari antrean — dipanggil dengan berkas persis. */
   onRemove: (file: File) => void;
+  /** Flush unggah in-flight: tombol hapus nonaktif agar klik "Hapus" tidak
+   * berlaku pada batch yang SUDAH di-capture (file tetap terkirim). */
+  disabled?: boolean;
 }
 
 export function PendingAttachmentList({
   files,
   onRemove,
+  disabled = false,
 }: PendingAttachmentListProps) {
   // Map File → objectURL; satu sumber kebenaran lifecycle (revoke on change).
   const [previews, setPreviews] = useState<Map<File, string>>(() => new Map());
@@ -97,7 +101,12 @@ export function PendingAttachmentList({
                 </span>
               )}
               <span>{file.name}</span>
-              <Button variant="ghost" size="xs" onClick={() => onRemove(file)}>
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={disabled}
+                onClick={() => onRemove(file)}
+              >
                 Hapus {file.name}
               </Button>
             </li>

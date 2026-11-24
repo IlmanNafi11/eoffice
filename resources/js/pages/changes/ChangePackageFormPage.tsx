@@ -31,7 +31,7 @@
  * Konvensi modul: pesan UI Indonesia, typed hooks, gate UI = permission persis
  * seeder + kondisi data, `can()` dari `lib/permissions`.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
@@ -205,6 +205,9 @@ export function ChangePackageFormPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // Draft create yang SUDAH berhasil tersimpan (retry setelah flush gagal
+  // tidak boleh membuat draft kedua — orphan dengan doc_number baru).
+  const createdIdRef = useRef<number | null>(null);
 
   /** Sinkron daftar lampiran + prefill dari data show (edit mode). */
   useEffect(() => {
@@ -238,8 +241,11 @@ export function ChangePackageFormPage() {
     }
   }
 
-  /** Pilih berkas: edit draft → unggah langsung; create → antre sampai ada id. */
+  /** Pilih berkas: edit draft → unggah langsung; create → antre sampada ada id.
+   * Diblokir saat simpan/submit in-flight (`busy`): POST yang mendarat di
+   * tengah mutasi bisa mengunggah ke paket yang statusnya baru berubah. */
   function handleFilesChange(files: File[]) {
+    if (busy || uploading) return;
     if (files.length === 0) return;
     const invalid = validateUploads(files, ATTACHMENT_RULE);
     if (invalid !== null) {
@@ -267,11 +273,14 @@ export function ChangePackageFormPage() {
    * Setelah draft create tersimpan: unggah antrean sebelum navigasi/submit.
    * `false` = gagal (pesan sudah tampil di kartu Lampiran) — pemanggil
    * memutus alur agar lampiran tak hilang diam-diam bersama state form.
+   * Snapshot antrean DIAMBIL SEKALI: klik "Hapus" pada berkas pending saat
+   * flush in-flight tidak boleh mengubah batch yang sudah dikirim.
    */
   async function flushPendingUploads(packageId: number): Promise<boolean> {
     if (pendingFiles.length === 0) return true;
+    const batch = [...pendingFiles];
     try {
-      await uploadFiles(packageId, pendingFiles);
+      await uploadFiles(packageId, batch);
       return true;
     } catch {
       return false;
@@ -291,14 +300,25 @@ export function ChangePackageFormPage() {
     if (busy || uploading) return;
     setUploading(true);
     setUploadError(null);
+    // Optimistic: baris hilang dari UI SEKARANG — refetch yang gagal tidak
+    // boleh menghidupkan kembali baris yang sudah terhapus di server (klik
+    // kedua hanya menghasilkan 404 yang menimpa pesan sukses).
+    const snapshot = attachments;
+    setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     try {
       await dispatch(
         deleteAttachmentThunk({ packageId: id, attachmentId }),
       ).unwrap();
-      const fresh = await changePackageApi.showPackage(id);
-      dispatch(setCurrentPackage(fresh));
-      setAttachments(fresh.implementation?.attachments ?? []);
+      try {
+        const fresh = await changePackageApi.showPackage(id);
+        dispatch(setCurrentPackage(fresh));
+        setAttachments(fresh.implementation?.attachments ?? []);
+      } catch {
+        // Refetch gagal tapi DELETE sukses: daftar optimistis sudah benar;
+        // kegagalan jaringan tidak mengubah fakta bahwa baris terhapus.
+      }
     } catch (err) {
+      setAttachments(snapshot);
       setUploadError(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setUploading(false);
@@ -307,8 +327,10 @@ export function ChangePackageFormPage() {
 
   /** Buang berkas dari antrean pending (belum ada di server). */
   function removePending(file: File) {
+    if (uploading) return;
     setPendingFiles((prev) => prev.filter((f) => f !== file));
   }
+
 
   /** Bangun payload implementation draft (semua prop nullable). */
   function implementationDraft(): PackageImplementationDraftInput {
@@ -410,16 +432,31 @@ export function ChangePackageFormPage() {
         },
         implementation: implementationDraft(),
       };
-      const result = isEdit
-        ? await dispatch(updatePackageThunk({ packageId: id, input })).unwrap()
-        : await dispatch(createPackageThunk(input)).unwrap();
-      if (!isEdit && !await flushPendingUploads(result.initiation.id)) {
+      let packageId = id;
+      let message: string;
+      if (isEdit) {
+        const updated = await dispatch(updatePackageThunk({ packageId: id, input })).unwrap();
+        message = updated.message;
+      } else if (createdIdRef.current !== null) {
+        // Retry setelah flush gagal: paket sudah ada — JANGAN create lagi
+        // (draft kedua = orphan dengan doc_number baru). Simpan perubahan
+        // form sebagai update, lalu ulangi unggah antrean.
+        packageId = createdIdRef.current;
+        const updated = await dispatch(updatePackageThunk({ packageId, input })).unwrap();
+        message = updated.message;
+      } else {
+        const created = await dispatch(createPackageThunk(input)).unwrap();
+        packageId = created.initiation.id;
+        createdIdRef.current = packageId;
+        message = created.message;
+      }
+      if (!isEdit && !await flushPendingUploads(packageId)) {
         // Simpan draft tetap sukses — JANGAN navigasi; user melihat pesan
-        // upload di kartu Lampiran dan bisa mencoba submit ulang.
+        // upload di kartu Lampiran dan bisa mencoba ulang.
         return;
       }
-      toast.success(result.message);
-      navigate(`/changes/${result.initiation.id}`);
+      toast.success(message);
+      navigate(`/changes/${packageId}`);
     } catch (err) {
       // Pesan error sudah di slice (current.error) → banner tetap; toast
       // menambah notifikasi sesaat (payload slice string `messageOf`).
@@ -445,18 +482,25 @@ export function ChangePackageFormPage() {
     try {
       let targetId = id;
       if (!isEdit) {
-        const created = await dispatch(
-          createPackageThunk({
-            initiation: {
-              field_id: fieldId as number,
-              needed_by_date: form.neededByDate,
-              description: form.description,
-              reason: form.reason,
-            },
-            implementation: implementationDraft(),
-          }),
-        ).unwrap();
-        targetId = created.initiation.id;
+        if (createdIdRef.current !== null) {
+          // Draft sudah tercipta di percobaan sebelumnya (flush gagal) —
+          // JANGAN create lagi: draft kedua = orphan dengan doc_number baru.
+          targetId = createdIdRef.current;
+        } else {
+          const created = await dispatch(
+            createPackageThunk({
+              initiation: {
+                field_id: fieldId as number,
+                needed_by_date: form.neededByDate,
+                description: form.description,
+                reason: form.reason,
+              },
+              implementation: implementationDraft(),
+            }),
+          ).unwrap();
+          targetId = created.initiation.id;
+          createdIdRef.current = targetId;
+        }
         // Antrean yang diantre sebelum draft ada harus menempel pada paket
         // ini SEBELUM submit — setelah navigasi state form hilang. Kegagalan
         // flush MENGABORT submit: paket tanpa bukti + state form hilang
@@ -808,7 +852,7 @@ export function ChangePackageFormPage() {
                 data-testid="change-package-attachment-input"
                 multiple
                 className="w-72"
-                disabled={uploading}
+                disabled={busy || uploading}
                 placeholder="Pilih lampiran…"
                 onFileChange={() => undefined}
                 onFilesChange={handleFilesChange}
@@ -840,6 +884,7 @@ export function ChangePackageFormPage() {
               <PendingAttachmentList
                 files={pendingFiles}
                 onRemove={removePending}
+                disabled={busy || uploading}
               />
             ) : null}
           </div>
