@@ -4,6 +4,26 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.1.0).
 Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
+### Added (backend+frontend, 2026-11-24 — dashboard beranda)
+- Beranda `/` kini adalah dashboard per-permission, bukan placeholder: satu
+  endpoint `GET /api/dashboard` (domain `app/Domains/Dashboard/`) dan satu
+  halaman SPA (`pages/dashboard/`) yang menjawab "apa yang harus saya kerjakan
+  hari ini dan bagaimana kepatuhan WFH?" sesuai peran peminta.
+- Seksi hanya dikirim/dirender bila peminta berhak: `today` (semua role),
+  rekap `scope` Tim/Bidang/Organisasi (`wfh.monitoring.view`), `queue` per
+  permission keputusan (`change.initiation.approve`,
+  `change.implementation.review`, `wfh.team_report.approve`), `trend` 14 hari
+  kerja terakhir dari setelan `wfh_allowed_days`, dan `attention` maksimal
+  5 user kepatuhan < 60% urut terendah dulu.
+- Semua angka kepatuhan memakai pembilang + penyebut ("3 dari 12 belum
+  absen"); penyebut hanya menghitung user aktif; hari non-kerja menampilkan
+  status netral tanpa angka menyesatkan; user nonaktif dikecualikan dari
+  rekap, tren, dan daftar perhatian.
+- Skeleton per seksi saat loading, refetch saat tab kembali fokus tanpa
+  blank, chart dari shadcn `chart` (`recharts@3.8.0`), dan seeder demo
+  `DashboardDemoSeeder` (local/testing saja, idempoten) yang mengisi data
+  contoh agar keempat role langsung terlihat hidup.
+
 ### Fixed (frontend, 2026-11-24 — UX lampiran paket perubahan)
 - Input unggah lampiran kini tetap menampilkan "Tambah lampiran" setelah
   berkas dipilih: daftar berkas tampil di bawah input, sehingga tombol

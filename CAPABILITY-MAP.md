@@ -67,3 +67,12 @@ terpisah. Spec: `SPEC-qr-spa-redirect.md`, `SPEC-field-user-picker.md`.
 |---|---|---|---|
 | 2026-11-02 | `qr-spa-redirect` | issue #2 | 2 commits (`459bb4b`, `d02d001`); unit URL RED→GREEN (`/verify/{token}`, bersih tanpa `/api/verify`); 3 test fitur (302 hanya text/html, JSON utuh, path tetap di-throttle); OpenAPI v6.7.0 response 302; CHANGELOG. Full suite 743/2327 hijau, Pint clean |
 | 2026-11-02 | `field-user-picker` | issue #1 | `GET /api/users` pola scoping `/teams` (admin/`user.manage` semua + `?field_id=`, non-admin bidang sendiri, `is_active` di semua jalur, tanpa tim → kosong); repo `listActiveForField` eager-load anti-N+1; 9 test RED 404→GREEN (termasuk 1 query-flat pola `AdminUserListQueryCountTest`); OpenAPI `operationId: listUsersForPicker` + schema; CHANGELOG. Full suite 743/2327, Pint clean |
+
+## Capability Map: Dashboard Beranda (2026-11-24)
+
+> Spec: `SPEC.md` (approved 2026-11-24). Plan: `tasks/plan.md` (T1–T8).
+> Peta modul lengkap: `CAPABILITY-MAP-dashboard.md`.
+
+| Module id | Responsibility | Depends on | Status |
+|---|---|---|---|
+| `dashboard` | Beranda `/` per-permission: `GET /api/dashboard` + halaman SPA; seksi `today` (me + scope), `queue`, `trend` 14 hari kerja, `attention` maks 5 < 60%, dikirim hanya bila peminta berhak | — | **IMPLEMENTED 2026-11-24** (T1–T8, `cb841b0`…`f865e68`; backend `tests/Feature/Dashboard` 31 passed, FE suite + typecheck + build hijau, smoke browser 4 role; closeout menunggu review human) |
