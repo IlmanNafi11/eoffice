@@ -296,6 +296,35 @@ class TeamReportPdfTest extends TestCase
         $this->assertSame(strtoupper($staf->name), $captured['makerName']);
     }
 
+    /** ship#19: a staf WITH wfh.monitoring.view (e.g. kepala tim path) CAN
+     * download a NEIGHBOURING team's PDF. Proves the 403 in the negative test
+     * comes from the new gate, not the field guard, and that the gate is not
+     * over-tightened for monitoring holders. */
+    public function test_staf_with_monitoring_permission_can_download_other_teams_pdf(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $otherTeam = Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+
+        $staf = User::factory()->create(['team_id' => $otherTeam->id]);
+        $staf->assignRole('staf');
+        $staf->givePermissionTo('wfh.monitoring.view');
+        $this->setUserSignature($staf);
+        Sanctum::actingAs($staf);
+
+        // The PDF embeds the MAKER's signature, so the creator needs one.
+        $creator = User::factory()->create(['team_id' => $team->id, 'name' => 'Pembuat Tim A']);
+        $this->setUserSignature($creator);
+        $teamReport = WfhTeamReport::factory()->status('pending')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $creator->id,
+        ]);
+
+        $captured = $this->capturePdfViewData($team, $teamReport->id);
+        $this->assertSame('PEMBUAT TIM A', $captured['makerName']);
+    }
+
     public function test_team_report_data_contains_raw_photo_path(): void
     {
         $field = Field::create(['name' => 'Bidang Test']);
