@@ -9,6 +9,7 @@ use App\Exceptions\ApiException;
 use App\Models\User;
 use App\Repositories\EloquentRepository;
 use App\Support\Constants\Roles;
+use App\Support\Media\PrivateMediaPath;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,9 @@ use Illuminate\Support\Facades\Storage;
 
 class EloquentChangeManagementRepository extends EloquentRepository implements ChangeManagementRepositoryInterface
 {
+    /** Directory prefix every evidence row is written under (`$file->store()`). */
+    private const ATTACHMENT_DIRECTORY = 'change-attachments';
+
     /** @var array<string, string> */
     private const CHILD_STATUS_MIRROR = [
         'draft' => 'draft',
@@ -239,10 +243,18 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
         DB::transaction(function () use ($attachment) {
             $attachment->delete();
 
-            // Evidence may predate the private-disk cutover and live on the
-            // public disk; clearing only one disk would leave a readable copy.
-            Storage::disk('local')->delete($attachment->path);
-            Storage::disk('public')->delete($attachment->path);
+            // The row was written by `$file->store('change-attachments')`,
+            // but the DB value is still untrusted (PrivateMediaPath treats it
+            // so on every read). Deleting DESTROYS bytes, so the path must be
+            // contained AND scoped to this directory: a tampered row pointing
+            // at `signatures/...` or `../` must not be actionable, while the
+            // row itself is still removed (the file is left for an operator).
+            if (PrivateMediaPath::scoped($attachment->path, self::ATTACHMENT_DIRECTORY)) {
+                // Evidence may predate the private-disk cutover and live on the
+                // public disk; clearing only one disk would leave a readable copy.
+                Storage::disk('local')->delete($attachment->path);
+                Storage::disk('public')->delete($attachment->path);
+            }
         });
     }
 

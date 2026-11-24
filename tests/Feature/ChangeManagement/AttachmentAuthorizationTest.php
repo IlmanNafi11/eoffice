@@ -255,4 +255,50 @@ class AttachmentAuthorizationTest extends TestCase
 
         $this->assertSame(10, $implementation->fresh()->attachments()->count());
     }
+
+    /**
+     * ship#17: the delete path DESTROYS bytes, so the DB-stored path is
+     * treated as untrusted with a stricter rule than reads — contained AND
+     * scoped to change-attachments/. A tampered row pointing at a shared
+     * signature file (or escaping via ../) must not be deletable; the row
+     * itself is still removed and the file survives for an operator.
+     */
+    public function test_delete_ignores_row_path_outside_change_attachments(): void
+    {
+        Storage::disk('local')->put('signatures/shared.png', 'signature-bytes');
+
+        $attachment = ChangeImplementationAttachment::create([
+            'change_implementation_id' => $this->package->implementation->id,
+            'path' => 'signatures/shared.png',
+            'sort_order' => 2,
+        ]);
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/'.$attachment->id)
+            ->assertNoContent();
+
+        Storage::disk('local')->assertExists('signatures/shared.png');
+        Storage::disk('public')->assertExists($this->attachment->path);
+        $this->assertDatabaseMissing('change_implementation_attachments', ['id' => $attachment->id]);
+    }
+
+    public function test_delete_ignores_traversal_row_path(): void
+    {
+        Storage::disk('local')->put('outside.txt', 'must survive');
+
+        $attachment = ChangeImplementationAttachment::create([
+            'change_implementation_id' => $this->package->implementation->id,
+            'path' => 'change-attachments/../outside.txt',
+            'sort_order' => 2,
+        ]);
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/'.$attachment->id)
+            ->assertNoContent();
+
+        Storage::disk('local')->assertExists('outside.txt');
+        $this->assertDatabaseMissing('change_implementation_attachments', ['id' => $attachment->id]);
+    }
 }

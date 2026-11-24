@@ -100,4 +100,17 @@ class PrivateMediaPath
             'attendance' => $attendanceId,
         ]);
     }
+
+    /**
+     * True when the relative path is contained AND scoped to the given
+     * directory prefix. Deleting uses this, not bare containment: a delete
+     * DESTROYS bytes, so a tampered row value pointing at a sibling directory
+     * (e.g. `signatures/...`) must not be actionable. Write paths store under
+     * their own prefix, so every legitimate row passes.
+     */
+    public static function scoped(string $relative, string $directory): bool
+    {
+        return SignaturePath::contained($relative)
+            && str_starts_with($relative, rtrim($directory, '/').'/');
+    }
 }

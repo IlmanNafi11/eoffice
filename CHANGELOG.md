@@ -5,6 +5,19 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-24 — ship-review #17)
+- Hapus attachment kini menolak path baris di luar `change-attachments/`:
+  baris yang tertamper menunjuk `signatures/...` atau `../` tidak lagi
+  menghapus berkas di luar direktori lampiran (baris tetap terhapus, berkas
+  lain aman). Berlaku juga untuk pembacaan snapshot lama saat delete.
+- Klik ganda pada "Hapus Lampiran" saat DELETE masih in-flight tidak lagi
+  menembak DELETE kedua (404 palsu yang menimpa pesan sukses).
+- Dialog "Buat laporan tim" yang dibuka ulang setelah create gagal tidak lagi
+  menampilkan pesan error 422 dari percobaan sebelumnya.
+- Antrean lampiran (create) memakai kunci React unik: dua berkas bernama sama
+  dari folder berbeda tidak lagi bentrok.
+- Kolom pembuat PDF tim tanpa laporan kini memakai em-dash `—` sesuai spec.
+
 ### Fixed (backend+frontend, 2026-11-24 — perbaikan lintas modul)
 - PDF laporan WFH tim: kop surat & tanggal kini sejajar dengan PDF individu;
   kolom "Yang Membuat Laporan" diisi `created_by` laporan tim (lookup tim+tanggal
