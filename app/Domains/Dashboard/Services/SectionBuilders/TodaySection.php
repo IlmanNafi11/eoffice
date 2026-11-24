@@ -3,6 +3,7 @@
 namespace App\Domains\Dashboard\Services\SectionBuilders;
 
 use App\Domains\Dashboard\Services\DashboardScope;
+use App\Domains\Dashboard\Services\WorkdayWindow;
 use App\Domains\Wfh\Models\WfhAttendance;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhTeamReport;
@@ -21,7 +22,7 @@ class TodaySection implements SectionBuilder
         return 'today';
     }
 
-    public function build(User $user): ?array
+    public function build(User $user, ?DashboardScope $scope = null): ?array
     {
         if (! $this->isWorkday()) {
             // A non-workday must not read as "everyone is absent": send the
@@ -35,12 +36,12 @@ class TodaySection implements SectionBuilder
                 'attendance' => $this->attendance($user),
                 'report' => $this->report($user),
             ],
-        ] + $this->scope($user);
+        ] + $this->scope($user, $scope);
     }
 
     private function isWorkday(): bool
     {
-        $allowedDays = Setting::get('wfh_allowed_days', [1, 2, 3, 4, 5]);
+        $allowedDays = Setting::get('wfh_allowed_days', WorkdayWindow::DEFAULT_ALLOWED_DAYS);
 
         // Empty setting = fail-closed: every day is a non-workday.
         return in_array(now()->dayOfWeekIso, (array) $allowedDays, true);
@@ -54,15 +55,14 @@ class TodaySection implements SectionBuilder
      *
      * @return array<string, mixed>
      */
-    private function scope(User $user): array
+    private function scope(User $user, ?DashboardScope $scope): array
     {
-        $scope = DashboardScope::for($user);
 
         if ($scope === null || $scope->isSelf()) {
             return [];
         }
 
-        $users = User::query()->where('is_active', true);
+        $users = DashboardScope::rosterQuery();
         $scope->applyTo($users);
 
         $teamReports = WfhTeamReport::query()->where('status', 'pending');

@@ -43,7 +43,7 @@ final class DashboardScope
         }
 
         if ($user->hasRole(Roles::KEPALA_TIM)) {
-            $teamId = $user->ledTeams()->value('id');
+            $teamId = $user->ledTeams()->orderBy('id')->value('id');
 
             return $teamId === null ? null : new self(self::TEAM, (int) $teamId);
         }
@@ -51,7 +51,7 @@ final class DashboardScope
         if ($user->hasRole(Roles::KEPALA_BIDANG)) {
             // Same field resolution as WfhMonitoringController: the field they
             // head, else the field of their own team.
-            $fieldId = Field::where('head_id', $user->id)->value('id')
+            $fieldId = Field::where('head_id', $user->id)->orderBy('id')->value('id')
                 ?? $user->team?->field_id;
 
             return $fieldId === null ? null : new self(self::FIELD, (int) $fieldId);
@@ -92,6 +92,15 @@ final class DashboardScope
             self::TEAM => $query->where("{$userTable}.team_id", $this->id),
             self::FIELD => $query->whereHas('team', fn (Builder $q) => $q->where('field_id', $this->id)),
         };
+    }
+
+    /**
+     * The active-user roster a scope aggregates over — the single place the
+     * "active only" denominator rule lives (callers used to repeat it).
+     */
+    public static function rosterQuery(): Builder
+    {
+        return User::query()->where('is_active', true);
     }
 
     /**

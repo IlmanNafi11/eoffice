@@ -47,7 +47,7 @@ export function DashboardPage() {
       </div>
 
       {error && (
-        <Card className="border-destructive/50" data-testid="dashboard-error">
+        <Card className="border-destructive/50" data-testid="dashboard-error" role="alert">
           <CardContent className="text-sm text-destructive">{error}</CardContent>
         </Card>
       )}

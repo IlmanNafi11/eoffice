@@ -3,7 +3,6 @@
 namespace App\Domains\Dashboard\Services;
 
 use App\Models\Setting;
-use Illuminate\Support\Carbon;
 
 /**
  * The single definition of "the last 14 workdays" used by both the trend
@@ -17,6 +16,9 @@ final class WorkdayWindow
 {
     public const DAYS = 14;
 
+    /** Default workdays when the setting is absent: Monday–Friday. */
+    public const DEFAULT_ALLOWED_DAYS = [1, 2, 3, 4, 5];
+
     /**
      * Ascending `Y-m-d` dates of the last 14 workdays, ending today when
      * today is a workday (or the most recent workday before it otherwise).
@@ -25,7 +27,7 @@ final class WorkdayWindow
      */
     public static function last(): array
     {
-        $allowed = array_map('intval', (array) Setting::get('wfh_allowed_days', [1, 2, 3, 4, 5]));
+        $allowed = array_map('intval', (array) Setting::get('wfh_allowed_days', self::DEFAULT_ALLOWED_DAYS));
 
         if ($allowed === []) {
             return [];
@@ -57,11 +59,5 @@ final class WorkdayWindow
         }
 
         return [$dates[0], $dates[count($dates) - 1]];
-    }
-
-    /** Carbon parse helper keeps call sites readable. */
-    public static function toDate(string $date): Carbon
-    {
-        return Carbon::parse($date);
     }
 }

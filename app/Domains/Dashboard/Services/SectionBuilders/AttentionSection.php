@@ -17,6 +17,9 @@ use App\Models\User;
  * The denominator per user is the same 14-workday window the trend section
  * uses (shared `WorkdayWindow`), and inactive users are excluded before any
  * ratio is computed.
+ *
+ * A null scope means the requester covers nobody (deny-by-default): the
+ * section is omitted instead of listing the whole organization.
  */
 class AttentionSection implements SectionBuilder
 {
@@ -29,23 +32,22 @@ class AttentionSection implements SectionBuilder
         return 'attention';
     }
 
-    public function build(User $user): ?array
+    public function build(User $user, ?DashboardScope $scope): ?array
     {
         if (! $user->can('wfh.monitoring.view')) {
             return null; // seksi tidak untuk peminta (design D1).
         }
 
+        if ($scope === null) {
+            return null; // no scope ⇒ no data, never the full roster.
+        }
+
         $dates = WorkdayWindow::last();
         $total = count($dates);
 
-        $users = User::query()->where('is_active', true);
-        $scope = DashboardScope::for($user);
-
-        if ($scope !== null) {
-            $scope->applyTo($users);
-        }
-
-        $users = $users->get(['id', 'name', 'team_id']);
+        $users = DashboardScope::rosterQuery();
+        $scope->applyTo($users);
+        $users = $users->with('team:id,name')->get(['id', 'name', 'team_id']);
 
         if ($total === 0 || $users->isEmpty()) {
             return ['users' => [], 'threshold_note' => $this->note()];
@@ -53,8 +55,7 @@ class AttentionSection implements SectionBuilder
 
         $compliant = $this->compliantByUser(
             $users->pluck('id')->all(),
-            $dates[0],
-            $dates[$total - 1],
+            $dates,
         );
 
         $below = $users
@@ -92,17 +93,25 @@ class AttentionSection implements SectionBuilder
     }
 
     /**
-     * Distinct compliant days per user over the window, in one grouped query.
+     * Distinct compliant days per user over the window, in one grouped query
+     * over the EXACT workday dates — a report filed on a non-workday inside
+     * the calendar span must never count as a compliant day, or a user's
+     * ratio could exceed 100% and hide their noncompliance.
      *
      * @param  list<int>  $userIds
+     * @param  list<string>  $dates
      * @return array<int, int>
      */
-    private function compliantByUser(array $userIds, string $from, string $to): array
+    private function compliantByUser(array $userIds, array $dates): array
     {
+        if ($userIds === [] || $dates === []) {
+            return [];
+        }
+
         $rows = WfhReport::query()
             ->whereIn('user_id', $userIds)
             ->whereIn('status', ['approved', 'pending'])
-            ->whereBetween('report_date', [$from, $to])
+            ->whereIn('report_date', $dates)
             ->selectRaw('user_id, count(distinct report_date) as compliant')
             ->groupBy('user_id')
             ->get();

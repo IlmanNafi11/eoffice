@@ -8,9 +8,10 @@
  *   bentuk request), bukan axios langsung;
  * - `generatedAt` dipisah dari `data` agar skeleton/refetch-on-focus bisa
  *   membaca timestamp payload terakhir tanpa membongkar objek data;
- * - rejected TIDAK menghapus `data` lama (refetch halus: data basi tetap
- *   tampil selama fetch gagal, pesan error tampil di atasnya);
- * - error fetch tersimpan sebagai pesan siap tampil (seam `toUiError`).
+ * - fulfilled menolak respons BASI: bila `generated_at` respons lebih lama
+ *   dari yang sudah tersimpan (dua fetch tumpang tindih — mount + focus —
+ *   lalu resolve tak berurutan), data baru jangan menimpa yang lebih segar
+ *   (ship review #20: race out-of-order).
  */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { toUiError } from "@/lib/ui-errors";
@@ -69,9 +70,15 @@ const slice = createSlice({
         state.error = null;
       })
       .addCase(fetchDashboard.fulfilled, (state, action) => {
+        const incoming = action.payload.generated_at;
+        if (state.generatedAt !== null && incoming <= state.generatedAt) {
+          // Respons lebih lama dari data yang sudah tampil — abaikan.
+          state.status = "succeeded";
+          return;
+        }
         state.status = "succeeded";
         state.data = action.payload;
-        state.generatedAt = action.payload.generated_at;
+        state.generatedAt = incoming;
         state.error = null;
       })
       .addCase(fetchDashboard.rejected, (state, action) => {

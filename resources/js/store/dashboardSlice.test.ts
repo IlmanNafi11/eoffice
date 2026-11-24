@@ -113,4 +113,34 @@ describe("dashboardSlice — fetchDashboard", () => {
     expect(selectDashboardData(store.getState())).toEqual(dashboardData);
     expect(state.generatedAt).toBe("2026-11-24T09:14:00+07:00");
   });
+
+  it("respons BASI dari fetch lama tidak menimpa data lebih segar (race out-of-order)", async () => {
+    // ship review #20: mount + focus-refetch tumpang tindih; fetch PERTAMA
+    // (payload lama) resolve TERAKHIR dan tidak boleh menimpa data baru.
+    const newer = { ...dashboardData, generated_at: "2026-11-24T09:20:00+07:00" };
+    const older = { ...dashboardData, generated_at: "2026-11-24T09:14:00+07:00" };
+    mockedGet.mockResolvedValueOnce(older);
+    mockedGet.mockResolvedValueOnce(newer);
+    const store = makeStore();
+
+    const first = store.dispatch(fetchDashboard());
+    const second = store.dispatch(fetchDashboard());
+    await Promise.all([first, second]);
+
+    const state = selectDashboard(store.getState());
+    expect(state.generatedAt).toBe("2026-11-24T09:20:00+07:00");
+    expect(selectDashboardData(store.getState())).toEqual(newer);
+  });
+
+  it("respons dengan generated_at sama tidak menimpa data (idempoten)", async () => {
+    mockedGet.mockResolvedValue(dashboardData);
+    const store = makeStore();
+    await store.dispatch(fetchDashboard());
+
+    await store.dispatch(fetchDashboard());
+
+    const state = selectDashboard(store.getState());
+    expect(state.status).toBe("succeeded");
+    expect(selectDashboardData(store.getState())).toEqual(dashboardData);
+  });
 });

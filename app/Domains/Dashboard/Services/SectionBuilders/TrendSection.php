@@ -16,6 +16,9 @@ use App\Models\User;
  * `rejected` and "no report" are not compliant. The denominator is always the
  * full active roster — it never shrinks to flatter the ratio.
  *
+ * A null scope means the requester covers nobody (deny-by-default): the
+ * section is omitted instead of aggregating the whole organization.
+ *
  * One aggregate query for all 14 days (group by date, distinct users), plus
  * two reads over `users` (roster count + ids): no per-day loop, no N+1.
  */
@@ -26,16 +29,16 @@ class TrendSection implements SectionBuilder
         return 'trend';
     }
 
-    public function build(User $user): ?array
+    public function build(User $user, ?DashboardScope $scope): ?array
     {
+        if ($scope === null) {
+            return null; // no scope ⇒ no data, never the full roster.
+        }
+
         $dates = WorkdayWindow::last();
 
-        $users = User::query()->where('is_active', true);
-        $scope = DashboardScope::for($user);
-
-        if ($scope !== null) {
-            $scope->applyTo($users);
-        }
+        $users = DashboardScope::rosterQuery();
+        $scope->applyTo($users);
 
         $total = (clone $users)->count();
         $compliant = $this->compliantByDate($users->pluck('id')->all(), $dates);
@@ -59,8 +62,9 @@ class TrendSection implements SectionBuilder
     }
 
     /**
-     * Distinct compliant users per workday, in a single grouped query scoped
-     * to the roster.
+     * Distinct compliant users per workday, in a single grouped query over
+     * the EXACT workday dates — a report filed on a non-workday inside the
+     * calendar span must never count toward a workday.
      *
      * @param  list<int>  $userIds
      * @param  list<string>  $dates
@@ -68,16 +72,14 @@ class TrendSection implements SectionBuilder
      */
     private function compliantByDate(array $userIds, array $dates): array
     {
-        $bounds = WorkdayWindow::bounds($dates);
-
-        if ($bounds === null || $userIds === []) {
+        if ($userIds === [] || $dates === []) {
             return [];
         }
 
         $rows = WfhReport::query()
             ->whereIn('user_id', $userIds)
             ->whereIn('status', ['approved', 'pending'])
-            ->whereBetween('report_date', $bounds)
+            ->whereIn('report_date', $dates)
             ->selectRaw('report_date, count(distinct user_id) as compliant')
             ->groupBy('report_date')
             ->get();

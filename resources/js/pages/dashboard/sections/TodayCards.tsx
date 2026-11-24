@@ -2,10 +2,10 @@
  * TodayCards — seksi "Meja Kerja" beranda (modul dashboard, plan T6).
  *
  * Kontrak:
- * - Menerima `section: DashboardToday | undefined` + `status` fetch mentah;
- *   `undefined` = seksi tidak dirender (backend memilih seksi per permission).
- * - Selama `status === "loading"` setiap kartu diganti Skeleton — tanpa data
- *   lama tidak ada yang bisa ditampilkan; status lain merender data.
+ * - Selama `status === "loading"` TANPA data lama, setiap kartu diganti
+ *   Skeleton. Saat refetch-on-focus berjalan di atas data lama, kartu tetap
+ *   dirender (opacity halus di `DashboardPage`), bukan berkedip jadi
+ *   skeleton (design §Refresh, keputusan 4; ship review #20 Required #4).
  * - Hari non-kerja (`is_workday:false`) → satu status netral tanpa kartu
  *   absensi/rekap (menampilkan "semua orang belum absen" saat libur
  *   menyesatkan, design §Resolved Questions 5).
@@ -104,7 +104,7 @@ function TodaySkeleton() {
 }
 
 export function TodayCards({ section, status }: TodayCardsProps) {
-  if (status === "loading") return <TodaySkeleton />;
+  if (status === "loading" && section === undefined) return <TodaySkeleton />;
   if (!section) return null;
 
   if (!section.is_workday) {

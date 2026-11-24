@@ -357,6 +357,30 @@ describe("DashboardPage — refetch-on-focus (T7)", () => {
     // Data lama tetap dirender selama refetch (tidak blank).
     expect(screen.getByTestId("today-attendance")).toBeTruthy();
   });
+
+  it("selama refetch berjalan data lama TETAP tampil (bukan skeleton)", async () => {
+    // ship review #20 Required #4: refetch-on-focus must dim the old data,
+    // never flash the today section back to skeletons. The second fetch is
+    // left pending, so the assertion lands exactly in the intermediate state
+    // that the previous test could not observe.
+    mockedGet.mockResolvedValueOnce(staffToday);
+    mockedGet.mockReturnValueOnce(new Promise(() => {}));
+
+    renderPage();
+    await screen.findByTestId("today-attendance");
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(2));
+
+    // Old data still rendered; no skeleton flash while status is "loading".
+    expect(screen.getByTestId("today-attendance")).toBeTruthy();
+    expect(screen.queryByTestId("today-card-skeleton")).toBeNull();
+  });
 });
 
 describe("Route `/` — cutover ke DashboardPage", () => {

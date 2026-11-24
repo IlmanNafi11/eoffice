@@ -74,7 +74,7 @@ class DashboardDemoSeeder extends Seeder
 
         $this->seedLowComplianceUser($dates);
         $this->seedTeamReports($dates);
-        $this->seedChangeQueue($staf, $kepalaTim);
+        $this->seedChangeQueue($staf);
     }
 
     /**
@@ -113,11 +113,22 @@ class DashboardDemoSeeder extends Seeder
                 'team_id' => $team->id,
                 'name' => 'Nia Noncompliant',
                 'nip' => '4444444444',
-                'password' => (string) config('app.demo_password', '') ?: Str::random(24),
+                'password' => Str::random(24),
                 'is_active' => true,
                 'must_change_password' => true,
             ],
         );
+
+        // Credential rotation mirrors DemoUsersSeeder (ship review #20): a
+        // firstOrCreate that returns an older row would otherwise leave an
+        // account nobody can log into (or rotate) alive. The demo password
+        // comes from APP_DEMO_PASSWORD, else a fresh random one — always
+        // written, then flagged for rotation on first login.
+        $password = (string) config('app.demo_password', '');
+        $user->forceFill([
+            'password' => $password === '' ? Str::random(24) : $password,
+            'must_change_password' => true,
+        ])->save();
 
         $user->assignRole('staf');
         $this->seedReportFor($user, $dates[0], 'pending');
@@ -139,7 +150,7 @@ class DashboardDemoSeeder extends Seeder
         $this->seedTeamReport($team->id, $maker->id, $dates[2], 'approved');
     }
 
-    private function seedChangeQueue(User $staf, User $kepalaTim): void
+    private function seedChangeQueue(User $staf): void
     {
         $fieldId = $staf->team?->field_id;
 

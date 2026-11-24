@@ -4,6 +4,28 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.1.0).
 Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
+### Fixed (backend+frontend, 2026-11-24 — ship review #20 dashboard)
+- `trend` dan `attention` kini gagal-tertutup: pemegang `wfh.monitoring.view`
+  tanpa tim/bidang yang dipimpin tidak lagi menerima tren kepatuhan dan daftar
+  perhatian seluruh organisasi — seksi dihilangkan, konsisten dengan kontrak
+  deny-by-default `DashboardScope` (sebelumnya setengah builder memperlakukan
+  scope `null` sebagai "tanpa filter").
+- Numerator kepatuhan `attention` hanya menghitung laporan pada tanggal hari
+  kerja (`whereIn` pada jendela kerja, bukan `whereBetween` kalender), sehingga
+  laporan di hari libur di tengah rentang tidak lagi menaikkan rasio di atas
+  100% dan menyembunyikan ketidakpatuhan.
+- Scope dashboard di-resolve sekali per request di `DashboardService` dan
+  diwariskan ke semua builder (tidak ada lagi empat kali resolusi per request
+  atau dua definisi scope yang bisa berbeda); lookup tim/bidang deterministik
+  (`orderBy('id')`).
+- Daftar perhatian eager-load nama tim (`with('team:id,name')`) — bukan satu
+  query lazy-load per user.
+- Refetch-on-focus beranda tidak lagi berkedip jadi skeleton: data lama tetap
+  tampil dengan redup opacity di semua seksi; respons fetch yang lebih lama
+  (`generated_at` basi) tidak lagi menimpa data yang lebih segar.
+- Seeder demo mengikuti konvensi rotasi kredensial `DemoUsersSeeder`
+  (password selalu ditulis ulang + wajib ganti saat login pertama).
+
 ### Added (backend+frontend, 2026-11-24 — dashboard beranda)
 - Beranda `/` kini adalah dashboard per-permission, bukan placeholder: satu
   endpoint `GET /api/dashboard` (domain `app/Domains/Dashboard/`) dan satu

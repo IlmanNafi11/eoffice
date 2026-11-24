@@ -4,6 +4,7 @@ namespace Tests\Feature\Dashboard;
 
 use App\Domains\Wfh\Models\WfhReport;
 use App\Models\Field;
+use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -183,6 +184,155 @@ class DashboardAttentionTest extends TestCase
 
         $this->assertSame([], $attention['users']);
         $this->assertSame('kepatuhan < 60% dalam 14 hari kerja terakhir', $attention['threshold_note']);
+    }
+
+    public function test_leader_without_a_led_team_gets_no_attention_section(): void
+    {
+        // ship review #20 (HIGH): the null scope used to be dropped from the
+        // query, leaking every active user's name and ratio. Deny-by-default
+        // means the section is omitted for this requester.
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $leader = $this->makeUser('kepala_tim', $team);
+        $outsider = User::factory()->create(['name' => 'Orang Lain']);
+        $this->fileCompliantDays($outsider, 1);
+
+        Sanctum::actingAs($leader);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertArrayNotHasKey('attention', $data);
+    }
+
+    public function test_field_head_without_a_field_gets_no_attention_section(): void
+    {
+        $head = $this->makeUser('kepala_bidang', null);
+        $this->fileCompliantDays(User::factory()->create(), 1);
+
+        Sanctum::actingAs($head);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertArrayNotHasKey('attention', $data);
+    }
+
+    public function test_reports_on_non_workdays_never_count_toward_the_14_day_numerator(): void
+    {
+        // ship review #20 (Required): the numerator used whereBetween, so a
+        // Saturday/Sunday report inside the calendar span counted as a
+        // compliant DAY against a fixed 14 denominator — inflating the ratio
+        // past 100% and hiding the very noncompliance this section surfaces.
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+        $this->fileCompliantDays($head, 14);
+
+        $member = User::factory()->create(['team_id' => $team->id, 'name' => 'Budi']);
+        // 4 real workdays ⇒ 4/14 ≈ 29% (below the threshold, must be listed).
+        $this->fileCompliantDays($member, 4);
+        // Six weekend reports inside the span would push a naive count to
+        // 10/14 ≈ 71% and silently drop them from the list.
+        foreach (['2026-07-04', '2026-07-05', '2026-07-11', '2026-07-12', '2026-07-18', '2026-07-19'] as $weekend) {
+            WfhReport::factory()->approved()->create([
+                'user_id' => $member->id, 'report_date' => $weekend,
+            ]);
+        }
+
+        Sanctum::actingAs($head);
+
+        $attention = $this->getJson('/api/dashboard')->assertOk()->json('data.attention');
+
+        $this->assertCount(1, $attention['users']);
+        $this->assertSame($member->id, $attention['users'][0]['user_id']);
+        $this->assertSame(4, $attention['users'][0]['compliant']);
+        $this->assertSame(14, $attention['users'][0]['total']);
+    }
+
+    public function test_window_ends_at_the_most_recent_workday_when_today_is_a_weekend(): void
+    {
+        // The trend axis and this list share WorkdayWindow — they must agree.
+        Carbon::setTestNow(Carbon::parse('2026-07-18 10:00:00', 'Asia/Jakarta'));
+
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+        $this->fileCompliantDays($head, 14);
+        $member = User::factory()->create(['team_id' => $team->id]);
+        $this->fileCompliantDays($member, 2);
+
+        Sanctum::actingAs($head);
+
+        $attention = $this->getJson('/api/dashboard')->assertOk()->json('data.attention');
+
+        $this->assertCount(1, $attention['users']);
+        $this->assertSame(2, $attention['users'][0]['compliant']);
+        $this->assertSame(14, $attention['users'][0]['total']);
+    }
+
+    public function test_empty_allowed_days_setting_yields_an_empty_list(): void
+    {
+        Setting::set('wfh_allowed_days', []);
+
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+        User::factory()->create(['team_id' => $team->id]);
+
+        Sanctum::actingAs($head);
+
+        $attention = $this->getJson('/api/dashboard')->assertOk()->json('data.attention');
+
+        $this->assertSame([], $attention['users']);
+    }
+
+    public function test_equal_ratios_are_ordered_by_user_id_ascending(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+        $this->fileCompliantDays($head, 14);
+
+        $first = User::factory()->create(['team_id' => $team->id]);
+        $second = User::factory()->create(['team_id' => $team->id]);
+        $this->fileCompliantDays($first, 3);
+        $this->fileCompliantDays($second, 3);
+
+        Sanctum::actingAs($head);
+
+        $attention = $this->getJson('/api/dashboard')->assertOk()->json('data.attention');
+
+        $this->assertSame(
+            [$first->id, $second->id],
+            array_column($attention['users'], 'user_id'),
+        );
+    }
+
+    public function test_attention_never_costs_one_query_per_user_for_teams(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+        User::factory()->count(10)->create(['team_id' => $team->id]);
+
+        Sanctum::actingAs($head);
+
+        \DB::enableQueryLog();
+        $this->getJson('/api/dashboard')->assertOk();
+        $queries = \DB::getQueryLog();
+        \DB::disableQueryLog();
+
+        // Eager loading collapses the team names into ONE read; a lazy load
+        // would emit one `select "id", "name" from "teams"` per roster user.
+        $teamReads = array_filter(
+            $queries,
+            fn (array $q) => str_starts_with($q['query'], 'select "id", "name" from "teams"'),
+        );
+        $this->assertLessThanOrEqual(1, count($teamReads));
     }
 
     private function makeUser(string $role, ?Team $team): User

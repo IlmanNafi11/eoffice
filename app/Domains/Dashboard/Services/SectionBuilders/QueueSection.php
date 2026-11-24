@@ -20,6 +20,13 @@ use Illuminate\Database\Eloquent\Builder;
  * of the actor's own team (a team-less kepala_* sees 0 — denied by default).
  * Implementation review is keyed on `ChangeInitiation::status`, the parent
  * column the submit/review transitions write; the child row mirrors it.
+ *
+ * Scope identity note (ship review #20): the WFH sections scope by the team
+ * the actor LEADS (`DashboardScope`, `ledTeams()`), while these change counts
+ * deliberately mirror the membership `team_id` used by
+ * `applyVisibilityScope` — the authoritative change-visibility rule. For the
+ * usual case (leader of their own team) the two agree; when they differ the
+ * change queue intentionally follows the change domain's own convention.
  */
 class QueueSection implements SectionBuilder
 {
@@ -28,7 +35,7 @@ class QueueSection implements SectionBuilder
         return 'queue';
     }
 
-    public function build(User $user): ?array
+    public function build(User $user, ?DashboardScope $scope = null): ?array
     {
         $section = [];
 
@@ -55,7 +62,7 @@ class QueueSection implements SectionBuilder
 
         if ($user->can('wfh.team_report.approve')) {
             $section['team_reports_pending'] = [
-                'count' => $this->countTeamReports($user),
+                'count' => $this->countTeamReports($scope),
             ];
         }
 
@@ -80,16 +87,13 @@ class QueueSection implements SectionBuilder
      * Team reports are scoped exactly like the recap's `team_reports_pending`
      * so the two figures can never disagree.
      */
-    private function countTeamReports(User $user): int
+    private function countTeamReports(?DashboardScope $scope): int
     {
-        $query = WfhTeamReport::query()->where('wfh_team_reports.status', 'pending');
-
-        $scope = DashboardScope::for($user);
-
         if ($scope === null) {
             return 0;
         }
 
+        $query = WfhTeamReport::query()->where('wfh_team_reports.status', 'pending');
         $scope->applyToTeams($query);
 
         return $query->count();

@@ -711,7 +711,7 @@ export interface DashboardToday {
       sessions_total: number;
       next_session: string | null;
     };
-    report: { status: "draft" | "pending" | "approved" | "rejected"; report_id: number } | null;
+    report: { status: WfhReportStatus; report_id: number } | null;
   } | null;
   scope?: DashboardScopeRecap;
 }

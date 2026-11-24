@@ -214,6 +214,98 @@ class DashboardTrendTest extends TestCase
         $this->assertSame(0, $days['2026-07-20']['compliant']);
     }
 
+    public function test_leader_without_a_led_team_gets_no_trend_instead_of_the_whole_org(): void
+    {
+        // ship review #20: DashboardScope::for() returns null for a kepala_tim
+        // who leads no team (deny-by-default, see the class docblock). The
+        // trend must then be ABSENT — never computed over the whole roster.
+        $field = Field::create(['name' => 'Bidang A']);
+        $teamA = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+        $leader = $this->makeUser('kepala_tim', $teamA);
+        User::factory()->count(3)->create(['team_id' => $teamA->id]);
+        User::factory()->count(2)->create();
+
+        Sanctum::actingAs($leader);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertArrayNotHasKey('trend', $data);
+    }
+
+    public function test_field_head_without_a_field_gets_no_trend(): void
+    {
+        // No field they head and no team row (teams.field_id is NOT NULL, so
+        // "team in no field" is not representable) → resolution returns null.
+        $head = $this->makeUser('kepala_bidang', null);
+        User::factory()->create();
+
+        Sanctum::actingAs($head);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertArrayNotHasKey('trend', $data);
+    }
+
+    public function test_window_ends_at_the_most_recent_workday_when_today_is_a_weekend(): void
+    {
+        // Saturday 2026-07-18: the 14 workdays end Friday 2026-07-17 and the
+        // Saturday/Sunday inside the span never appear on the axis.
+        Carbon::setTestNow(Carbon::parse('2026-07-18 10:00:00', 'Asia/Jakarta'));
+
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+
+        Sanctum::actingAs($head);
+
+        $trend = $this->getJson('/api/dashboard')->assertOk()->json('data.trend');
+
+        $expected = [
+            '2026-06-30', '2026-07-01', '2026-07-02', '2026-07-03', '2026-07-06',
+            '2026-07-07', '2026-07-08', '2026-07-09', '2026-07-10', '2026-07-13',
+            '2026-07-14', '2026-07-15', '2026-07-16', '2026-07-17',
+        ];
+        $this->assertSame($expected, array_column($trend['days'], 'date'));
+        $this->assertSame(14 * 1, $trend['summary']['total']);
+    }
+
+    public function test_empty_allowed_days_setting_yields_an_empty_trend(): void
+    {
+        // Fail-closed outside `today` too: no workdays → no days, no denominator.
+        Setting::set('wfh_allowed_days', []);
+
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $head = $this->makeUser('kepala_bidang', $team);
+        $field->update(['head_id' => $head->id]);
+
+        Sanctum::actingAs($head);
+
+        $trend = $this->getJson('/api/dashboard')->assertOk()->json('data.trend');
+
+        $this->assertSame([], $trend['days']);
+        $this->assertSame(['compliant' => 0, 'total' => 0], $trend['summary']);
+    }
+
+    public function test_trend_with_an_empty_roster_reports_zero_without_failing(): void
+    {
+        // Field head whose own team is in no field → the field scope matches
+        // nobody. The axis must still render 14 workdays with a zero total.
+        $field = Field::create(['name' => 'Bidang Kosong']);
+        $head = $this->makeUser('kepala_bidang', null);
+        $field->update(['head_id' => $head->id]);
+
+        Sanctum::actingAs($head);
+
+        $trend = $this->getJson('/api/dashboard')->assertOk()->json('data.trend');
+
+        $this->assertCount(14, $trend['days']);
+        $this->assertSame(0, $trend['summary']['total']);
+        $this->assertSame(0, $trend['summary']['compliant']);
+    }
+
     private function makeUser(string $role, ?Team $team): User
     {
         $user = User::factory()->create(['team_id' => $team?->id]);

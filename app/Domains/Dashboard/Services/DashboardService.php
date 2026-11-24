@@ -14,6 +14,10 @@ use App\Models\User;
  * whether its section belongs to this requester; a builder returning null
  * means the key is omitted entirely — never sent as an empty array (design
  * decision D1).
+ *
+ * The acting scope is resolved ONCE here and passed down, so the recap, the
+ * trend and the attention list cannot drift apart (and the role/field
+ * resolution queries are not repeated per section).
  */
 class DashboardService
 {
@@ -36,9 +40,10 @@ class DashboardService
     public function for(User $user): array
     {
         $data = ['generated_at' => now()->toISOString()];
+        $scope = DashboardScope::for($user);
 
         foreach ($this->builders as $builder) {
-            $section = $builder->build($user);
+            $section = $builder->build($user, $scope);
 
             if ($section !== null) {
                 $data[$builder->key()] = $section;
