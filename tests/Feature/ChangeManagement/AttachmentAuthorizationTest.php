@@ -345,6 +345,45 @@ class AttachmentAuthorizationTest extends TestCase
         $this->assertDatabaseMissing('change_implementation_attachments', ['id' => $attachment->id]);
     }
 
+    /**
+     * ship#19: the tamper log embeds the untrusted DB path. A path carrying
+     * control characters must NOT be able to forge surrounding log lines
+     * (CWE-117 — Monolog's inline formatter re-expands \n in context), so the
+     * logged value is one-line-encoded via addcslashes.
+     */
+    public function test_delete_tampered_path_log_is_one_line_encoded(): void
+    {
+        $attachment = ChangeImplementationAttachment::create([
+            'change_implementation_id' => $this->package->implementation->id,
+            'path' => "signatures/evil.png\n2026-11-24 security.ALERT: forged line",
+            'sort_order' => 2,
+        ]);
+
+        Log::spy();
+
+        Sanctum::actingAs($this->initiator);
+
+        $this->deleteJson('/api/changes/'.$this->package->id.'/attachments/'.$attachment->id)
+            ->assertNoContent();
+
+        $logged = null;
+        Log::shouldHaveReceived('warning')
+            ->withArgs(function (string $message, array $context = []) use (&$logged) {
+                if (str_contains($message, 'tampered')) {
+                    $logged = $context['path'] ?? null;
+
+                    return true;
+                }
+
+                return false;
+            });
+
+        // The raw newline never reaches the log: encoded, not expanded.
+        $this->assertNotNull($logged);
+        $this->assertStringNotContainsString("\n", $logged);
+        $this->assertStringContainsString('\\n', $logged);
+    }
+
     public function test_delete_ignores_traversal_row_path(): void
     {
         Storage::disk('local')->put('outside.txt', 'must survive');

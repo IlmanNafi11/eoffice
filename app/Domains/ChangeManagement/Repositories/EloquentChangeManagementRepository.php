@@ -254,9 +254,12 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
             // row being deleted is the fingerprint of tampering, and the row
             // (the only record of the attempt) disappears with the request.
             if (! PrivateMediaPath::scoped($attachment->path, self::ATTACHMENT_DIRECTORY)) {
+                // `path` is an untrusted DB value: control characters would be
+                // re-expanded by Monolog's inline formatter and let a tampered
+                // row forge surrounding log lines (CWE-117). One-line-encode.
                 Log::warning('change.attachment.delete.skipped_tampered_path', [
                     'attachment_id' => $attachment->id,
-                    'path' => $attachment->path,
+                    'path' => addcslashes($attachment->path, "\0..\37\\"),
                 ]);
 
                 return;
@@ -273,7 +276,7 @@ class EloquentChangeManagementRepository extends EloquentRepository implements C
             if (! $localGone) {
                 Log::warning('change.attachment.delete.unremovable_file', [
                     'attachment_id' => $attachment->id,
-                    'path' => $attachment->path,
+                    'path' => addcslashes($attachment->path, "\0..\37\\"),
                 ]);
             }
         });
