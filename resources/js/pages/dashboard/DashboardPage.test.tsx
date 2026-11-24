@@ -23,7 +23,7 @@ import { setToken } from "@/store/authSlice";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { DashboardData } from "@/api/types";
@@ -195,6 +195,167 @@ describe("DashboardPage — kegagalan fetch", () => {
     renderPage();
 
     expect(await screen.findByTestId("dashboard-error")).toBeTruthy();
+  });
+});
+
+describe("DashboardPage — seksi lanjutan (T7)", () => {
+  it("TrendChart merender 10 bar + ringkasan '118 dari 140'", async () => {
+    // jsdom: 0×0 membuat recharts tidak merender; stub geometri agar bar
+    // benar-benar muncul (pola disimpan dalam kontrak test seksi chart).
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 800, height: 300, top: 0, left: 0, bottom: 300, right: 800, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const days = Array.from({ length: 10 }, (_, i) => ({
+      date: `2026-11-${String(i + 1).padStart(2, "0")}`,
+      compliant: 9,
+      total: 12,
+    }));
+    const data: DashboardData = {
+      ...staffToday,
+      trend: { days, summary: { compliant: 118, total: 140 } },
+    };
+    mockedGet.mockResolvedValue(data);
+
+    renderPage();
+
+    await screen.findByTestId("trend-chart");
+    expect(screen.getByTestId("trend-summary").textContent).toContain("118 dari 140");
+    expect(document.querySelectorAll(".recharts-bar-rectangle").length).toBe(10);
+  });
+});
+
+describe("DashboardPage — QueueCard (T7)", () => {
+  const admin = {
+    ...staff,
+    id: 30,
+    roles: ["admin"],
+    permissions: ["change.initiation.approve", "change.implementation.review"],
+  };
+
+  it("menampilkan jumlah paket + tombol menuju list paket", async () => {
+    const data: DashboardData = {
+      ...staffToday,
+      queue: { change_initiations_pending: { count: 5 } },
+    };
+    mockedGet.mockResolvedValue(data);
+
+    renderPage(admin);
+
+    const kartu = await screen.findByTestId("queue-card");
+    expect(kartu.textContent).toContain("5 paket perubahan menunggu keputusan");
+    expect(screen.getByTestId("queue-link").getAttribute("href")).toBe("/changes");
+  });
+
+  it("tidak dirender bila kunci queue tidak ada", async () => {
+    mockedGet.mockResolvedValue(staffToday);
+
+    renderPage(admin);
+
+    await screen.findByTestId("today-attendance");
+    expect(screen.queryByTestId("queue-card")).toBeNull();
+  });
+});
+
+describe("DashboardPage — AttentionCard (T7)", () => {
+  const monitoringUser = {
+    ...staff,
+    id: 40,
+    roles: ["kepala_bidang"],
+    permissions: ["wfh.monitoring.view"],
+  };
+
+  const attention: DashboardData["attention"] = {
+    users: [
+      { user_id: 2, name: "Rina", team: "Tim B", compliant: 4, total: 14 },
+      { user_id: 1, name: "Andi", team: "Tim A", compliant: 6, total: 14 },
+    ],
+    threshold_note: "Kepatuhan di bawah 60% dari 14 hari kerja terakhir",
+  };
+
+  it("daftar urut terendah dulu + note threshold", async () => {
+    const data: DashboardData = { ...staffToday, attention };
+    mockedGet.mockResolvedValue(data);
+
+    renderPage(monitoringUser);
+
+    const kartu = await screen.findByTestId("attention-card");
+    expect(kartu.textContent).toContain("Kepatuhan di bawah 60%");
+    const rows = screen.getAllByTestId("attention-row");
+    expect(rows[0]?.textContent).toContain("Rina");
+    expect(rows[1]?.textContent).toContain("Andi");
+  });
+
+  it("users kosong → empty state satu kalimat", async () => {
+    const data: DashboardData = {
+      ...staffToday,
+      attention: { users: [], threshold_note: "x" },
+    };
+    mockedGet.mockResolvedValue(data);
+
+    renderPage(monitoringUser);
+
+    const kartu = await screen.findByTestId("attention-card");
+    expect(kartu.textContent).toContain("Semua user memenuhi target kepatuhan");
+    expect(screen.queryByTestId("attention-row")).toBeNull();
+  });
+});
+
+describe("DashboardPage — ShortcutsRow (T7)", () => {
+  it("staf: hanya pintasan absen + laporan", async () => {
+    mockedGet.mockResolvedValue(staffToday);
+
+    renderPage();
+
+    await screen.findByTestId("today-attendance");
+    const links = screen.getAllByTestId("shortcut-link").map((el) => el.getAttribute("href"));
+    expect(links).toContain("/wfh");
+    expect(links).not.toContain("/monitoring");
+    expect(links).not.toContain("/admin/users");
+  });
+
+  it("admin: + monitoring + kelola user", async () => {
+    const admin = {
+      ...staff,
+      id: 50,
+      roles: ["admin"],
+      permissions: [
+        "wfh.report.create",
+        "wfh.monitoring.view",
+        "user.manage",
+      ],
+    };
+    mockedGet.mockResolvedValue(staffToday);
+
+    renderPage(admin);
+
+    await screen.findByTestId("today-attendance");
+    const links = screen.getAllByTestId("shortcut-link").map((el) => el.getAttribute("href"));
+    expect(links).toContain("/wfh");
+    expect(links).toContain("/monitoring");
+    expect(links).toContain("/admin/users");
+  });
+});
+
+describe("DashboardPage — refetch-on-focus (T7)", () => {
+  it("dispatch fetchDashboard lagi saat visibilitychange → visible", async () => {
+    mockedGet.mockResolvedValue(staffToday);
+
+    renderPage();
+
+    await screen.findByTestId("today-attendance");
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+
+    // Skeleton halus (opacity) di atas data lama saat refetch berjalan.
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(2));
+    // Data lama tetap dirender selama refetch (tidak blank).
+    expect(screen.getByTestId("today-attendance")).toBeTruthy();
   });
 });
 
