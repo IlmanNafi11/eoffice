@@ -35,7 +35,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
-import { ATTACHMENT_RULE, validateUploads } from "@/lib/upload-validate";
 import { ArrowLeft, Check, Pencil, Send, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,8 +46,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { FileInput } from "@/components/ui/file-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -72,7 +69,6 @@ import {
   selectChangePackageCurrent,
   selectChangePackageCurrentData,
   submitPackageThunk,
-  uploadAttachmentsThunk,
 } from "@/store/changePackageSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/authSlice";
@@ -85,7 +81,6 @@ import type {
 /** Batas kontrak `UploadChangePackageAttachmentsRequest` (max:10 file). */
 const MAX_ATTACHMENTS = 10;
 
-/** Unduh bytes lampiran lewat httpClient ber-bearer → objectURL → anchor. */
 export async function downloadAttachmentObjectUrl(url: string): Promise<void> {
   const res = await httpClient.get<Blob>(url, { responseType: "blob" });
   const objectUrl = URL.createObjectURL(res.data);
@@ -152,8 +147,6 @@ export function ChangePackageDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingPackage, setDeletingPackage] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   // Guard double-submit (pola WFH detail #4): ref sinkron menolak dua klik
   // beruntun; state men-disable tombol selama in-flight. DIDEKLARASIKAN
   // SEBELUM early-return — Rules of Hooks.
@@ -211,11 +204,6 @@ export function ChangePackageDetailPage() {
   const canEdit = isDraft && isOwner && can(user, "change.initiation.update");
   const canDoSubmit = isDraft && isOwner && can(user, "change.initiation.submit");
   const canDelete = isDraft && isOwner && can(user, "change.initiation.delete");
-  const canUpload =
-    isDraft &&
-    isOwner &&
-    can(user, "change.implementation.update") &&
-    (impl?.attachments?.length ?? 0) < MAX_ATTACHMENTS;
   // Server (ChangePackageDecision): pending 422 → scope 403 → self 403. UI
   // menambah "bukan inisiator" — tombol yang pasti 403 disembunyikan.
   const canApprove = isPending && !isOwner && can(user, "change.initiation.approve");
@@ -389,7 +377,7 @@ export function ChangePackageDetailPage() {
       </Card>
 
       {/* ── Aksi draft (inisiator) ── */}
-      {canEdit || canDoSubmit || canUpload || canDelete ? (
+      {canEdit || canDoSubmit || canDelete ? (
         <div className="flex flex-wrap items-center gap-2">
           {canEdit ? (
             <Button variant="outline" asChild>
@@ -416,51 +404,6 @@ export function ChangePackageDetailPage() {
               <Send aria-hidden="true" className="size-4" />
               Ajukan Submit
             </Button>
-          ) : null}
-          {canUpload ? (
-            <Field orientation="vertical">
-              <FieldLabel htmlFor="change-package-attachment-input" className="sr-only">
-                Unggah Lampiran
-              </FieldLabel>
-              <FileInput
-                id="change-package-attachment-input"
-                data-testid="change-package-attachment-input"
-                multiple
-                className="w-72"
-                disabled={uploading}
-                placeholder="Pilih lampiran…"
-                onFileChange={() => undefined}
-                onFilesChange={(files) => {
-                  if (files.length === 0) return;
-                  // Pre-check client (T9a): jumlah/ukuran/tipe dicek SEBELUM
-                  // request; pesan inline memakai label, bukan kunci `files.N`.
-                  const invalid = validateUploads(files, ATTACHMENT_RULE);
-                  if (invalid !== null) {
-                    setUploadError(invalid);
-                    return;
-                  }
-                  setUploadError(null);
-                  void (async () => {
-                    setUploading(true);
-                    try {
-                      await dispatch(
-                        uploadAttachmentsThunk({ packageId: id, files }),
-                      ).unwrap();
-                      dispatch(fetchPackage(id));
-                    } catch {
-                      // Pesan error disimpan slice → tampil di halaman.
-                    } finally {
-                      setUploading(false);
-                    }
-                  })();
-                }}
-              />
-              {uploadError ? (
-                <p className="text-xs text-destructive" role="alert">
-                  {uploadError}
-                </p>
-              ) : null}
-            </Field>
           ) : null}
           {canDelete ? (
             <Button

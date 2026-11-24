@@ -4,11 +4,11 @@
  * Mengunci kontrak halaman detail:
  * - mount → `fetchPackage(id)` (show, relasi change_types/attachments di-load)
  *   lalu dua kartu Inisiasi/Implementasi + lampiran dirender;
- * - matriks tombol × (permission sintetik × status × ownership): Edit/Submit/
- *   Hapus/Unggah Lampiran hanya inisiator + draft; Setujui/Tolak hanya pemegang
+ *   Hapus hanya inisiator + draft; Setujui/Tolak hanya pemegang
  *   approve/reject + pending + BUKAN inisiator (user sintetik inisiator yang
  *   juga pemegang approve → tombol tersembunyi, bukan role — Resolved #4 tanpa
- *   dialog alasan);
+ *   dialog alasan); T8: input unggah lampiran TIDAK ada di detail —
+ *   pengelolaan lampiran hanya di form create/edit;
  * - PDF via `PdfDownloadButton` (`getBlob` + `getError` → 422 tanda tangan),
  *   digate `export_pdf` + status (`approved` / impl `completed`);
  * - unduh lampiran via blob dari `attachment.url` (route `attachments.download`,
@@ -241,13 +241,14 @@ describe("ChangePackageDetailPage — render dua kartu + lampiran", () => {
 
 describe("ChangePackageDetailPage — matriks tombol (permission × status × ownership)", () => {
   /** Sel draft + inisiator: empat aksi draft tampil; setujui/tolak/PDF tidak. */
-  it("inisiator + draft → Edit, Submit, Unggah Lampiran, Hapus; tanpa Setujui/Tolak/PDF", async () => {
+  it("inisiator + draft → Edit, Submit, Hapus; tanpa input unggah/Setujui/Tolak/PDF", async () => {
     renderDetail(staf);
     await screen.findByText("001/9/1.1/114/2025");
 
     expect(screen.getByRole("link", { name: /ubah draft/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /ajukan submit/i })).toBeTruthy();
-    expect(screen.getByLabelText(/unggah lampiran/i)).toBeTruthy();
+    // T8: input lampiran pindah ke form create/edit — detail read-only.
+    expect(screen.queryByLabelText(/unggah lampiran/i)).toBeNull();
     expect(screen.getByRole("button", { name: /hapus/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /setujui/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /tolak/i })).toBeNull();
@@ -397,80 +398,15 @@ describe("ChangePackageDetailPage — aksi mutasi", () => {
     expect(await screen.findByText("changes-list-stub")).toBeTruthy();
   });
 
-  it("Unggah Lampiran (≤10 file) → uploadPackageAttachments multipart, lalu refetch", async () => {
+  it("detail TIDAK merender input unggah lampiran untuk siapa pun — lampiran read-only (T8)", async () => {
     renderDetail(staf);
     await screen.findByText("001/9/1.1/114/2025");
 
-    // Kontrak backend `files.*` = mimes:jpg,jpeg,png (bukan PDF) — pre-check
-    // client memakai rule yang sama, jadi file uji harus gambar valid.
-    const file = new File(["png-bytes"], "bukti.png", { type: "image/png" });
-    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
-    await userEvent.upload(input, file);
-
-    await waitFor(() => {
-      expect(mockedUpload).toHaveBeenCalledWith(12, [file]);
-    });
-    await waitFor(() => {
-      expect(mockedShow).toHaveBeenCalledTimes(2);
-    });
-  });
-});
-
-describe("ChangePackageDetailPage — pre-check lampiran (T9a)", () => {
-  it("11 file ditolak sebelum upload (0 panggilan API) + pesan jumlah", async () => {
-    renderDetail(staf);
-    await screen.findByText("001/9/1.1/114/2025");
-
-    const files = Array.from(
-      { length: 11 },
-      (_, i) => new File([new ArrayBuffer(8)], `f${i}.png`, { type: "image/png" }),
-    );
-    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
-    await userEvent.upload(input, files);
-
-    expect(mockedUpload).not.toHaveBeenCalled();
-    expect(await screen.findByText(/maksimal 10 lampiran/i)).toBeTruthy();
-  });
-
-  it("file > 10MB ditolak sebelum upload dengan pesan ukuran label", async () => {
-    renderDetail(staf);
-    await screen.findByText("001/9/1.1/114/2025");
-
-    const big = new File(
-      [new ArrayBuffer(10 * 1024 * 1024 + 1)],
-      "besar.png",
-      { type: "image/png" },
-    );
-    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
-    await userEvent.upload(input, big);
-
-    expect(mockedUpload).not.toHaveBeenCalled();
-    expect(await screen.findByText(/ukuran lampiran maksimal 10mb/i)).toBeTruthy();
-  });
-
-  it("tipe salah (.gif) ditolak sebelum upload dengan pesan format label", async () => {
-    renderDetail(staf);
-    await screen.findByText("001/9/1.1/114/2025");
-
-    const gif = new File([new ArrayBuffer(8)], "ttd.gif", { type: "image/gif" });
-    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
-    await userEvent.upload(input, gif);
-
-    expect(mockedUpload).not.toHaveBeenCalled();
-    expect(
-      await screen.findByText(/format lampiran harus jpg, jpeg, atau png/i),
-    ).toBeTruthy();
-  });
-
-  it("lampiran lolos pre-check → tetap terkirim (tidak ada false positive)", async () => {
-    renderDetail(staf);
-    await screen.findByText("001/9/1.1/114/2025");
-
-    const ok = new File([new ArrayBuffer(8)], "ok.png", { type: "image/png" });
-    const input = screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement;
-    await userEvent.upload(input, ok);
-
-    await waitFor(() => expect(mockedUpload).toHaveBeenCalledWith(12, [ok]));
+    // Input lampiran hanya di form create/edit; di detail daftar + unduh tetap.
+    expect(screen.queryByLabelText(/unggah lampiran/i)).toBeNull();
+    expect(screen.queryByTestId("change-package-attachment-input")).toBeNull();
+    expect(screen.getByTestId("attachment-item-15")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /unduh/i })).toBeTruthy();
   });
 });
 

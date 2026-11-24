@@ -39,6 +39,7 @@ import { ATTACHMENT_RULE, validateUploads } from "@/lib/upload-validate";
 import { ArrowLeft, FilePlus2, Save } from "lucide-react";
 
 import { AttachmentList } from "@/components/changes/attachment-list";
+import { PendingAttachmentList } from "@/components/changes/pending-attachment-list";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateInput } from "@/components/ui/date-input";
@@ -71,6 +72,7 @@ import {
   submitPackageThunk,
   updatePackageThunk,
   uploadAttachmentsThunk,
+  deleteAttachmentThunk,
   setCurrentPackage,
 } from "@/store/changePackageSlice";
 import * as changePackageApi from "@/api/change-package";
@@ -267,6 +269,34 @@ export function ChangePackageFormPage() {
     } catch {
       // Paket tetap tersimpan; pesan sudah tampil di kartu Lampiran.
     }
+  }
+
+  /**
+   * Hapus lampiran existing (edit draft) → DELETE ke server, lalu segarkan
+   * daftar lampiran. Melempar error agar pesan tampil di kartu Lampiran.
+   */
+  async function removeExisting(attachmentId: number) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await dispatch(
+        deleteAttachmentThunk({ packageId: id, attachmentId }),
+      ).unwrap();
+      const fresh = await changePackageApi.showPackage(id);
+      dispatch(setCurrentPackage(fresh));
+      setAttachments(fresh.implementation?.attachments ?? []);
+    } catch (err) {
+      const message = toUiError(err).message;
+      setUploadError(message);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /** Buang berkas dari antrean pending (belum ada di server). */
+  function removePending(file: File) {
+    setPendingFiles((prev) => prev.filter((f) => f !== file));
   }
 
   /** Bangun payload implementation draft (semua prop nullable). */
@@ -744,7 +774,8 @@ export function ChangePackageFormPage() {
         <CardHeader>
           <CardTitle>Lampiran</CardTitle>
           <CardDescription>
-            {attachments.length} dari maksimal {MAX_ATTACHMENTS} berkas.
+            {attachments.length + pendingFiles.length} dari maksimal{" "}
+            {MAX_ATTACHMENTS} berkas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -776,7 +807,20 @@ export function ChangePackageFormPage() {
               ) : null}
             </Field>
             {attachments.length > 0 ? (
-              <AttachmentList attachments={attachments} />
+              <AttachmentList
+                attachments={attachments}
+                onRemove={
+                  isEdit && canDraft
+                    ? (attachment) => void removeExisting(attachment.id)
+                    : undefined
+                }
+              />
+            ) : null}
+            {pendingFiles.length > 0 ? (
+              <PendingAttachmentList
+                files={pendingFiles}
+                onRemove={removePending}
+              />
             ) : null}
           </div>
         </CardContent>

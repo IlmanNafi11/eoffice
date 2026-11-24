@@ -38,7 +38,7 @@ vi.mock("@/api/change-package", () => ({
   approvePackage: vi.fn(),
   rejectPackage: vi.fn(),
   uploadPackageAttachments: vi.fn(),
-  exportInitiationPdf: vi.fn(),
+  deletePackageAttachment: vi.fn(),
   exportImplementationPdf: vi.fn(),
   listChangeTypes: vi.fn(),
 }));
@@ -57,7 +57,7 @@ const mockedUpdate = changePackageApi.updatePackage as unknown as Mock;
 const mockedSubmit = changePackageApi.submitPackage as unknown as Mock;
 const mockedChangeTypes = changePackageApi.listChangeTypes as unknown as Mock;
 const mockedUpload = changePackageApi.uploadPackageAttachments as unknown as Mock;
-
+const mockedDeleteAttachment = changePackageApi.deletePackageAttachment as unknown as Mock;
 const changeTypes: ChangeType[] = [
   { id: 1, name: "Hardware" },
   { id: 2, name: "Network" },
@@ -116,6 +116,15 @@ const editPkg: ChangePackage = {
     cost_amount: "15000000.00",
     status: "draft",
     change_types: [{ id: 2, name: "Network" }],
+  },
+};
+
+/** Varian editPkg dengan satu lampiran implementasi tersimpan. */
+const editPkgWithAttachment: ChangePackage = {
+  initiation: editPkg.initiation,
+  implementation: {
+    ...editPkg.implementation!,
+    attachments: [{ id: 21, url: "/changes/12/attachments/21", sort_order: 1 }],
   },
 };
 
@@ -227,6 +236,11 @@ beforeEach(() => {
   mockedCreate.mockResolvedValue(editPkg);
   mockedUpdate.mockResolvedValue(editPkg);
   mockedSubmit.mockResolvedValue(submittedPkg);
+  mockedDeleteAttachment.mockResolvedValue(undefined);
+  URL.createObjectURL = vi.fn(
+    () => `blob:stub-${Math.random().toString(36).slice(2)}`,
+  );
+  URL.revokeObjectURL = vi.fn();
 });
 
 describe("ChangePackageFormPage — create mode (/changes/new)", () => {
@@ -325,6 +339,30 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(await screen.findByText(/maksimal 10 lampiran/i)).toBeTruthy();
     expect(screen.getByText(/8 berkas menunggu/i)).toBeTruthy();
   });
+
+  it("dua berkas terpilih → dua thumbnail SEBELUM draft disimpan; hapus satu → tinggal satu", async () => {
+    renderForm("/changes/new");
+
+    const first = new File(["png-bytes"], "bukti-a.png", { type: "image/png" });
+    const second = new File(["png-bytes"], "bukti-b.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      [first, second],
+    );
+
+    // Pratinjau lokal (objectURL) tersedia tanpa menunggu draft tersimpan.
+    expect(await screen.findByAltText("bukti-a.png")).toBeTruthy();
+    expect(screen.getByAltText("bukti-b.png")).toBeTruthy();
+    expect(screen.getByText("2 berkas menunggu — terunggah otomatis setelah draft disimpan.")).toBeTruthy();
+    expect(mockedUpload).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Hapus bukti-a.png" }));
+
+    expect(screen.queryByAltText("bukti-a.png")).toBeNull();
+    expect(screen.getByAltText("bukti-b.png")).toBeTruthy();
+    expect(screen.getByText(/1 berkas menunggu/i)).toBeTruthy();
+  });
+
 
   it('"Simpan Draft" → POST draft payload nested persis skema, lalu navigasi detail', async () => {
     renderForm("/changes/new");
@@ -515,8 +553,31 @@ describe("ChangePackageFormPage — Submit (create mode)", () => {
 });
 
 describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () => {
+  it("edit draft → hapus lampiran existing memanggil DELETE lalu menyegarkan daftar", async () => {
+    mockedShow.mockResolvedValue(editPkgWithAttachment);
+    renderForm("/changes/12/edit");
+
+    // Form tidak merender doc_number: tunggu prefill Deskripsi dari show.
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Hapus Lampiran #21" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedDeleteAttachment).toHaveBeenCalledWith(12, 21);
+    });
+    await waitFor(() => {
+      expect(mockedShow).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("mount mem-fetch showPackage dan prefill seluruh field dari data", async () => {
     renderForm("/changes/12/edit");
+
 
     await waitFor(() => {
       expect(mockedShow).toHaveBeenCalledWith(12);

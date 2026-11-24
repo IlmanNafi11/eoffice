@@ -27,6 +27,11 @@ interface AttachmentListProps {
   attachments: PackageAttachment[];
   /** Aksi unduh — dipisah agar halaman pemakai mengendalikan fetch + anchor. */
   onDownload?: (attachment: PackageAttachment) => void | Promise<void>;
+  /**
+   * Aksi hapus (draft-only) — TANPA prop → tidak ada tombol hapus
+   * (halaman read-only seperti detail tetap aman).
+   */
+  onRemove?: (attachment: PackageAttachment) => void | Promise<void>;
 }
 
 interface LoadedPreview {
@@ -39,7 +44,11 @@ function isImageType(contentType: string): boolean {
   return contentType.startsWith("image/");
 }
 
-export function AttachmentList({ attachments, onDownload }: AttachmentListProps) {
+export function AttachmentList({
+  attachments,
+  onDownload,
+  onRemove,
+}: AttachmentListProps) {
   // map id → objectURL; satu sumber kebenaran lifecycle (revoke on change).
   const [previews, setPreviews] = useState<Map<number, LoadedPreview>>(
     () => new Map(),
@@ -162,6 +171,15 @@ export function AttachmentList({ attachments, onDownload }: AttachmentListProps)
               >
                 Unduh
               </Button>
+              {onRemove ? (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => void onRemove?.(attachment)}
+                >
+                  Hapus Lampiran #{attachment.id}
+                </Button>
+              ) : null}
             </li>
           );
         })}

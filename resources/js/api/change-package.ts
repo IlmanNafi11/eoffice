@@ -120,6 +120,17 @@ export async function uploadPackageAttachments(
 }
 
 /**
+ * DELETE /changes/{id}/attachments/{attachment} — 204 tanpa body.
+ * Draft-only + inisiator (server guard); "ganti" = hapus lalu unggah ulang.
+ */
+export async function deletePackageAttachment(
+  packageId: number,
+  attachmentId: number,
+): Promise<void> {
+  await api.del<void>(`/changes/${packageId}/attachments/${attachmentId}`);
+}
+
+/**
  * GET /changes/{id}/pdf/initiation — binary `application/pdf` (non-envelope).
  * Tidak melewati unwrap interceptor: ambil Blob langsung dari `httpClient`.
  * Pada 4xx interceptor memberi `ApiError.responseBody` = Blob; decode pesan

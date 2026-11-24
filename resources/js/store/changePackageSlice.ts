@@ -233,6 +233,21 @@ export const uploadAttachmentsThunk = createAsyncThunk<
   },
 );
 
+/** DELETE /changes/{id}/attachments/{aid} — 204; halaman refetch detail setelahnya. */
+export const deleteAttachmentThunk = createAsyncThunk<
+  void,
+  { packageId: number; attachmentId: number }
+>(
+  "changePackage/deleteAttachment",
+  async ({ packageId, attachmentId }, { rejectWithValue }) => {
+    try {
+      await changePackageApi.deletePackageAttachment(packageId, attachmentId);
+    } catch (error) {
+      return rejectWithValue(messageOf(error));
+    }
+  },
+);
+
 /** Aksi mutasi yang fulfilled-nya membawa `ChangePackage` — update current + baris. */
 const CHANGE_PACKAGE_MUTATION_FULFILLED =
   /^changePackage\/(create|update|submit|decide)Package\/fulfilled$/;

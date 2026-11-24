@@ -168,3 +168,26 @@ describe("AttachmentList — non-gambar & lifecycle", () => {
   });
 
 });
+
+describe("AttachmentList — hapus lampiran (onRemove opsional)", () => {
+  it("dengan onRemove → tombol hapus per lampiran memanggil callback", async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AttachmentList attachments={attachments} onRemove={onRemove} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Hapus Lampiran #15" }),
+    );
+
+    expect(onRemove).toHaveBeenCalledWith(attachments[0]);
+  });
+
+  it("tanpa prop onRemove → tidak ada tombol hapus (detail page aman)", () => {
+    render(<AttachmentList attachments={attachments} />);
+
+    expect(screen.queryByRole("button", { name: /hapus lampiran/i })).toBeNull();
+  });
+});
