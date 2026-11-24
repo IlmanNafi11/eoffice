@@ -4,6 +4,7 @@ use App\Domains\Auth\Http\Controllers\AuthController;
 use App\Domains\ChangeManagement\Http\Controllers\ChangeManagementPdfController;
 use App\Domains\ChangeManagement\Http\Controllers\ChangePackageController;
 use App\Domains\ChangeManagement\Http\Controllers\ChangeTypeController;
+use App\Domains\Dashboard\Http\Controllers\DashboardController;
 use App\Domains\Organization\Http\Controllers\PermissionController;
 use App\Domains\Organization\Http\Controllers\ProfileController;
 use App\Domains\Organization\Http\Controllers\RoleController;
@@ -54,6 +55,9 @@ Route::get('/verify/{token}', function (Request $request, string $token) {
 Route::middleware('auth:sanctum')->post('/auth/change-password', [AuthController::class, 'changePassword']);
 
 Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
+    // Dashboard (beranda) — one endpoint, sections gated by permission.
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
     // Auth
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);

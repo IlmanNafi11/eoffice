@@ -9,6 +9,13 @@ info:
 
     Authentication uses Laravel Sanctum bearer tokens.
     Authorization uses Spatie permission-based roles (admin, kepala_bidang, kepala_tim, staf).
+    **v6.9.0 — Dashboard Beranda (`dashboard`):**
+    - Added `GET /api/dashboard` — one endpoint backing the SPA home page. The
+      payload carries `generated_at` plus only the sections the requester's
+      permissions allow (`today` for everyone; `today.scope`, `queue`,
+      `trend`, `attention` per permission). Compliance figures always ship
+      numerator + denominator, and the denominator counts active users only.
+
     **v6.8.0 — WFH personal report range filter:**
     - `GET /api/wfh/reports` now also accepts `date_from`/`date_to` (inclusive
       range, either bound may be given alone), matching `GET /api/admin/wfh/reports`.
@@ -852,6 +859,147 @@ components:
         data:
           sessions: [pagi, siang, sore]
           allowed_days: [1, 2, 3, 4, 5]
+    # ── Dashboard ────────────────────────────────────────────────────
+    DashboardResponse:
+      type: object
+      description: |
+        Beranda payload. `generated_at` is an ISO 8601 server timestamp;
+        section keys exist only for sections the requester is allowed to see
+        (absent = hidden, never an empty array). `today` is present for every
+        authenticated role; `scope` lives inside it for monitoring roles.
+      required: [success, data, message, meta]
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: "#/components/schemas/DashboardData" }
+        message: { type: string, nullable: true, example: null }
+        meta: { type: object, nullable: true, example: null }
+      example:
+        success: true
+        data:
+          generated_at: "2026-11-24T09:14:00+07:00"
+          today:
+            is_workday: true
+            me:
+              attendance: { sessions_done: 2, sessions_total: 3, next_session: sore }
+              report: { status: pending, report_id: 123 }
+        message: null
+        meta: null
+    DashboardData:
+      type: object
+      required: [generated_at, today]
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          description: Server time the payload was built (ISO 8601).
+          example: "2026-11-24T09:14:00+07:00"
+        today: { $ref: "#/components/schemas/DashboardToday" }
+        queue: { $ref: "#/components/schemas/DashboardQueue" }
+        trend: { $ref: "#/components/schemas/DashboardTrend" }
+        attention: { $ref: "#/components/schemas/DashboardAttention" }
+    DashboardToday:
+      type: object
+      description: |
+        Personal "Meja Kerja Hari Ini". On a non-workday `is_workday` is false
+        and `me` is null — no misleading zeros. `scope` appears only for
+        `wfh.monitoring.view` and only on a workday.
+      required: [is_workday, me]
+      properties:
+        is_workday: { type: boolean, example: true }
+        me:
+          type: object
+          nullable: true
+          required: [attendance, report]
+          properties:
+            attendance:
+              type: object
+              required: [sessions_done, sessions_total, next_session]
+              properties:
+                sessions_done: { type: integer, example: 2 }
+                sessions_total: { type: integer, example: 3 }
+                next_session: { type: string, nullable: true, example: sore }
+            report:
+              type: object
+              nullable: true
+              required: [status, report_id]
+              properties:
+                status: { type: string, enum: [draft, pending, approved, rejected], example: pending }
+                report_id: { type: integer, example: 123 }
+        scope: { $ref: "#/components/schemas/DashboardScopeRecap" }
+    DashboardScopeRecap:
+      type: object
+      description: Recap of the requester's scope — counts use active users only.
+      required: [label, users_total, absent, no_report, team_reports_pending]
+      properties:
+        label: { type: string, enum: [Tim, Bidang, Organisasi], example: Bidang }
+        users_total: { type: integer, example: 12 }
+        absent: { type: integer, example: 3 }
+        no_report: { type: integer, example: 5 }
+        team_reports_pending:
+          type: integer
+          nullable: true
+          description: Only present for `wfh.team_report.approve`; otherwise null.
+          example: 2
+    DashboardQueue:
+      type: object
+      description: Each key exists only when the requester holds its permission.
+      properties:
+        change_initiations_pending:
+          type: object
+          description: "`change.initiation.approve` — pending change packages in scope."
+          required: [count]
+          properties:
+            count: { type: integer, example: 5 }
+        implementations_review:
+          type: object
+          description: "`change.implementation.review` — submitted implementations in scope."
+          required: [count]
+          properties:
+            count: { type: integer, example: 2 }
+        team_reports_pending:
+          type: object
+          description: "`wfh.team_report.approve` — pending team reports in scope."
+          required: [count]
+          properties:
+            count: { type: integer, example: 2 }
+    DashboardTrend:
+      type: object
+      required: [days, summary]
+      properties:
+        days:
+          type: array
+          description: Last 14 workdays from `wfh_allowed_days`, ascending.
+          items:
+            type: object
+            required: [date, compliant, total]
+            properties:
+              date: { type: string, format: date, example: "2026-11-03" }
+              compliant: { type: integer, example: 9 }
+              total: { type: integer, example: 12 }
+        summary:
+          type: object
+          required: [compliant, total]
+          properties:
+            compliant: { type: integer, example: 118 }
+            total: { type: integer, example: 140 }
+    DashboardAttention:
+      type: object
+      description: Only for `wfh.monitoring.view`. Max 5 users below 60% compliance, lowest first.
+      required: [users, threshold_note]
+      properties:
+        users:
+          type: array
+          items:
+            type: object
+            required: [user_id, name, team, compliant, total]
+            properties:
+              user_id: { type: integer, example: 7 }
+              name: { type: string, example: Siti }
+              team: { type: string, nullable: true, example: Tim A }
+              compliant: { type: integer, example: 5 }
+              total: { type: integer, example: 12 }
+        threshold_note: { type: string, example: "kepatuhan < 60% dalam 14 hari kerja terakhir" }
+
     # ── WFH Attendance ──────────────────────────────────────────────
     AttendanceResponse:
       type: object
@@ -2244,6 +2392,8 @@ tags:
     description: Change package workflow (create draft → submit → approve/reject, PDF export)
   - name: Verification
     description: Public QR token document verification
+  - name: Dashboard
+    description: Beranda dashboard — per-permission sections for the home page
 paths:
   # ── Auth ─────────────────────────────────────────────────────────
   /api/auth/login:
@@ -5546,3 +5696,28 @@ paths:
                   value:
                     success: false
                     message: Andi belum mengatur tanda tangan. Atur tanda tangan terlebih dahulu sebelum mengekspor PDF.
+  # ── Dashboard ────────────────────────────────────────────────────
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Beranda dashboard payload (permission-gated sections)
+      operationId: getDashboard
+      security:
+        - bearerAuth: []
+      description: |
+        Single endpoint backing the SPA home page (`/`). `data.generated_at` is
+        the server time the payload was built, plus only the sections the
+        requester may see — an absent key means "not for you" (never an empty
+        array). `today` ships for every authenticated role; `today.scope`
+        requires `wfh.monitoring.view`; `queue` keys appear per permission;
+        `trend` follows the requester's scope; `attention` requires
+        `wfh.monitoring.view`. All counts consider active users only, and work
+        days come from the `wfh_allowed_days` setting (empty = fail-closed).
+      responses:
+        "200":
+          description: Dashboard sections visible to the requester
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
