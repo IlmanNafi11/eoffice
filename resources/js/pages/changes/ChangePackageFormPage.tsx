@@ -273,9 +273,12 @@ export function ChangePackageFormPage() {
 
   /**
    * Hapus lampiran existing (edit draft) → DELETE ke server, lalu segarkan
-   * daftar lampiran. Melempar error agar pesan tampil di kartu Lampiran.
+   * daftar lampiran. Pesan kegagalan tampil di kartu Lampiran via
+   * `uploadError`; tanpa `throw` (tidak ada pemanggil yang menangkapnya —
+   * unhandled rejection hanya noise).
    */
   async function removeExisting(attachmentId: number) {
+    if (uploading) return;
     setUploading(true);
     setUploadError(null);
     try {
@@ -286,9 +289,7 @@ export function ChangePackageFormPage() {
       dispatch(setCurrentPackage(fresh));
       setAttachments(fresh.implementation?.attachments ?? []);
     } catch (err) {
-      const message = toUiError(err).message;
-      setUploadError(message);
-      throw err;
+      setUploadError(toUiError(err).message);
     } finally {
       setUploading(false);
     }
@@ -809,6 +810,7 @@ export function ChangePackageFormPage() {
             {attachments.length > 0 ? (
               <AttachmentList
                 attachments={attachments}
+                removing={uploading}
                 onRemove={
                   isEdit && canDraft
                     ? (attachment) => void removeExisting(attachment.id)

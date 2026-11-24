@@ -586,6 +586,33 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
     });
   });
 
+  /** ship#17: double-click pada "Hapus Lampiran" saat DELETE masih in-flight
+   * harus menembak SATU kali — DELETE kedua akan 404 dan menimpa pesan sukses
+   * dengan error palsu di kartu Lampiran. */
+  it("klik ganda saat DELETE in-flight → hanya SATU panggilan delete", async () => {
+    mockedShow.mockResolvedValue(editPkgWithAttachment);
+    let resolveFirst: (v?: unknown) => void = () => {};
+    mockedDeleteAttachment.mockImplementation(
+      () => new Promise((res) => { resolveFirst = res as (v?: unknown) => void; }),
+    );
+    renderForm("/changes/12/edit");
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    const btn = await screen.findByRole("button", { name: "Hapus Lampiran #21" });
+    await userEvent.click(btn);
+    await userEvent.click(btn);
+    expect(mockedDeleteAttachment).toHaveBeenCalledTimes(1);
+
+    resolveFirst();
+    await waitFor(() => {
+      expect(mockedShow).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("mount mem-fetch showPackage dan prefill seluruh field dari data", async () => {
     renderForm("/changes/12/edit");
 

@@ -32,6 +32,8 @@ interface AttachmentListProps {
    * (halaman read-only seperti detail tetap aman).
    */
   onRemove?: (attachment: PackageAttachment) => void | Promise<void>;
+  /** True saat mutasi lampiran sedang berjalan — tombol hapus mati. */
+  removing?: boolean;
 }
 
 interface LoadedPreview {
@@ -48,6 +50,7 @@ export function AttachmentList({
   attachments,
   onDownload,
   onRemove,
+  removing,
 }: AttachmentListProps) {
   // map id → objectURL; satu sumber kebenaran lifecycle (revoke on change).
   const [previews, setPreviews] = useState<Map<number, LoadedPreview>>(
@@ -175,6 +178,9 @@ export function AttachmentList({
                 <Button
                   variant="ghost"
                   size="xs"
+                  // Double-click must not fire two DELETEs: the second would
+                  // 404 and paint a spurious error over a success.
+                  disabled={removing}
                   onClick={() => void onRemove?.(attachment)}
                 >
                   Hapus Lampiran #{attachment.id}

@@ -64,11 +64,15 @@ export function PendingAttachmentList({
   return (
     <PhotoProvider>
       <ul className="flex flex-col gap-1">
-        {files.map((file) => {
+        {files.map((file, index) => {
           const objectUrl = previews.get(file);
           return (
             <li
-              key={file.name}
+              // `file.name` BUKAN kunci unik: dua berkas dari folder berbeda
+              // bisa bernama sama dalam satu antrean multi-select. Referensi
+              // `File` stabil selama masih di antrean (identik dengan kunci
+              // map preview); index mengunci posisi saat antrean berubah.
+              key={`${file.name}-${index}`}
               data-testid={`pending-attachment-${file.name}`}
               className="flex items-center gap-3 text-sm"
             >

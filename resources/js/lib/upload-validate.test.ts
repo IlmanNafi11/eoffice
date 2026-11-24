@@ -45,55 +45,65 @@ describe("validateUploads — ukuran", () => {
 });
 
 describe("validateUploads — tipe", () => {
-  it("menolak tipe salah via MIME (image/gif)", () => {
-    const gif = fileOfSize(8, "x.gif", "image/gif");
-    expect(validateUploads([gif], ATTENDANCE_RULE)).toBe(
-      "Format foto absensi harus JPG, JPEG, atau PNG.",
-    );
-  });
+  // ship#17: kedua rule multi-file harus diuji TIPE-nya. ATTENDANCE_RULE
+  // saja tidak mengunci ATTACHMENT_RULE — kalau mimes lampiran bergeser
+  // (mis. PDF diterima), seluruh suite tetap hijau padahal backend 422.
+  const typeRules = [
+    { rule: ATTENDANCE_RULE, label: "foto absensi" },
+    { rule: ATTACHMENT_RULE, label: "lampiran" },
+  ] as const;
 
-  it("menolak tipe salah via ekstensi nama file saat MIME kosong", () => {
-    // Beberapa browser/agent mengirim MIME kosong; ekstensi tetap dicek
-    // agar .gif tidak lolos pre-check (kontrak backend tetap final gate).
-    const gif = fileOfSize(8, "x.gif", "");
-    expect(validateUploads([gif], ATTENDANCE_RULE)).toBe(
-      "Format foto absensi harus JPG, JPEG, atau PNG.",
-    );
-  });
+  for (const { rule, label } of typeRules) {
+    it(`[${label}] menolak tipe salah via MIME (image/gif)`, () => {
+      const gif = fileOfSize(8, "x.gif", "image/gif");
+      expect(validateUploads([gif], rule)).toBe(
+        `Format ${label} harus JPG, JPEG, atau PNG.`,
+      );
+    });
 
-  it("menolak file dengan ekstensi benar tapi MIME palsu di luar allowlist", () => {
-    // evil.png dengan type palsu tidak boleh lolos pre-check hanya karena
-    // ekstensinya benar (ship review #13: pre-check harus mirror server).
-    const evil = fileOfSize(8, "evil.png", "application/x-httpd-php");
-    expect(validateUploads([evil], ATTENDANCE_RULE)).toBe(
-      "Format foto absensi harus JPG, JPEG, atau PNG.",
-    );
-  });
+    it(`[${label}] menolak tipe salah via ekstensi nama file saat MIME kosong`, () => {
+      // Beberapa browser/agent mengirim MIME kosong; ekstensi tetap dicek
+      // agar .gif tidak lolos pre-check (kontrak backend tetap final gate).
+      const gif = fileOfSize(8, "x.gif", "");
+      expect(validateUploads([gif], rule)).toBe(
+        `Format ${label} harus JPG, JPEG, atau PNG.`,
+      );
+    });
 
-  it("menerima file dengan ekstensi benar dan MIME kosong", () => {
-    const png = fileOfSize(8, "foto.png", "");
-    expect(validateUploads([png], ATTENDANCE_RULE)).toBeNull();
-  });
+    it(`[${label}] menolak file dengan ekstensi benar tapi MIME palsu di luar allowlist`, () => {
+      // evil.png dengan type palsu tidak boleh lolos pre-check hanya karena
+      // ekstensinya benar (ship review #13: pre-check harus mirror server).
+      const evil = fileOfSize(8, "evil.png", "application/x-httpd-php");
+      expect(validateUploads([evil], rule)).toBe(
+        `Format ${label} harus JPG, JPEG, atau PNG.`,
+      );
+    });
 
-  it("menolak file tanpa ekstensi walau MIME benar", () => {
-    const noExt = fileOfSize(8, "foto", "image/png");
-    expect(validateUploads([noExt], ATTENDANCE_RULE)).toBe(
-      "Format foto absensi harus JPG, JPEG, atau PNG.",
-    );
-  });
+    it(`[${label}] menerima file dengan ekstensi benar dan MIME kosong`, () => {
+      const png = fileOfSize(8, "foto.png", "");
+      expect(validateUploads([png], rule)).toBeNull();
+    });
 
-  it("menerima jpg/jpeg/png (ketiga varian rule attendance)", () => {
-    expect(
-      validateUploads(
-        [
-          fileOfSize(8, "a.jpg", "image/jpeg"),
-          fileOfSize(8, "b.jpeg", "image/jpeg"),
-          fileOfSize(8, "c.png", "image/png"),
-        ],
-        ATTENDANCE_RULE,
-      ),
-    ).toBeNull();
-  });
+    it(`[${label}] menolak file tanpa ekstensi walau MIME benar`, () => {
+      const noExt = fileOfSize(8, "foto", "image/png");
+      expect(validateUploads([noExt], rule)).toBe(
+        `Format ${label} harus JPG, JPEG, atau PNG.`,
+      );
+    });
+
+    it(`[${label}] menerima jpg/jpeg/png (ketiga varian)`, () => {
+      expect(
+        validateUploads(
+          [
+            fileOfSize(8, "a.jpg", "image/jpeg"),
+            fileOfSize(8, "b.jpeg", "image/jpeg"),
+            fileOfSize(8, "c.png", "image/png"),
+          ],
+          rule,
+        ),
+      ).toBeNull();
+    });
+  }
 });
 
 describe("validateUploads — jumlah (attachment)", () => {
