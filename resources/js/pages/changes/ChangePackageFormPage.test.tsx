@@ -359,6 +359,41 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
     expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
   });
 
+  /** ship#19: Submit setelah flush Simpan Draft gagal memakai paket yang
+   * SAMA (createdIdRef) — create kedua = orphan dengan doc_number baru.
+   * Tanpa test ini, menghapus cabang reuse di handleSubmit tetap hijau. */
+  it("Submit setelah flush Simpan Draft gagal → paket SAMA, create TIDAK dipanggil dua kali", async () => {
+    renderForm("/changes/new");
+    await fillForSubmit();
+
+    const file = new File(["png-bytes"], "hasil-uji.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      file,
+    );
+    mockedUpload.mockRejectedValueOnce(
+      new ApiError("http", "Maksimal 10 lampiran.", { status: 422 }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledTimes(1);
+    });
+
+    // Retry via Submit: unggah berhasil kali ini → lanjut POST /submit.
+    mockedUpload.mockResolvedValueOnce({ files: [], message: "" });
+    await userEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    await waitFor(() => {
+      expect(mockedSubmit).toHaveBeenCalled();
+    });
+    // Draft id 12 dipakai ulang: create persis sekali, upload & submit ke 12.
+    expect(mockedCreate).toHaveBeenCalledTimes(1);
+    expect(mockedUpload).toHaveBeenLastCalledWith(12, [file]);
+    expect(mockedSubmit).toHaveBeenCalledWith(12, fullSubmitInput);
+    expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
   /** ship#18: pilih berkas saat Simpan Draft in-flight di edit mode →
    * diabaikan (shared-flag race: POST yang mendarat di tengah mutasi). */
   it("pilih berkas saat Simpan Draft in-flight (edit) → TIDAK ada panggilan upload", async () => {
@@ -786,6 +821,68 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
 
     resolveUpdate(editPkg);
     expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
+  /** ship#19: hapus lampiran optimistis — baris hilang SAAT DELETE masih
+   * in-flight (klik kedua tidak mungkin menyasar baris yang sama), dan
+   * dikembalikan bila server menolak. Pre-optimistic code keeps the row
+   * visible until settle, so this test dies if the optimistic update or the
+   * snapshot rollback is reverted. */
+  it("hapus optimistis: baris hilang sebelum DELETE selesai; ditolak → baris kembali", async () => {
+    mockedShow.mockResolvedValue(editPkgWithAttachment);
+    let rejectDelete: (e?: unknown) => void = () => {};
+    mockedDeleteAttachment.mockImplementation(
+      () => new Promise((_, rej) => { rejectDelete = rej as (e?: unknown) => void; }),
+    );
+    renderForm("/changes/12/edit");
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    const btn = await screen.findByRole("button", { name: "Hapus Lampiran #21" });
+    await userEvent.click(btn);
+    expect(mockedDeleteAttachment).toHaveBeenCalledWith(12, 21);
+    // DELETE masih pending: baris sudah tidak dirender.
+    expect(screen.queryByRole("button", { name: "Hapus Lampiran #21" })).toBeNull();
+
+    rejectDelete(
+      new ApiError("http", "Hanya inisiator yang dapat menghapus lampiran.", { status: 403 }),
+    );
+    // Rollback: baris kembali dan pesan server tampil apa adanya.
+    expect(
+      await screen.findByRole("button", { name: "Hapus Lampiran #21" }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText("Hanya inisiator yang dapat menghapus lampiran."),
+    ).toBeTruthy();
+  });
+
+  /** ship#19: DELETE sukses tapi refetch gagal (jaringan) → daftar
+   * optimistis TETAP benar: baris tidak dihidupkan kembali dan tidak ada
+   * pesan error palsu untuk operasi yang sebenarnya berhasil. */
+  it("DELETE sukses tapi refetch gagal → baris tetap hilang, tanpa pesan error", async () => {
+    mockedShow.mockResolvedValue(editPkgWithAttachment);
+    renderForm("/changes/12/edit");
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    mockedShow.mockRejectedValueOnce(
+      new ApiError("network", "Koneksi ke server gagal.", { status: 0 }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Hapus Lampiran #21" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedShow).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByRole("button", { name: "Hapus Lampiran #21" })).toBeNull();
+    expect(screen.queryByText("Koneksi ke server gagal.")).toBeNull();
   });
 
   it("mount mem-fetch showPackage dan prefill seluruh field dari data", async () => {
