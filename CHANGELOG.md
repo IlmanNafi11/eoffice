@@ -4,6 +4,31 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.1.0).
 Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
+### Fixed (backend+frontend, 2026-11-24 — ship-review #18 closeout)
+- PDF laporan tim WFH kini butuh `wfh.monitoring.view` bila pengunduh bukan
+  anggota tim itu: staf dengan `wfh.report.export_pdf` saja tidak lagi bisa
+  mengunduh PDF tim tetangga dalam bidang yang sama — dokumen itu memuat
+  nama+NIP seluruh anggota, foto absensi, identitas pembuat laporan, dan
+  (bila disetujui) tanda tangan kepala bidang. Unduh tim sendiri tetap bebas.
+- Retry "Simpan Draft"/"Submit" setelah gagal unggah antrean kini memakai
+  paket draft yang SAMA (bukan membuat draft kedua — orphan dengan nomor
+  dokumen baru yang tidak pernah terlihat user).
+- Memilih berkas saat Simpan/Submit in-flight kini diblokir (input disabled +
+  guard `busy || uploading`), menutup race lintas-alur yang sebelumnya hanya
+  ditutup di sisi hapus lampiran.
+- Hapus "Hapus" pada berkas antrean dinonaktifkan saat unggah in-flight:
+  batch yang sudah terkirim tidak bisa dibatalkan dari UI (dulu klik terlihat
+  berhasil tapi berkas tetap terunggah).
+- Hapus lampiran kini optimistis: baris hilang dari daftar seketika; refetch
+  yang gagal tidak lagi menghidupkan kembali baris yang sudah terhapus di
+  server (klik kedua hanya menghasilkan 404 yang menimpa pesan sukses).
+- Path lampiran tertamper (di luar `change-attachments/`) yang dihapus kini
+  tercatat sebagai `Log::warning` — dulu baris terhapus diam-diam tanpa jejak;
+  gagal unlink (disk penuh/izin bergeser) juga memunculkan warning karena
+  kedua disk non-throwing dan tidak ada lagi baris untuk atribusi.
+- Test isolation: bucket rate-limit (`throttle:auth`, api 60/menit) kini
+  di-flush per test di `TestCase` — dulu kelas yang menghujam login/verify
+  meracuni kelas lain dengan 429 sesuai urutan file.
 
 ### Fixed (frontend, 2026-11-24 — ship-review #18)
 - Gagal unggah antrean lampiran saat Submit (create) kini MENGABORT submit:
