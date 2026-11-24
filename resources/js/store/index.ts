@@ -2,7 +2,8 @@
  * Store tingkat aplikasi (frontend-phase1).
  *
  * - Token awal dibaca dari localStorage agar refresh tidak memaksa login ulang.
- * - Reducer `wfhMonitoring` ditambahkan modul wfh-monitoring (Task 3).
+ * - Reducer `wfhMonitoring` ditambahkan modul wfh-monitoring (Task 3);
+ *   `dashboard` ditambahkan modul dashboard (Task 5).
  * - Interceptor 401 (`@/api/client`) sudah menghapus token dari localStorage
  *   dan redirect ke `/login`; yang kurang hanya state Redux, jadi
  *   `makeStore` mendaftarkan handler yang memanggil `clearToken`.
@@ -22,6 +23,8 @@ import type { WfhMonitoringState } from "@/store/wfhMonitoringSlice";
 import { wfhMonitoringReducer } from "@/store/wfhMonitoringSlice";
 import type { ChangePackageState } from "@/store/changePackageSlice";
 import { changePackageReducer } from "@/store/changePackageSlice";
+import type { DashboardState } from "@/store/dashboardSlice";
+import { dashboardReducer } from "@/store/dashboardSlice";
 import type { AdminState } from "@/store/adminSlice";
 import { adminReducer } from "@/store/adminSlice";
 // ── Tipe store (named — bukan ReturnType) ───────────────────────────
@@ -33,6 +36,7 @@ export type RootState = {
   wfhMonitoring: WfhMonitoringState;
   changePackage: ChangePackageState;
   admin: AdminState;
+  dashboard: DashboardState;
 };
 
 /** Dispatch dengan middleware thunk default RTK. */
@@ -53,7 +57,7 @@ export function makeStore(): AppStore {
   const storedToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
 
   const store: AppStore = configureStore({
-    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer, wfhMonitoring: wfhMonitoringReducer, changePackage: changePackageReducer, admin: adminReducer },
+    reducer: { auth: authReducer, wfh: wfhReducer, wfhTeam: wfhTeamReducer, wfhMonitoring: wfhMonitoringReducer, changePackage: changePackageReducer, admin: adminReducer, dashboard: dashboardReducer },
     preloadedState: storedToken
       ? { auth: { ...initialAuthState(), token: storedToken } }
       : undefined,

@@ -682,3 +682,71 @@ export interface QrVerification {
   message: string;
 }
 
+
+// ── Dashboard (modul dashboard) ──────────────────────────────────────
+
+/**
+ * `#/components/schemas/DashboardData` — `GET /dashboard`. Kunci seksi
+ * (`queue`/`trend`/`attention`) hanya ada bila peminta berhak melihatnya
+ * (absen = tersembunyi, bukan array kosong); `today` selalu ada.
+ */
+export interface DashboardData {
+  generated_at: string;
+  today: DashboardToday;
+  queue?: DashboardQueue;
+  trend?: DashboardTrend;
+  attention?: DashboardAttention;
+}
+
+/**
+ * `#/components/schemas/DashboardToday` — meja kerja hari ini. Hari non-kerja
+ * `is_workday: false` dan `me: null` (tanpa nol menyesatkan). `scope` hanya
+ * untuk pemegang `wfh.monitoring.view` dan hanya pada hari kerja.
+ */
+export interface DashboardToday {
+  is_workday: boolean;
+  me: {
+    attendance: {
+      sessions_done: number;
+      sessions_total: number;
+      next_session: string | null;
+    };
+    report: { status: "draft" | "pending" | "approved" | "rejected"; report_id: number } | null;
+  } | null;
+  scope?: DashboardScopeRecap;
+}
+
+/** `#/components/schemas/DashboardScopeRecap` — rekap cakupan peminta; hitungan hanya user aktif. */
+export interface DashboardScopeRecap {
+  label: "Tim" | "Bidang" | "Organisasi";
+  users_total: number;
+  absent: number;
+  no_report: number;
+  /** Hanya ada (non-null) bagi pemegang `wfh.team_report.approve`. */
+  team_reports_pending: number | null;
+}
+
+/** `#/components/schemas/DashboardQueue` — setiap kunci hanya ada bila pemegang permissionnya. */
+export interface DashboardQueue {
+  change_initiations_pending?: { count: number };
+  implementations_review?: { count: number };
+  team_reports_pending?: { count: number };
+}
+
+/** `#/components/schemas/DashboardTrend` — 14 hari kerja terakhir, asc. */
+export interface DashboardTrend {
+  days: Array<{ date: string; compliant: number; total: number }>;
+  summary: { compliant: number; total: number };
+}
+
+/** `#/components/schemas/DashboardAttention` — hanya `wfh.monitoring.view`; maks 5 user < 60%, terendah dulu. */
+export interface DashboardAttention {
+  users: Array<{
+    user_id: number;
+    name: string;
+    team: string | null;
+    compliant: number;
+    total: number;
+  }>;
+  threshold_note: string;
+}
