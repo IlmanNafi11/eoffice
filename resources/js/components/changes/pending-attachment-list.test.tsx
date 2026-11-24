@@ -68,6 +68,29 @@ describe("PendingAttachmentList", () => {
     expect(onRemove).toHaveBeenCalledWith(pdf);
   });
 
+  /** ship#18 (b0d3bb2): dua berkas bernama sama dari folder berbeda harus
+   * dirender sebagai DUA baris terpisah, dan tombol hapus menunjuk berkas
+   * yang tepat — bukan bentrok pada `key`/`data-testid` nama berkas. */
+  it("dua berkas bernama sama → dua baris; hapus menunjuk File yang tepat", async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    const buktiA = new File(["a-bytes"], "bukti.png", { type: "image/png" });
+    const buktiB = new File(["b-bytes"], "bukti.png", { type: "image/png" });
+    render(<PendingAttachmentList files={[buktiA, buktiB]} onRemove={onRemove} />);
+
+    expect(screen.getAllByText("bukti.png")).toHaveLength(2);
+
+    const removeButtons = screen.getAllByRole("button", { name: "Hapus bukti.png" });
+    expect(removeButtons).toHaveLength(2);
+    await user.click(removeButtons[1] as Element);
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    // Referensi eksak: `toHaveBeenCalledWith(File)` membandingkan field, dan
+    // dua File bernama sama berukuran sama identik field-nya — identitas
+    // referensi yang membuktikan baris KEDUA yang dihapus.
+    expect(onRemove.mock.calls[0]?.[0]).toBe(buktiB);
+  });
+
   it("berkas non-gambar tidak dirender sebagai thumbnail img", () => {
     render(<PendingAttachmentList files={[pdf]} onRemove={vi.fn()} />);
 

@@ -561,6 +561,35 @@ describe("ChangePackageFormPage — Submit (create mode)", () => {
     const submitOrder = mockedSubmit.mock.invocationCallOrder[0] as number;
     expect(uploadOrder).toBeLessThan(submitOrder);
   });
+
+  /** ship#18: unggah antrean gagal → JANGAN POST /submit. Lanjut submit akan
+   * mengunci paket tanpa bukti, lalu navigasi membuang state form (file
+   * antrean) — lampiran hilang diam-diam. */
+  it("Submit di create: upload antrean gagal → TIDAK submit, TIDAK navigasi", async () => {
+    renderForm("/changes/new");
+    await fillForSubmit();
+
+    const file = new File(["png-bytes"], "bukti.png", { type: "image/png" });
+    await userEvent.upload(
+      screen.getByLabelText(/unggah lampiran/i) as HTMLInputElement,
+      file,
+    );
+    mockedUpload.mockRejectedValueOnce(
+      new ApiError("http", "Maksimal 10 lampiran.", { status: 422 }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalled();
+    });
+    // Form tetap terpasang (tanpa navigasi) dan pesan upload tampil di kartu.
+    expect(screen.queryByText("changes-detail-stub")).toBeNull();
+    expect(
+      (await screen.findAllByText("Maksimal 10 lampiran.")).length,
+    ).toBeGreaterThan(0);
+    expect(mockedSubmit).not.toHaveBeenCalled();
+  });
 });
 
 describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () => {
@@ -611,6 +640,60 @@ describe("ChangePackageFormPage — edit mode (/changes/:packageId/edit)", () =>
     await waitFor(() => {
       expect(mockedShow).toHaveBeenCalledTimes(2);
     });
+  });
+
+  /** ship#18: DELETE ditolak server (403 non-inisiator / 422 non-draft) —
+   * pesan tampil di kartu Lampiran dan tombol hapus aktif lagi (tidak
+   * terkunci `uploading=true` permanen). */
+  it("DELETE gagal → pesan alert di kartu Lampiran + tombol hapus aktif lagi", async () => {
+    mockedShow.mockResolvedValue(editPkgWithAttachment);
+    mockedDeleteAttachment.mockRejectedValueOnce(
+      new ApiError("http", "Hanya inisiator yang dapat menghapus lampiran.", { status: 403 }),
+    );
+    renderForm("/changes/12/edit");
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Hapus Lampiran #21" }),
+    );
+
+    expect(
+      await screen.findByText("Hanya inisiator yang dapat menghapus lampiran."),
+    ).toBeTruthy();
+    const btn = screen.getByRole("button", { name: "Hapus Lampiran #21" });
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+    // Gagal → daftar TIDAK disegarkan (tetap menampilkan lampiran).
+    expect(mockedShow).toHaveBeenCalledTimes(1);
+  });
+
+  /** ship#18: DELETE tidak boleh berlari dengan simpan/submit in-flight —
+   * bisa menghapus baris yang baru diunggah, atau refetch menghidupkan lagi
+   * baris yang terhapus. Saat `busy`, klik hapus diabaikan. */
+  it("klik hapus saat Simpan Draft in-flight → TIDAK ada panggilan delete", async () => {
+    mockedShow.mockResolvedValue(editPkgWithAttachment);
+    let resolveUpdate: (v?: unknown) => void = () => {};
+    mockedUpdate.mockImplementation(
+      () => new Promise((res) => { resolveUpdate = res as (v?: unknown) => void; }),
+    );
+    renderForm("/changes/12/edit");
+
+    await waitFor(() => {
+      expect(
+        (screen.getByLabelText("Deskripsi") as HTMLInputElement).value,
+      ).toBe("Migrasi server aplikasi e-Office ke cloud Kominfo");
+    });
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Hapus Lampiran #21" }),
+    );
+    expect(mockedDeleteAttachment).not.toHaveBeenCalled();
+
+    resolveUpdate(editPkg);
+    expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
   });
 
   it("mount mem-fetch showPackage dan prefill seluruh field dari data", async () => {

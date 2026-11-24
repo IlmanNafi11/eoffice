@@ -228,8 +228,10 @@ export function ChangePackageFormPage() {
       setAttachments(fresh.implementation?.attachments ?? []);
       setPendingFiles([]);
     } catch (err) {
-      const message = toUiError(err).message;
-      setUploadError(message);
+      // Thunk reject memakai `rejectWithValue(messageOf(error))` (string), jadi
+      // `err` BUKAN ApiError: hanya jalur error transport (non-string) yang
+      // perlu `toUiError`.
+      setUploadError(typeof err === "string" && err ? err : toUiError(err).message);
       throw err;
     } finally {
       setUploading(false);
@@ -261,13 +263,18 @@ export function ChangePackageFormPage() {
     }
   }
 
-  /** Setelah draft create tersimpan: unggah antrean sebelum navigasi. */
-  async function flushPendingUploads(packageId: number) {
-    if (pendingFiles.length === 0) return;
+  /**
+   * Setelah draft create tersimpan: unggah antrean sebelum navigasi/submit.
+   * `false` = gagal (pesan sudah tampil di kartu Lampiran) — pemanggil
+   * memutus alur agar lampiran tak hilang diam-diam bersama state form.
+   */
+  async function flushPendingUploads(packageId: number): Promise<boolean> {
+    if (pendingFiles.length === 0) return true;
     try {
       await uploadFiles(packageId, pendingFiles);
+      return true;
     } catch {
-      // Paket tetap tersimpan; pesan sudah tampil di kartu Lampiran.
+      return false;
     }
   }
 
@@ -275,10 +282,13 @@ export function ChangePackageFormPage() {
    * Hapus lampiran existing (edit draft) → DELETE ke server, lalu segarkan
    * daftar lampiran. Pesan kegagalan tampil di kartu Lampiran via
    * `uploadError`; tanpa `throw` (tidak ada pemanggil yang menangkapnya —
-   * unhandled rejection hanya noise).
+   * unhandled rejection hanya noise). Diblokir saat simpan/submit in-flight
+   * (`busy`): DELETE yang mendarat di tengah alur itu bisa menghapus baris
+   * yang baru saja diunggah, atau refetch-nya menghidupkan lagi baris yang
+   * terhapus.
    */
   async function removeExisting(attachmentId: number) {
-    if (uploading) return;
+    if (busy || uploading) return;
     setUploading(true);
     setUploadError(null);
     try {
@@ -289,7 +299,7 @@ export function ChangePackageFormPage() {
       dispatch(setCurrentPackage(fresh));
       setAttachments(fresh.implementation?.attachments ?? []);
     } catch (err) {
-      setUploadError(toUiError(err).message);
+      setUploadError(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
       setUploading(false);
     }
@@ -403,7 +413,11 @@ export function ChangePackageFormPage() {
       const result = isEdit
         ? await dispatch(updatePackageThunk({ packageId: id, input })).unwrap()
         : await dispatch(createPackageThunk(input)).unwrap();
-      if (!isEdit) await flushPendingUploads(result.initiation.id);
+      if (!isEdit && !await flushPendingUploads(result.initiation.id)) {
+        // Simpan draft tetap sukses — JANGAN navigasi; user melihat pesan
+        // upload di kartu Lampiran dan bisa mencoba submit ulang.
+        return;
+      }
       toast.success(result.message);
       navigate(`/changes/${result.initiation.id}`);
     } catch (err) {
@@ -443,9 +457,13 @@ export function ChangePackageFormPage() {
           }),
         ).unwrap();
         targetId = created.initiation.id;
-        // Lampiran yang diantre sebelum draft ada harus menempel pada paket
-        // ini SEBELUM submit — setelah navigasi state form hilang.
-        await flushPendingUploads(targetId);
+        // Antrean yang diantre sebelum draft ada harus menempel pada paket
+        // ini SEBELUM submit — setelah navigasi state form hilang. Kegagalan
+        // flush MENGABORT submit: paket tanpa bukti + state form hilang
+        // sesudah navigasi = lampiran hilang diam-diam.
+        if (!(await flushPendingUploads(targetId))) {
+          return;
+        }
       }
       const submitted = await dispatch(
         submitPackageThunk({ packageId: targetId, input: buildSubmitInput() }),

@@ -5,6 +5,18 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (frontend, 2026-11-24 — ship-review #18)
+- Gagal unggah antrean lampiran saat Submit (create) kini MENGABORT submit:
+  paket tidak lagi terkunci status submitted tanpa bukti, dan state form
+  (berkas antrean) tidak hilang bersama navigasi. "Simpan Draft" gagal-unggah
+  tetap menyimpan draft dan TIDAK menavigasi — pesan error tampil di kartu
+  Lampiran agar bisa dicoba ulang.
+- Klik "Hapus Lampiran" diabaikan saat simpan/submit masih in-flight: DELETE
+  yang mendarat di tengah alur itu bisa menghapus baris yang baru diunggah,
+  atau refetch menghidupkan lagi baris yang terhapus.
+- Pesan error server (mis. "Hanya inisiator yang dapat menghapus lampiran.")
+  kini tampil apa adanya di kartu Lampiran, bukan pesan generik.
+
 ### Fixed (backend+frontend, 2026-11-24 — ship-review #17)
 - Hapus attachment kini menolak path baris di luar `change-attachments/`:
   baris yang tertamper menunjuk `signatures/...` atau `../` tidak lagi
