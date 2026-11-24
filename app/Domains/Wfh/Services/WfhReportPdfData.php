@@ -82,7 +82,7 @@ class WfhReportPdfData
      *
      * @return array<string, mixed>
      */
-    public function forTeam(Team $team, User $admin, ?User $head, string $date, bool $isApproved): array
+    public function forTeam(Team $team, ?User $maker, ?User $head, string $date, bool $isApproved): array
     {
         $teamData = $this->wfhRepository->getTeamReportData($team->id, $date);
 
@@ -114,7 +114,7 @@ class WfhReportPdfData
             $sessions[$sessionName] = $entries;
         }
 
-        $makerSig = SignaturePath::resolve($admin->signature_path) ?: null;
+        $makerSig = $maker ? (SignaturePath::resolve($maker->signature_path) ?: null) : null;
 
         $supervisorSig = null;
         if ($isApproved && $head?->signature_path) {
@@ -124,14 +124,14 @@ class WfhReportPdfData
         return [
             'namaTim' => $team->name,
             'unitKerja' => $field?->name ?? '-',
-            'tanggalPelaksanaan' => Carbon::parse($date)->isoFormat('D MMMM Y'),
-            'staff' => $staff,
             'sessions' => $sessions,
             'isApproved' => $isApproved,
+            'tanggalPelaksanaan' => Carbon::parse($date)->isoFormat('D MMMM Y'),
+            'staff' => $staff,
+            'makerName' => $maker ? strtoupper($maker->name) : '-',
+            'makerNip' => $maker?->nip ?? '-',
             'signatureMakerPath' => $makerSig,
             'signatureSupervisorPath' => $supervisorSig,
-            'makerName' => strtoupper($admin->name),
-            'makerNip' => $admin->nip,
             'supervisorName' => $head ? strtoupper($head->name) : '-',
             'supervisorNip' => $head?->nip ?? '-',
             'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),

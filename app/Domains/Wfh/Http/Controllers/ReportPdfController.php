@@ -96,25 +96,32 @@ class ReportPdfController extends Controller
         $team->load(['field.head']);
         $head = $team->field?->head;
 
-        // Check team report status if team_report_id provided. Scoped to this
-        // team: passing another team's approved report id must not stamp THIS
-        // PDF as approved (it would carry the field head's signature).
-        $isApproved = false;
+        // The maker column is signed by whoever created the team report
+        // (created_by), never by the admin downloading the PDF. Scoped to this
+        // team: passing another team's report id must not stamp THIS PDF with
+        // that report's signer or approval. A date-based download resolves the
+        // report for that date; no report means no maker ('-'), not the admin.
         if ($teamReportId = $validated['team_report_id'] ?? null) {
             $teamReport = WfhTeamReport::where('team_id', $team->id)->find($teamReportId);
-            $isApproved = $teamReport !== null && $teamReport->status === 'approved';
+        } else {
+            $teamReport = WfhTeamReport::where('team_id', $team->id)
+                ->where('report_date', $date)->first();
         }
 
+        $isApproved = $teamReport !== null && $teamReport->status === 'approved';
+        $maker = $teamReport?->creator;
+
         // PDF embeds real signatures; refuse export when any involved user
-        // has not configured theirs yet.
+        // has not configured theirs yet. The downloading admin no longer
+        // signs, so they are not guarded.
         if ($missing = SignatureGuard::missing([
-            $admin,
+            $maker,
             $isApproved ? $head : null,
         ])) {
             return ApiResponse::fail(SignatureGuard::missingMessage($missing->name)['message'], 422);
         }
 
-        $data = $this->pdfData->forTeam($team, $admin, $head, $date, $isApproved);
+        $data = $this->pdfData->forTeam($team, $maker, $head, $date, $isApproved);
 
         $pdf = $this->pdfRenderer->render('pdf.wfh-report-admin', $data);
 

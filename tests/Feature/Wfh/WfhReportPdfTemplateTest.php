@@ -129,6 +129,9 @@ class WfhReportPdfTemplateTest extends TestCase
             'namaTim' => 'Tim Test',
             'staff' => [['name' => 'USER A', 'nip' => '1', 'links' => []]],
             'sessions' => ['pagi' => [], 'siang' => [], 'sore' => []],
+            // Maker img is conditional on the path (no report → no image), so
+            // the inside-the-box regression needs a truthy path to have an img.
+            'signatureMakerPath' => 'signatures/maker.png',
         ]))->render();
 
         $this->assertSignatureImageSitsInsideTheBox($html);

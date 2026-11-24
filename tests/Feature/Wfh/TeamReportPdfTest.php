@@ -108,6 +108,75 @@ class TeamReportPdfTest extends TestCase
         $this->assertNull($captured['signatureSupervisorPath']);
     }
 
+    public function test_team_pdf_maker_is_the_report_creator_not_the_downloader(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $creator = User::factory()->create(['team_id' => $team->id, 'name' => 'Pembuat Laporan']);
+        $creator->assignRole('staf');
+        $this->setUserSignature($creator);
+
+        $admin = User::factory()->create(['team_id' => $team->id, 'name' => 'Admin Unduh']);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+        $this->setUserSignature($admin);
+
+        $teamReport = WfhTeamReport::factory()->status('pending')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $creator->id,
+        ]);
+
+        $captured = $this->capturePdfViewData($team, $teamReport->id);
+
+        $this->assertSame('PEMBUAT LAPORAN', $captured['makerName']);
+        $this->assertNotSame('ADMIN UNDUH', $captured['makerName']);
+        $this->assertNotNull($captured['signatureMakerPath']);
+    }
+
+    public function test_team_pdf_without_any_team_report_renders_dash_maker(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $admin = User::factory()->create(['team_id' => $team->id]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+        $this->setUserSignature($admin);
+
+        $captured = $this->capturePdfViewData($team, null);
+
+        $this->assertSame('-', $captured['makerName']);
+        $this->assertNull($captured['signatureMakerPath']);
+        $this->assertSame(200, $this->getJson("/api/admin/wfh/teams/{$team->id}/pdf?date=".now()->toDateString())->status());
+    }
+
+    public function test_team_pdf_guard_names_the_creator_when_signature_missing(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $creator = User::factory()->create(['team_id' => $team->id, 'name' => 'Pembuat Laporan']);
+        $creator->assignRole('staf');
+
+        $admin = User::factory()->create(['team_id' => $team->id]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+        $this->setUserSignature($admin);
+
+        $teamReport = WfhTeamReport::factory()->status('pending')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $creator->id,
+        ]);
+
+        $response = $this->getJson("/api/admin/wfh/teams/{$team->id}/pdf?team_report_id={$teamReport->id}");
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('Pembuat Laporan', (string) $response->json('message'));
+    }
+
     /**
      * M2: passing another team's approved report id must not stamp THIS PDF as
      * approved — that would attach the field head's signature to a report they

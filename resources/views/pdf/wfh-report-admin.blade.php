@@ -193,7 +193,9 @@
                 <td>
                     <div class="signature-role">Yang Membuat Laporan</div>
                     <div class="signature-box">
-                        <img src="{{ $signatureMakerPath }}" alt="signature">
+                        @if ($signatureMakerPath)
+                            <img src="{{ $signatureMakerPath }}" alt="signature">
+                        @endif
                     </div>
                     <div class="signature-name">{{ $makerName }}</div>
                     <div class="signature-nip">NIP. {{ $makerNip }}</div>

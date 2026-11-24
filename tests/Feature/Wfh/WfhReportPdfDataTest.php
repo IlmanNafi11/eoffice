@@ -171,14 +171,12 @@ class WfhReportPdfDataTest extends TestCase
         $field = Field::create(['name' => 'Bidang Test']);
         $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
 
-        $adminTeam = Team::create(['field_id' => $field->id, 'name' => 'Tim Admin']);
-        $admin = User::factory()->create(['team_id' => $adminTeam->id, 'name' => 'Admin Example']);
-        $admin->assignRole('admin');
-        $this->setUserSignature($admin);
+        $maker = User::factory()->create(['team_id' => $team->id, 'name' => 'Pembuat Laporan']);
+        $this->setUserSignature($maker);
 
         $data = app(WfhReportPdfData::class)->forTeam(
             team: $team,
-            admin: $admin,
+            maker: $maker,
             head: null,
             date: now()->toDateString(),
             isApproved: false,
@@ -187,8 +185,7 @@ class WfhReportPdfDataTest extends TestCase
         $this->assertEqualsCanonicalizing($this->adminKeys(), array_keys($data));
         $this->assertSame('Tim Test', $data['namaTim']);
         $this->assertSame('Bidang Test', $data['unitKerja']);
-        $this->assertSame('ADMIN EXAMPLE', $data['makerName']);
-        $this->assertFalse($data['isApproved']);
+        $this->assertSame('PEMBUAT LAPORAN', $data['makerName']);
         $this->assertNull($data['signatureSupervisorPath']);
         $this->assertSame(['pagi', 'siang', 'sore'], array_keys($data['sessions']));
     }
@@ -216,18 +213,13 @@ class WfhReportPdfDataTest extends TestCase
         $field = Field::create(['name' => 'Bidang Test']);
         $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
 
-        $admin = User::factory()->create(['team_id' => $team->id]);
-        $admin->assignRole('admin');
-        $this->setUserSignature($admin);
-
         $data = app(WfhReportPdfData::class)->forTeam(
             team: $team,
-            admin: $admin,
+            maker: null,
             head: null,
             date: now()->toDateString(),
             isApproved: false,
         );
-
         $this->assertStringStartsWith('data:image/webp;base64,', $data['logoDoc']);
     }
 
