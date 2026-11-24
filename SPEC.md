@@ -22,8 +22,8 @@ Penerima manfaat:
 | Role | Yang dilihat | Yang membuat berbeda |
 |---|---|---|
 | staf | absensi hari ini, status laporan hari ini, pintasan absen/buat laporan | hanya data diri |
-| kepala tim | rekap kehadiran timnya hari ini, antrean laporan tim & paket perubahan tim | `wfh.monitoring.view` + team-scoped |
-| kepala bidang | rekap seluruh bidang, antrean laporan tim, tren & daftar perhatian | field-scope |
+| kepala tim | rekap kehadiran timnya hari ini, tren & daftar perhatian timnya, antrean laporan tim & paket perubahan tim | `wfh.monitoring.view` + team-scoped (tren/perhatian mengikuti permission, bukan role) |
+| kepala bidang | rekap seluruh bidang, antrean laporan tim, tren & daftar perhatian | field-scope; tren/perhatian juga muncul bagi pemegang `wfh.monitoring.view` |
 | admin | rekap organisasi, tren organisasi, daftar perhatian | scope all |
 
 **Masalah saat ini:** `/` hanya berisi teks "Beranda — modul menyusul di fase berikutnya."; kepala

@@ -55,8 +55,10 @@ class WfhMonitoringController extends Controller
                 // Field head without explicit team_id → entire field
                 $fieldId = $actorFieldId;
             } else {
-                // Non-head without explicit team_id → own team / led team (status quo)
-                $teamId = $user->ledTeams()->pluck('id')->first() ?? $user->team_id;
+                // Non-head without explicit team_id → own team / led team.
+                // `orderBy('id')` matches DashboardScope::for — a multi-team
+                // leader must resolve to the SAME team on both screens.
+                $teamId = $user->ledTeams()->orderBy('id')->value('id') ?? $user->team_id;
             }
         }
 

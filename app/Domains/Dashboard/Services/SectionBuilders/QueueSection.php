@@ -35,7 +35,7 @@ class QueueSection implements SectionBuilder
         return 'queue';
     }
 
-    public function build(User $user, ?DashboardScope $scope = null): ?array
+    public function build(User $user, ?DashboardScope $scope): ?array
     {
         $section = [];
 

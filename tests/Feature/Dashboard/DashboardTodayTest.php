@@ -105,6 +105,38 @@ class DashboardTodayTest extends TestCase
         $this->assertNull($data['today']['me']['report']);
     }
 
+    public function test_completed_attendance_reports_null_next_session(): void
+    {
+        // The terminal state — all sessions done — has its own FE rendering
+        // ("Semua sesi selesai"); a `?? 'pagi'`-style regression would tell a
+        // finished user to check in again.
+        $staf = $this->staf();
+
+        $report = WfhReport::factory()->pending()->create([
+            'user_id' => $staf->id,
+            'report_date' => now()->toDateString(),
+        ]);
+
+        foreach (['pagi', 'siang', 'sore'] as $session) {
+            WfhAttendance::create([
+                'user_id' => $staf->id,
+                'report_id' => $report->id,
+                'date' => now()->toDateString(),
+                'session' => $session,
+                'photo_path' => "attendances/{$staf->id}/".now()->toDateString()."/{$session}.jpg",
+                'check_in_at' => now(),
+            ]);
+        }
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertSame([
+            'sessions_done' => 3,
+            'sessions_total' => 3,
+            'next_session' => null,
+        ], $data['today']['me']['attendance']);
+    }
+
     public function test_non_workday_reports_false_and_no_personal_section(): void
     {
         // Sunday 2026-07-19 — outside the default Mon–Fri set.

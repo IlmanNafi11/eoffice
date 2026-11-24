@@ -51,13 +51,16 @@ final class WorkdayWindow
         return array_reverse($dates);
     }
 
-    /** First/last date of the window, or null when there are no workdays. */
-    public static function bounds(array $dates): ?array
+    /**
+     * Whether today is a workday per the `wfh_allowed_days` setting — the
+     * single workday rule `TodaySection` renders from (same source as
+     * `last()`, so the recap and the window can never disagree). Empty
+     * setting = fail-closed: every day is a non-workday.
+     */
+    public static function todayIsWorkday(): bool
     {
-        if ($dates === []) {
-            return null;
-        }
+        $allowed = array_map('intval', (array) Setting::get('wfh_allowed_days', self::DEFAULT_ALLOWED_DAYS));
 
-        return [$dates[0], $dates[count($dates) - 1]];
+        return in_array(now()->dayOfWeekIso, $allowed, true);
     }
 }

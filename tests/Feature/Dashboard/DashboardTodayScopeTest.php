@@ -245,17 +245,21 @@ class DashboardTodayScopeTest extends TestCase
         $queries = \DB::getQueryLog();
         \DB::disableQueryLog();
 
-        // The recap costs exactly three aggregate reads over `users` (total,
-        // absent, no-report) and the trend roster adds exactly one more
-        // (its denominator) — four bounded counts, no per-user reads: any
-        // N+1 shows up as a count proportional to the 12 seeded users.
-        // Predicate is exact: a count(*) that STARTS from users.
+        // The recap + trend roster cost a handful of aggregate reads over
+        // `users` (total/absent/no-report + the trend denominator), NOT one
+        // per seeded user: any N+1 shows up as a count proportional to the 12
+        // seeded users. Deliberately a bound, not an exact number — merging
+        // the aggregates into one query or switching to a subquery form is a
+        // behavior-preserving refactor that must not fail this test.
         $userCounts = array_filter(
             $queries,
-            fn (array $q) => str_starts_with($q['query'], 'select count(*) as aggregate from "users"'),
+            fn (array $q) => str_contains($q['query'], 'count(') && str_contains($q['query'], '"users"'),
         );
-        $this->assertCount(4, $userCounts, $this->dumpQueries($queries));
+        $this->assertGreaterThan(0, count($userCounts), $this->dumpQueries($queries));
+        $this->assertLessThanOrEqual(6, count($userCounts), $this->dumpQueries($queries));
 
+        // The real N+1 guard: no per-user row reads (e.g. a lazy-loading
+        // relationship touching `users` once per roster member).
         $perUserReads = array_filter(
             $queries,
             fn (array $q) => str_starts_with($q['query'], 'select * from "users"'),

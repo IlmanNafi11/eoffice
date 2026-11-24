@@ -145,13 +145,33 @@ describe("DashboardPage — data staf", () => {
 
     const badge = screen.getByTestId("wfh-status-badge");
     expect(badge.textContent).toBe("Menunggu persetujuan");
-    // pending = warning (peta warna modul; amber dipakai varian warning).
-    expect(badge.className).toMatch(/amber/);
+    // The label is the contract; the color variant lives in the shared
+    // STATUS_VARIANT map and is asserted there once, not per consumer.
 
     // Staf tanpa permission monitoring: tidak ada kartu rekap cakupan.
     expect(screen.queryByTestId("today-scope")).toBeNull();
   });
 
+
+  it("menampilkan 'Semua sesi selesai' saat next_session null (backend GAP-5)", async () => {
+    mockedGet.mockResolvedValue({
+      ...staffToday,
+      today: {
+        is_workday: true,
+        me: {
+          attendance: { sessions_done: 3, sessions_total: 3, next_session: null },
+          report: { status: "pending", report_id: 123 },
+        },
+      },
+    });
+
+    renderPage();
+
+    const absensi = await screen.findByTestId("today-attendance");
+    expect(absensi.textContent).toContain("3/3 sesi");
+    expect(absensi.textContent).toContain("Semua sesi selesai");
+    expect(absensi.textContent).not.toContain("Sesi berikutnya");
+  });
   it("tidak merender kartu rekap saat scope tidak dikirim backend", async () => {
     mockedGet.mockResolvedValue(staffToday);
 
@@ -398,7 +418,7 @@ describe("Route `/` — cutover ke DashboardPage", () => {
     );
 
     expect(await screen.findByTestId("today-attendance")).toBeTruthy();
-    // Teks placeholder lama tidak boleh ada lagi.
-    expect(screen.queryByText(/modul menyusul di fase berikutnya/i)).toBeNull();
+    // The positive assertion above already proves the cutover: only
+    // DashboardPage renders this test id.
   });
 });

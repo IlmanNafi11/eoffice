@@ -187,6 +187,76 @@ class DashboardQueueTest extends TestCase
         $this->assertSame(3, $data['queue']['change_initiations_pending']['count']);
     }
 
+    public function test_admin_sees_all_submitted_implementations_across_teams(): void
+    {
+        // Only the admin branch skips the team filter (QueueSection:51); if a
+        // regression applied the default scope the admin would silently lose
+        // other teams' submissions from their review queue.
+        $teamA = Team::factory()->create();
+        $teamB = Team::factory()->create();
+
+        foreach ([$teamA, $teamB] as $team) {
+            $package = ChangeInitiation::factory()->create([
+                'initiator_id' => User::factory()->create(['team_id' => $team->id])->id,
+                'status' => 'pending',
+            ]);
+            $this->makeImplementation($package, 'submitted');
+        }
+
+        // A still-draft implementation (own package — one row per package)
+        // must not count.
+        $this->makeImplementation(
+            ChangeInitiation::factory()->create([
+                'initiator_id' => User::factory()->create(['team_id' => $teamA->id])->id,
+                'status' => 'pending',
+            ]),
+            'draft',
+        );
+
+        Sanctum::actingAs($this->makeUser('admin', null));
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertSame(2, $data['queue']['implementations_review']['count']);
+    }
+
+    public function test_change_queue_follows_membership_team_id_not_led_teams(): void
+    {
+        // Ship review #20, GAP-4: the WFH sections scope by the team the actor
+        // LEADS (`DashboardScope::for`, ledTeams) while these change counts
+        // deliberately mirror the membership `team_id` used by
+        // applyVisibilityScope — the change domain's authoritative rule. A
+        // leader who leads team A but is a MEMBER of team B sees B's queue
+        // figures. Pinning current behavior so a future "unification" of the
+        // two scopes must consciously update this test (design note in
+        // QueueSection's docblock).
+        $field = Field::factory()->create();
+        $ledTeam = Team::factory()->create(['field_id' => $field->id]);
+        $memberTeam = Team::factory()->create(['field_id' => $field->id]);
+
+        $leader = $this->makeUser('kepala_tim', $memberTeam);
+        $ledTeam->update(['leader_id' => $leader->id]);
+
+        // Packages initiated by the LED team's members: NOT in this queue.
+        ChangeInitiation::factory()->count(2)->create([
+            'field_id' => $field->id,
+            'initiator_id' => User::factory()->create(['team_id' => $ledTeam->id])->id,
+            'status' => 'pending',
+        ]);
+        // Packages initiated by the MEMBER team: in this queue.
+        ChangeInitiation::factory()->create([
+            'field_id' => $field->id,
+            'initiator_id' => User::factory()->create(['team_id' => $memberTeam->id])->id,
+            'status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($leader);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertSame(1, $data['queue']['change_initiations_pending']['count']);
+    }
+
     private function makeUser(string $role, ?Team $team): User
     {
         $user = User::factory()->create(['team_id' => $team?->id]);

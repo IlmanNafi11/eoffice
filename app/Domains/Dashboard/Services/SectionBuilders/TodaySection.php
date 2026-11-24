@@ -22,7 +22,7 @@ class TodaySection implements SectionBuilder
         return 'today';
     }
 
-    public function build(User $user, ?DashboardScope $scope = null): ?array
+    public function build(User $user, ?DashboardScope $scope): ?array
     {
         if (! $this->isWorkday()) {
             // A non-workday must not read as "everyone is absent": send the
@@ -41,10 +41,7 @@ class TodaySection implements SectionBuilder
 
     private function isWorkday(): bool
     {
-        $allowedDays = Setting::get('wfh_allowed_days', WorkdayWindow::DEFAULT_ALLOWED_DAYS);
-
-        // Empty setting = fail-closed: every day is a non-workday.
-        return in_array(now()->dayOfWeekIso, (array) $allowedDays, true);
+        return WorkdayWindow::todayIsWorkday();
     }
 
     /**

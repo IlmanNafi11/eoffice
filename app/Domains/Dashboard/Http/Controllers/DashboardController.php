@@ -15,8 +15,10 @@ class DashboardController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        // Supervision aggregates (names, compliance counts) must not linger in
+        // a shared browser's HTTP cache after logout (ship#20 SEC-LOW).
         return ApiResponse::ok(DashboardResource::make(
             $this->service->for($request->user()),
-        )->resolve());
+        )->resolve())->header('Cache-Control', 'no-store, private');
     }
 }

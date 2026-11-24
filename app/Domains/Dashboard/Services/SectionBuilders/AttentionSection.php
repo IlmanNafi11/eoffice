@@ -50,7 +50,7 @@ class AttentionSection implements SectionBuilder
         $users = $users->with('team:id,name')->get(['id', 'name', 'team_id']);
 
         if ($total === 0 || $users->isEmpty()) {
-            return ['users' => [], 'threshold_note' => $this->note()];
+            return ['users' => [], 'threshold_note' => $this->note($total)];
         }
 
         $compliant = $this->compliantByUser(
@@ -80,15 +80,20 @@ class AttentionSection implements SectionBuilder
             ->values()
             ->all();
 
-        return ['users' => $below, 'threshold_note' => $this->note()];
+        return ['users' => $below, 'threshold_note' => $this->note($total)];
     }
 
-    private function note(): string
+    /**
+     * Caption for the list. `$days` is the real window length (0 when the
+     * setting yields no workdays), never the constant — a fail-closed window
+     * must not claim "14 hari kerja terakhir".
+     */
+    private function note(int $days): string
     {
         return sprintf(
             'kepatuhan < %d%% dalam %d hari kerja terakhir',
             self::THRESHOLD_PERCENT,
-            WorkdayWindow::DAYS,
+            $days,
         );
     }
 

@@ -22,7 +22,6 @@ import {
   fetchDashboard,
   initialDashboardState,
   selectDashboard,
-  selectDashboardData,
 } from "@/store/dashboardSlice";
 import { makeStore } from "@/store";
 
@@ -78,7 +77,7 @@ describe("dashboardSlice — fetchDashboard", () => {
     const state = selectDashboard(store.getState());
     expect(state.status).toBe("succeeded");
     expect(state.error).toBeNull();
-    expect(selectDashboardData(store.getState())).toEqual(dashboardData);
+    expect(selectDashboard(store.getState()).data).toEqual(dashboardData);
     expect(state.generatedAt).toBe("2026-11-24T09:14:00+07:00");
     expect(mockedGet).toHaveBeenCalledWith();
   });
@@ -100,7 +99,7 @@ describe("dashboardSlice — fetchDashboard", () => {
     mockedGet.mockResolvedValueOnce(dashboardData);
     const store = makeStore();
     await store.dispatch(fetchDashboard());
-    expect(selectDashboardData(store.getState())).toEqual(dashboardData);
+    expect(selectDashboard(store.getState()).data).toEqual(dashboardData);
 
     mockedGet.mockRejectedValueOnce(
       new ApiError("network", "Network Error", { status: null }),
@@ -110,7 +109,7 @@ describe("dashboardSlice — fetchDashboard", () => {
     const state = selectDashboard(store.getState());
     expect(state.status).toBe("failed");
     expect(state.error).not.toBeNull();
-    expect(selectDashboardData(store.getState())).toEqual(dashboardData);
+    expect(selectDashboard(store.getState()).data).toEqual(dashboardData);
     expect(state.generatedAt).toBe("2026-11-24T09:14:00+07:00");
   });
 
@@ -129,18 +128,24 @@ describe("dashboardSlice — fetchDashboard", () => {
 
     const state = selectDashboard(store.getState());
     expect(state.generatedAt).toBe("2026-11-24T09:20:00+07:00");
-    expect(selectDashboardData(store.getState())).toEqual(newer);
+    expect(selectDashboard(store.getState()).data).toEqual(newer);
   });
 
   it("respons dengan generated_at sama tidak menimpa data (idempoten)", async () => {
-    mockedGet.mockResolvedValue(dashboardData);
+    // Same timestamp but a MUTATED body: if the guard compared nothing, the
+    // second payload would overwrite the first. The stale-guard must reject
+    // `incoming <= state.generatedAt`, so the mutated body is ignored.
+    const mutated = { ...dashboardData, today: {} as DashboardData["today"] };
+    mockedGet.mockResolvedValueOnce(dashboardData);
+    mockedGet.mockResolvedValueOnce(mutated);
     const store = makeStore();
-    await store.dispatch(fetchDashboard());
 
+    await store.dispatch(fetchDashboard());
     await store.dispatch(fetchDashboard());
 
     const state = selectDashboard(store.getState());
     expect(state.status).toBe("succeeded");
-    expect(selectDashboardData(store.getState())).toEqual(dashboardData);
+    expect(state.generatedAt).toBe(dashboardData.generated_at);
+    expect(selectDashboard(store.getState()).data).toEqual(dashboardData);
   });
 });

@@ -12,6 +12,10 @@
  *   dari yang sudah tersimpan (dua fetch tumpang tindih — mount + focus —
  *   lalu resolve tak berurutan), data baru jangan menimpa yang lebih segar
  *   (ship review #20: race out-of-order).
+ * - Design decision 4 also sketched a visible "Diperbarui HH:mm" cap; it was
+ *   NOT implemented (SPEC.md success criteria omits it). `generatedAt` lives
+ *   in state solely as the stale-response race guard — a UI clock, if ever
+ *   wanted, can read the same field.
  */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { toUiError } from "@/lib/ui-errors";
@@ -71,6 +75,10 @@ const slice = createSlice({
       })
       .addCase(fetchDashboard.fulfilled, (state, action) => {
         const incoming = action.payload.generated_at;
+        // ISO-8601 comparison is lexicographically safe here because the
+        // single producer is `now()->toISOString()` (uniform format/offset).
+        // If a second producer with a different offset is ever introduced,
+        // switch to `Date.parse` on both sides.
         if (state.generatedAt !== null && incoming <= state.generatedAt) {
           // Respons lebih lama dari data yang sudah tampil — abaikan.
           state.status = "succeeded";
@@ -97,5 +105,3 @@ export const dashboardReducer = slice.reducer;
 // ── Selectors ───────────────────────────────────────────────────────
 
 export const selectDashboard = (state: WithDashboard): DashboardState => state.dashboard;
-export const selectDashboardData = (state: WithDashboard): DashboardData | null =>
-  state.dashboard.data;
