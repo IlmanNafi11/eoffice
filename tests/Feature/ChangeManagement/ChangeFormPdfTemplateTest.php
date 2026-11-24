@@ -181,7 +181,11 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertStringContainsString('I WAYAN RUDY ARTHA', $html);
         $this->assertStringContainsString('REVIEWER', $html);
         $this->assertStringContainsString('PENANGGUNG', $html);
-        $this->assertSame(3, substr_count($html, 'Tanda Tangan'));
+        $this->assertMatchesRegularExpression(
+            '/<td class="signature">\s*<div class="signature-label">Tanda Tangan<\/div>\s*<img/',
+            $html,
+        );
+        $this->assertSame(3, substr_count($html, 'class="signature-label"'));
     }
 
     public function test_implementation_template_embeds_signature_image_in_each_identity_row(): void

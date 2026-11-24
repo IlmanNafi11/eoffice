@@ -534,18 +534,16 @@ export function ChangePackageFormPage() {
                   : (user?.team?.field?.name ?? "-")}
               </p>
             </Field>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field orientation="vertical">
-                <FieldLabel htmlFor="change-package-needed-by">
-                  Tanggal dibutuhkan
-                </FieldLabel>
-                <DateInput
-                  id="change-package-needed-by"
-                  value={form.neededByDate}
-                  onChange={(v) => set("neededByDate", v)}
-                />
-              </Field>
-            </div>
+            <Field orientation="vertical">
+              <FieldLabel htmlFor="change-package-needed-by">
+                Tanggal dibutuhkan
+              </FieldLabel>
+              <DateInput
+                id="change-package-needed-by"
+                value={form.neededByDate}
+                onChange={(v) => set("neededByDate", v)}
+              />
+            </Field>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-description">Deskripsi</FieldLabel>
               <Textarea
@@ -678,7 +676,7 @@ export function ChangePackageFormPage() {
             </div>
             <Field orientation="vertical">
               <FieldLabel htmlFor="change-package-implementation-result">
-                Hasil implementasi
+                Tanggapan Perubahan
               </FieldLabel>
               <Textarea
                 id="change-package-implementation-result"

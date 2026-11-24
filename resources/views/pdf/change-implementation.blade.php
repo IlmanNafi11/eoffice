@@ -32,6 +32,7 @@
         .info-table td { border: 1px solid #000; padding: 2px 5px; vertical-align: top; }
         .info-table td.label { font-weight: bold; background-color: #f0f0f0; width: 150px; }
         .info-table td.signature { width: 110px; text-align: center; vertical-align: middle; }
+        .info-table td.signature .signature-label { text-align: center; margin-bottom: 6px; }
         .info-table td.signature img { height: 42px; width: auto; max-width: 100%; }
 
         .check { white-space: nowrap; }
@@ -159,6 +160,7 @@
                     </table>
                 </td>
                 <td class="signature">
+                    <div class="signature-label">Tanda Tangan</div>
                     <img src="{{ $evaluatorSig }}" alt="Tanda Tangan">
                 </td>
             </tr>
@@ -199,6 +201,7 @@
                     </table>
                 </td>
                 <td class="signature">
+                    <div class="signature-label">Tanda Tangan</div>
                     <img src="{{ $reviewerSig }}" alt="Tanda Tangan">
                 </td>
             </tr>
@@ -240,6 +243,7 @@
                     </table>
                 </td>
                 <td class="signature">
+                    <div class="signature-label">Tanda Tangan</div>
                     <img src="{{ $responsibleSig }}" alt="Tanda Tangan">
                 </td>
             </tr>

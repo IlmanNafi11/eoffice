@@ -156,7 +156,7 @@ async function fillForSubmit(opts?: { withCost?: boolean }) {
   await userEvent.type(screen.getByLabelText("Rencana pengujian"), "Uji migrasi di staging");
   await pickDate(screen.getByLabelText("Tanggal eksekusi"), "2025-12-01");
   await pickDate(screen.getByLabelText("Tanggal rilis"), "2025-12-15");
-  await userEvent.type(screen.getByLabelText("Hasil implementasi"), "Migrasi selesai");
+  await userEvent.type(screen.getByLabelText("Tanggapan Perubahan"), "Migrasi selesai");
   await userEvent.type(screen.getByLabelText("Dampak produksi"), "Downtime 1 jam");
   await userEvent.type(screen.getByLabelText("Upaya/Tindakan"), "3 orang-hari");
   await userEvent.type(screen.getByLabelText("Sumber daya"), "2 teknisi");
@@ -344,6 +344,36 @@ describe("ChangePackageFormPage — create mode (/changes/new)", () => {
       });
     });
     expect(await screen.findByText("changes-detail-stub")).toBeTruthy();
+  });
+
+  it("field Tanggal dibutuhkan full-width, bukan anak grid 2 kolom", async () => {
+    renderForm("/changes/new");
+
+    const dateField = screen.getByLabelText("Tanggal dibutuhkan");
+
+    expect(dateField.closest('[class*="grid-cols-2"]')).toBeNull();
+  });
+
+  it('label "Tanggapan Perubahan" tetap mengirim field implementation_result', async () => {
+    renderForm("/changes/new");
+    await fillInitiation();
+    await pickDate(screen.getByLabelText("Tanggal rilis"), "2025-12-15");
+    await userEvent.type(
+      screen.getByLabelText("Tanggapan Perubahan"),
+      "Migrasi selesai",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /simpan draft/i }));
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          implementation: expect.objectContaining({
+            implementation_result: "Migrasi selesai",
+          }),
+        }),
+      );
+    });
   });
 
 
