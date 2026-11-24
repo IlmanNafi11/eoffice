@@ -133,4 +133,54 @@ class WfhReportPdfTemplateTest extends TestCase
 
         $this->assertSignatureImageSitsInsideTheBox($html);
     }
+
+    private function adminData(): array
+    {
+        return array_merge($this->data(), [
+            'namaTim' => 'Tim Test',
+            'staff' => [['name' => 'USER A', 'nip' => '1', 'links' => []]],
+            'sessions' => ['pagi' => [], 'siang' => [], 'sore' => []],
+        ]);
+    }
+
+    public function test_team_letterhead_uses_table_with_vertically_aligned_logo_and_text(): void
+    {
+        $html = view('pdf.wfh-report-admin', $this->adminData())->render();
+
+        $this->assertStringContainsString('<table class="kop-surat">', $html);
+        $this->assertMatchesRegularExpression('/\.kop-surat td\s*\{\s*vertical-align:\s*middle;/', $html);
+        // Kop surat tim harus table-based, bukan flex (unreliable di DOMPDF) —
+        // cakupan pada blok CSS .kop-surat saja.
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.kop-surat\s*\{[^}]*flex/',
+            $html,
+        );
+    }
+
+    public function test_team_signature_date_sits_directly_above_supervisor_column(): void
+    {
+        $html = view('pdf.wfh-report-admin', $this->adminData())->render();
+
+        // Tanggal berada di baris tabel khusus di atas kolom kanan (sel
+        // `atasan`) — bukan di dalam sel label "Atasan Langsung".
+        $this->assertMatchesRegularExpression(
+            '/<tr>\s*<td><\/td>\s*<td class="atasan">\s*<div class="tanggal">Surabaya, .*?<\/div>\s*<\/td>\s*<\/tr>/s',
+            $html,
+        );
+        // Kedua label tanda tangan berada di <tr> yang SAMA.
+        $this->assertMatchesRegularExpression(
+            '/<tr>\s*<td>\s*<div class="signature-role">Yang Membuat Laporan<\/div>.*?<\/td>\s*<td>\s*<div class="signature-role">Atasan Langsung<\/div>/s',
+            $html,
+        );
+        // Tanggal berada SEBELUM baris label; blok footer tanggal lama tidak
+        // boleh ikut merender (tanggal hanya di dalam tabel tanda tangan).
+        $this->assertStringNotContainsString('<div class="footer-bar">', $html);
+        $datePos = strrpos($html, 'Surabaya,');
+        $makerPos = strrpos($html, 'Yang Membuat Laporan');
+        $supervisorPos = strrpos($html, 'Atasan Langsung');
+        $this->assertNotFalse($datePos);
+        $this->assertNotFalse($makerPos);
+        $this->assertNotFalse($supervisorPos);
+        $this->assertTrue($datePos < $makerPos && $makerPos < $supervisorPos);
+    }
 }

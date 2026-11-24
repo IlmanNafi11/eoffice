@@ -16,23 +16,27 @@
 
         /* === KOP SURAT === */
         .kop-surat {
-            display: flex;
-            align-items: flex-start;
+            width: 100%;
+            border-collapse: collapse;
+            border-bottom: 3px solid #000;
             margin-bottom: 5px;
             padding-bottom: 8px;
-            border-bottom: 3px solid #000;
+        }
+        .kop-surat td {
+            vertical-align: middle;
         }
         .kop-logo {
             width: 74px;
-            flex-shrink: 0;
-            margin-right: 14px;
         }
         .kop-logo img {
             width: 74px;
             height: auto;
             display: block;
         }
-        .kop-text { text-align: center; flex-grow: 1; }
+        .kop-text {
+            text-align: center;
+            padding-left: 14px;
+        }
         .kop-text h3 { margin: 0; font-size: 16px; text-transform: uppercase; font-weight: bold; }
         .kop-text h2 { margin: 2px 0; font-size: 20px; text-transform: uppercase; font-weight: bold; }
         .kop-text p { margin: 3px 0 0; font-size: 9px; }
@@ -82,8 +86,7 @@
         .signature-box img { max-height: 65px; max-width: 100%; width: auto; }
         .signature-name { font-weight: bold; border-top: 1px solid #000; padding-top: 3px; margin-top: 2px; }
         .signature-nip { font-size: 10px; margin-top: 1px; }
-        .footer-bar { position: relative; margin-top: 10px; }
-        .tanggal { text-align: right; margin-bottom: 8px; }
+        .tanggal { text-align: center; margin-bottom: 6px; }
 
         /* === DOKUMENTASI === */
         .dok-title {
@@ -119,15 +122,17 @@
 <body>
 
     {{-- KOP SURAT --}}
-    <div class="kop-surat">
-        <img class="kop-logo" src="{{ $logoDoc }}" alt="Logo Jawa Timur">
-        <div class="kop-text">
-            <h3>PEMERINTAH PROVINSI JAWA TIMUR</h3>
-            <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
-            <p>Jalan Ahmad Yani Nomor 242-244, Gayungan, Surabaya, Jawa Timur 60235<br>
-            Tlp. (031) 8294608, Fak. (031) 8294517, Laman kominfo.jatimprov.go.id, Pos-el kominfo@jatimprov.go.id</p>
-        </div>
-    </div>
+    <table class="kop-surat">
+        <tr>
+            <td class="kop-logo"><img src="{{ $logoDoc }}" alt="Logo Jawa Timur"></td>
+            <td class="kop-text">
+                <h3>PEMERINTAH PROVINSI JAWA TIMUR</h3>
+                <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
+                <p>Jalan Ahmad Yani Nomor 242-244, Gayungan, Surabaya, Jawa Timur 60235<br>
+                Tlp. (031) 8294608, Fak. (031) 8294517, Laman kominfo.jatimprov.go.id, Pos-el kominfo@jatimprov.go.id</p>
+            </td>
+        </tr>
+    </table>
 
     {{-- JUDUL --}}
     <div class="judul">
@@ -171,14 +176,19 @@
         </tbody>
     </table>
 
-    {{-- FOOTER: TANGGAL --}}
-    <div class="footer-bar">
-        <div class="tanggal">Surabaya, {{ $tanggalPelaksanaan }}</div>
-    </div>
+    {{-- FOOTER: TANGGAL — tanggal berada di baris tabel terendiri di atas
+         kolom "Atasan Langsung" (lihat blok tanda tangan di bawah). --}}
 
-    {{-- BLOK TANDA TANGAN --}}
+    {{-- BLOK TANDA TANGAN — baris 1: tanggal di kolom kanan saja; baris 2:
+         kedua label di baris yang sama sehingga sejajar horizontal. --}}
     <div class="signature-area">
         <table class="signature-table">
+            <tr>
+                <td></td>
+                <td class="atasan">
+                    <div class="tanggal">Surabaya, {{ $tanggalPelaksanaan }}</div>
+                </td>
+            </tr>
             <tr>
                 <td>
                     <div class="signature-role">Yang Membuat Laporan</div>
