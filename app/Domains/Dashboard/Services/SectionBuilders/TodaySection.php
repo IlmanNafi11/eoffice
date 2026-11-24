@@ -48,17 +48,20 @@ class TodaySection implements SectionBuilder
     }
 
     /**
-     * Monitoring recap for viewers with a scope (staf has none — key absent,
-     * design D1). Every count is over ACTIVE users only: the dashboard
-     * denominator deliberately excludes inactive users, unlike the existing
-     * monitoring list.
+     * Monitoring recap for viewers holding `wfh.monitoring.view` AND a real
+     * scope (staf has none — key absent, design D1). The permission check is
+     * explicit, not incidental to role seeding: attention and the monitoring
+     * board gate on the same permission, and the contract
+     * (`openapi.yaml`, DashboardScopeRecap) promises scope appears only for
+     * `wfh.monitoring.view` holders. Every count is over ACTIVE users only:
+     * the dashboard denominator deliberately excludes inactive users, unlike
+     * the existing monitoring list.
      *
      * @return array<string, mixed>
      */
     private function scope(User $user, ?DashboardScope $scope): array
     {
-
-        if ($scope === null || $scope->isSelf()) {
+        if (! $user->can('wfh.monitoring.view') || $scope === null || $scope->isSelf()) {
             return [];
         }
 

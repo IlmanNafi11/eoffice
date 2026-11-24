@@ -5,6 +5,10 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 ### Fixed (backend+frontend, 2026-11-24 — ship review #20 dashboard)
+- `today.scope` kini diberi gate eksplisit pada `wfh.monitoring.view` (plus
+  scope riil), bukan sekadar efek samping role seeding — sesuai kontrak
+  openapi; role yang kehilangan permission tersebut tidak lagi menerima rekap
+  monitoring di beranda (dengan regresi uji + verifikasi mutasi).
 - `trend` dan `attention` kini gagal-tertutup: pemegang `wfh.monitoring.view`
   tanpa tim/bidang yang dipimpin tidak lagi menerima tren kepatuhan dan daftar
   perhatian seluruh organisasi — seksi dihilangkan, konsisten dengan kontrak

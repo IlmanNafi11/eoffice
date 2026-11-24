@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -161,6 +162,23 @@ class DashboardTodayScopeTest extends TestCase
 
         $this->assertArrayHasKey('scope', $data['today']);
         $this->assertNull($data['today']['scope']['team_reports_pending']);
+    }
+
+    public function test_scope_is_absent_without_the_monitoring_view_permission(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+
+        $leader = $this->makeUser('kepala_tim', $team);
+        $team->update(['leader_id' => $leader->id]);
+        Role::findByName('kepala_tim')->revokePermissionTo('wfh.monitoring.view');
+
+        Sanctum::actingAs($leader);
+
+        $data = $this->getJson('/api/dashboard')->assertOk()->json('data');
+
+        $this->assertTrue($data['today']['is_workday']);
+        $this->assertArrayNotHasKey('scope', $data['today']);
     }
 
     public function test_team_leader_without_a_led_team_gets_no_scope_deny_by_default(): void
