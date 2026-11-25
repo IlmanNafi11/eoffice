@@ -159,7 +159,9 @@ class DashboardDemoSeederTest extends TestCase
             ->assertJsonPath('data.today.scope.label', 'Bidang')
             ->assertJsonPath('data.queue.team_reports_pending.count', 2)
             ->assertJsonPath('data.attention.users.0.name', 'Nia Noncompliant')
-            ->assertJsonPath('data.trend.summary.total', 14 * 4);
+            // All five seeded accounts (staf, KT, KB, admin, straggler) share
+            // the demo field, so the field roster is the whole demo roster.
+            ->assertJsonPath('data.trend.summary.total', 14 * 5);
 
         $this->actingAsRole('admin@kominfo.go.id')
             ->assertJsonPath('data.today.scope.label', 'Organisasi')

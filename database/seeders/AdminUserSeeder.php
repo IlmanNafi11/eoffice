@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\DemoOrganization;
 use App\Support\Constants\Roles;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -14,12 +15,16 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $field = Field::firstOrCreate(
-            ['name' => 'Bidang Aplikasi Informatika'],
+            ['name' => DemoOrganization::FIELD],
         );
         $team = Team::firstOrCreate(
-            ['name' => 'Tim Aplikasi'],
+            ['name' => DemoOrganization::TEAM],
             ['field_id' => $field->id],
         );
+
+        if ($team->field_id !== $field->id) {
+            $team->update(['field_id' => $field->id]);
+        }
 
         // Fail closed: never seed a known password. A committed default turns
         // every fresh install into an admin takeover (documented credential,
@@ -42,6 +47,14 @@ class AdminUserSeeder extends Seeder
                 'must_change_password' => true,
             ],
         );
+
+        // The admin must live in the same org unit as the demo users: a row
+        // seeded before the org units were unified would otherwise sit in a
+        // team nobody can see (team-scoped lists and WFH monitoring skip it).
+        if ($admin->team_id !== $team->id) {
+            $admin->update(['team_id' => $team->id]);
+        }
+
         $admin->assignRole(Roles::ADMIN);
 
         if ($generated && $admin->wasRecentlyCreated) {

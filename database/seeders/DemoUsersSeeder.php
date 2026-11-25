@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\DemoOrganization;
 use App\Support\Constants\Roles;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -40,13 +41,17 @@ class DemoUsersSeeder extends Seeder
         }
 
         $field = Field::firstOrCreate(
-            ['name' => 'Bidang Pengembangan Aplikasi'],
+            ['name' => DemoOrganization::FIELD],
         );
 
         $team = Team::firstOrCreate(
-            ['name' => 'Tim Pengembangan'],
+            ['name' => DemoOrganization::TEAM],
             ['field_id' => $field->id],
         );
+
+        if ($team->field_id !== $field->id) {
+            $team->update(['field_id' => $field->id]);
+        }
 
         $password = (string) config('app.demo_password', '');
         $generated = $password === '';

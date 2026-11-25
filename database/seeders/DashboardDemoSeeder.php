@@ -10,6 +10,7 @@ use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Constants\DemoOrganization;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -101,7 +102,7 @@ class DashboardDemoSeeder extends Seeder
      */
     private function seedLowComplianceUser(array $dates): void
     {
-        $team = Team::where('name', 'Tim Pengembangan')->first();
+        $team = Team::where('name', DemoOrganization::TEAM)->first();
 
         if ($team === null) {
             return;
@@ -136,7 +137,7 @@ class DashboardDemoSeeder extends Seeder
 
     private function seedTeamReports(array $dates): void
     {
-        $team = Team::where('name', 'Tim Pengembangan')->first();
+        $team = Team::where('name', DemoOrganization::TEAM)->first();
         $maker = User::where('email', 'kepala.tim@kominfo.go.id')->first();
 
         if ($team === null || $maker === null) {
