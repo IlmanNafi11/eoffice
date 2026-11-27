@@ -10,6 +10,7 @@ use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class TeamReportShowTest extends TestCase
@@ -114,6 +115,109 @@ class TeamReportShowTest extends TestCase
         $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
 
         $this->assertSame($pending->id, $data[0]['report_id']);
+    }
+
+    // === HTTP endpoint ===
+
+    public function test_show_returns_envelope_with_resource_fields_and_members(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+        $creator = User::factory()->create(['team_id' => $team->id]);
+        $creator->assignRole('kepala_tim');
+        $report = WfhTeamReport::factory()->status('pending')->create([
+            'team_id' => $team->id,
+            'report_date' => now()->toDateString(),
+            'created_by' => $creator->id,
+        ]);
+        $personal = $this->personalReport($member, 'pending');
+
+        $viewer = User::factory()->create(['team_id' => $team->id]);
+        $viewer->assignRole('kepala_tim');
+        Sanctum::actingAs($viewer);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.id', $report->id)
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.team.id', $team->id)
+            ->assertJsonPath('data.members.0.user_id', $member->id)
+            ->assertJsonPath('data.members.0.report_id', $personal->id);
+    }
+
+    public function test_show_returns_422_for_user_without_field(): void
+    {
+        [$team] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+
+        $user = User::factory()->create(['team_id' => null]);
+        $user->assignRole('kepala_tim');
+        Sanctum::actingAs($user);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'User tidak terhubung dengan bidang manapun.');
+    }
+
+    public function test_show_returns_403_for_cross_field_viewer(): void
+    {
+        [$team] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+
+        $fieldB = Field::create(['name' => 'Bidang B']);
+        $teamB = Team::create(['field_id' => $fieldB->id, 'name' => 'Tim B']);
+        $kt = User::factory()->create(['team_id' => $teamB->id]);
+        $kt->assignRole('kepala_tim');
+        Sanctum::actingAs($kt);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Laporan tidak berada dalam bidang Anda.');
+    }
+
+    public function test_show_returns_403_for_kepala_tim_outside_own_team(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+        $this->personalReport($member, 'pending');
+
+        $otherTeam = Team::create(['field_id' => $team->field_id, 'name' => 'Tim Lain']);
+        $kt = User::factory()->create(['team_id' => $otherTeam->id]);
+        $kt->assignRole('kepala_tim');
+        Sanctum::actingAs($kt);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Laporan tidak berada dalam bidang Anda.');
+    }
+
+    public function test_show_allows_admin_from_any_field(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+        $personal = $this->personalReport($member, 'pending');
+
+        $admin = User::factory()->create(['team_id' => null]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.id', $report->id)
+            ->assertJsonPath('data.members.0.report_id', $personal->id);
+    }
+
+    public function test_show_requires_view_permission(): void
+    {
+        [$team] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+
+        $staf = User::factory()->create(['team_id' => $team->id]);
+        $staf->assignRole('staf');
+        Sanctum::actingAs($staf);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(403);
     }
 
     // === Resource ===

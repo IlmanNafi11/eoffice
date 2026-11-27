@@ -168,6 +168,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
     Route::get('/admin/wfh/team-reports', [TeamReportController::class, 'index'])
         ->middleware('permission:wfh.team_report.view');
+    Route::get('/admin/wfh/team-reports/{report}', [TeamReportController::class, 'show'])
+        ->middleware('permission:wfh.team_report.view');
     Route::post('/admin/wfh/team-reports', [TeamReportController::class, 'store'])
         ->middleware('permission:wfh.team_report.create');
 

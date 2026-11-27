@@ -3,6 +3,7 @@
 namespace App\Domains\Wfh\Http\Controllers;
 
 use App\Domains\Wfh\Http\Controllers\Concerns\EnsuresSameField;
+use App\Domains\Wfh\Http\Resources\TeamReportDetailResource;
 use App\Domains\Wfh\Http\Resources\TeamReportResource;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Services\TeamReportStateMachine;
@@ -83,6 +84,35 @@ class TeamReportController extends Controller
             ->paginate($perPage);
 
         return ApiResponse::paginated($reports, TeamReportResource::class);
+    }
+
+    public function show(Request $request, WfhTeamReport $report): JsonResponse
+    {
+        $this->authorize('wfh.team_report.view');
+
+        $user = $request->user();
+
+        // Same scope as index(): admin any field; non-admin must have a field,
+        // and only a field head may read a sibling team within that field.
+        if (! $user->hasRole(Roles::ADMIN)) {
+            $user->loadMissing('team.field');
+            $fieldId = $user->team?->field?->id;
+            if (! $fieldId) {
+                return ApiResponse::fail('User tidak terhubung dengan bidang manapun.');
+            }
+
+            $isFieldHead = Field::where('id', $fieldId)->where('head_id', $user->id)->exists();
+            $inScope = $report->team?->field_id === $fieldId
+                && ($isFieldHead || $report->team_id === $user->team_id);
+
+            if (! $inScope) {
+                return ApiResponse::fail('Laporan tidak berada dalam bidang Anda.', 403);
+            }
+        }
+
+        return ApiResponse::ok(
+            new TeamReportDetailResource($report->load(['team', 'creator', 'supervisor'])),
+        );
     }
 
     public function store(Request $request): JsonResponse

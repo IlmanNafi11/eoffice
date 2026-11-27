@@ -119,6 +119,11 @@ class UniqueViolatingWfhRepository implements RepositoryInterface, WfhRepository
         return $this->real->getTeamReportData($teamId, $date);
     }
 
+    public function getTeamReportDetailData(int $teamId, string $date): array
+    {
+        return $this->real->getTeamReportDetailData($teamId, $date);
+    }
+
     public function getUsersWithoutAttendance(string $date, ?int $teamId = null, ?int $fieldId = null): array
     {
         return $this->real->getUsersWithoutAttendance($date, $teamId, $fieldId);

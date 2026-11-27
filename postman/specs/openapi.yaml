@@ -2288,6 +2288,96 @@ components:
           example: "Data anggota tim tidak lengkap untuk tanggal ini."
       example:
         reason: "Data anggota tim tidak lengkap untuk tanggal ini."
+    WfhTeamReportDetail:
+      allOf:
+        - $ref: "#/components/schemas/WfhTeamReport"
+        - type: object
+          required: [members]
+          properties:
+            members:
+              type: array
+              description: |
+                One entry per active member of the report's team on the report
+                date, resolved from live data so a deep-link/refresh is always
+                fresh. The chosen personal report is the newest live one
+                (`pending|approved` beat `draft|rejected`, then `updated_at`).
+              items:
+                $ref: "#/components/schemas/WfhTeamReportMember"
+    WfhTeamReportMember:
+      type: object
+      required: [user_id, name, report_id, report_status, activities, attendances]
+      properties:
+        user_id:
+          type: integer
+          example: 42
+        name:
+          type: string
+          example: "Budi Santoso"
+        nip:
+          type: string
+          nullable: true
+          example: "1987654321"
+        report_id:
+          type: integer
+          nullable: true
+          description: Personal WFH report selected for the team report date; null when the member has none.
+          example: 101
+        report_status:
+          type: string
+          nullable: true
+          enum: [draft, pending, approved, rejected]
+          example: pending
+        activities:
+          type: array
+          items:
+            type: object
+            required: [id, start_time, end_time, activity, links]
+            properties:
+              id:
+                type: integer
+                example: 501
+              start_time:
+                type: string
+                nullable: true
+                example: "08:00"
+              end_time:
+                type: string
+                nullable: true
+                example: "10:00"
+              activity:
+                type: string
+                example: "Kerja lapangan"
+              links:
+                type: array
+                items:
+                  type: string
+                example: ["https://contoh.id/bukti"]
+        attendances:
+          type: array
+          items:
+            type: object
+            required: [id, session, photo_url]
+            properties:
+              id:
+                type: integer
+                example: 701
+              session:
+                type: string
+                example: pagi
+              photo_url:
+                type: string
+                nullable: true
+                description: Route URL of the attendance photo (`attendances.photo`, requires `wfh.monitoring.view`); null when no photo was uploaded.
+                example: "/api/wfh/reports/101/attendances/701/photo"
+    WfhTeamReportDetailResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          $ref: "#/components/schemas/WfhTeamReportDetail"
+        message: { type: string, nullable: true, example: null }
+        meta: { type: object, nullable: true, example: null }
     TeamReportListResponse:
       type: object
       description: |
@@ -5035,6 +5125,29 @@ paths:
             default: 15
             maximum: 100
           example: 15
+        - name: status
+          in: query
+          description: Narrow the list to one report status.
+          schema:
+            type: string
+            enum: [draft, pending, approved, rejected]
+        - name: date_from
+          in: query
+          description: Inclusive lower bound of the report date.
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Inclusive upper bound of the report date.
+          schema:
+            type: string
+            format: date
+        - name: team_id
+          in: query
+          description: Narrow the list to one team (must exist; still scoped by role).
+          schema:
+            type: integer
       responses:
         "200":
           description: Paginated team reports
@@ -5112,6 +5225,73 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 message: Laporan untuk tim dan tanggal ini sudah ada.
+  /api/admin/wfh/team-reports/{id}:
+    get:
+      tags: [WFH Team Reports]
+      summary: Show a team report with per-member detail
+      operationId: getWfhTeamReport
+      security:
+        - bearerAuth: []
+      description: |
+        Returns one team report: the `WfhTeamReport` fields plus `members[]`,
+        one entry per active member of the team on the report date with their
+        selected personal report, activities, and attendances (photo URLs via
+        `attendances.photo`, which requires `wfh.monitoring.view` — every
+        holder of `wfh.team_report.view` also holds it). Scope mirrors the
+        list endpoint: admin sees any report; kepala_bidang (field head) sees
+        reports of teams in their field; kepala_tim and other users only
+        their own team's reports. Requires `wfh.team_report.view`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      responses:
+        "200":
+          description: Team report detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WfhTeamReportDetailResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Unauthenticated.
+        "403":
+          description: Missing permission, or report outside the caller's scope
+            (different field, or own-team-only caller reading a sibling team)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Laporan tidak berada dalam bidang Anda.
+        "422":
+          description: Authenticated user has no field association
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: User tidak terhubung dengan bidang manapun.
+        "404":
+          description: Team report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: No query results for model [App\\Domains\\Wfh\\Models\\WfhTeamReport] 999.
   /api/admin/wfh/team-reports/{id}/approve:
     post:
       tags: [WFH Team Reports]
