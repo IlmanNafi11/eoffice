@@ -42,7 +42,11 @@ class TeamReportController extends Controller
             'status' => ['nullable', Rule::in(WfhReportStatus::ALL)],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
-            'team_id' => ['nullable', 'integer', 'exists:teams,id'],
+            // No `exists` rule: it runs BEFORE role scoping and turned
+            // 422-vs-200 into a cross-field existence oracle for non-admins
+            // (ship review #22). An unknown id now yields an empty page, the
+            // same answer every role gets for a team outside its scope.
+            'team_id' => ['nullable', 'integer'],
         ]);
 
         $user = $request->user();

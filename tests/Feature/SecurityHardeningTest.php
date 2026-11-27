@@ -97,6 +97,20 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private');
     }
 
+    /** Ship review #22: kondisi `no-store` bersifat konten-agnostik; health
+     *  check tanpa data/sesi TIDAK boleh ikut dibekukan — regresi yang
+     *  membuat kondisi itu tanpa syarat harus gagal di sini. */
+    public function test_health_check_is_not_forced_to_no_store(): void
+    {
+        $response = $this->get('/up');
+
+        $response->assertOk();
+        $this->assertStringNotContainsString(
+            'no-store',
+            (string) $response->headers->get('Cache-Control'),
+        );
+    }
+
     /**
      * Guard posisi: satu-satunya environment tanpa CSP adalah `local`, karena
      * hanya di sana `vite dev` menyuntik script HMR inline dari dev-server

@@ -13,7 +13,35 @@ class SecurityHeaders
         $response = $next($request);
         self::apply($response);
 
+        // `no-store` upgrade is auth-gated (see applyNoStore()): a request carrying a
+        // credential answered 2xx is private data, and its errors are too.
+        self::applyNoStore($response, authenticated: $request->user() !== null || $response->getStatusCode() >= 400);
+
         return $response;
+    }
+
+    /**
+     * Private data (names, NIP, activities, photo URLs) must not sit in a
+     * browser/proxy cache. Authenticated calls rely on Laravel's default
+     * `no-cache, private`, which still allows storage; `no-store` forbids it
+     * entirely (parity with the photo endpoint, already `no-store`).
+     *
+     * Auth-gated on purpose (ship review #22): the earlier content-agnostic
+     * rule keyed on `private` alone, and Laravel marks *everything* private —
+     * so the session-less health check `/up` was frozen to `no-store, private`
+     * too. Only responses to a credentialed request, or any error response,
+     * are upgraded; anonymous success responses keep the framework default.
+     */
+    public static function applyNoStore(Response $response, bool $authenticated): void
+    {
+        if (! $authenticated) {
+            return;
+        }
+
+        if ($response->headers->has('Cache-Control')
+            && str_contains((string) $response->headers->get('Cache-Control'), 'private')) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+        }
     }
 
     /**
@@ -26,15 +54,6 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        // Data terautentikasi (nama, NIP, aktivitas, URL foto) tidak boleh
-        // tersimpan di cache browser/proxy. Panggilan terautentikasi
-        // mengandalkan default `no-cache, private`, yang masih boleh
-        // disimpan; `no-store` melarang penyimpanan sama sekali (paritas
-        // dengan endpoint foto yang sudah no-store).
-        if ($response->headers->has('Cache-Control')
-            && str_contains((string) $response->headers->get('Cache-Control'), 'private')) {
-            $response->headers->set('Cache-Control', 'no-store, private');
-        }
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
         // CSP + HSTS dinyalakan untuk SEMUA environment selain local (bukan

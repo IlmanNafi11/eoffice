@@ -193,6 +193,89 @@ class TeamReportShowTest extends TestCase
         $this->assertNull($data[0]['attendances'][0]['photo_url']);
     }
 
+    /** Ship review #22: draf tidak boleh bocor ke PDF tim — draf adalah
+     *  milik penulis di seluruh sistem, bukan hanya di endpoint detail. */
+    public function test_team_pdf_data_ignores_draft_only_member(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $draft = $this->personalReport($member, 'draft');
+        $this->repo()->addActivityToReport($draft, ['activity' => 'Draf rahasia', 'links' => ['https://draf.rahasia/1']]);
+        $this->repo()->addAttendanceToReport($draft, ['session' => 'pagi', 'photo_path' => 'wfh/draf.jpg']);
+
+        $data = $this->repo()->getTeamReportData($team->id, now()->toDateString());
+
+        $this->assertSame([], $data[0]['links']);
+        $this->assertSame([], $data[0]['photos']);
+    }
+
+    /** Draf yang lebih baru tidak menggeser laporan live yang dicetak ke PDF. */
+    public function test_team_pdf_data_prefers_live_report_over_newer_draft(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $pending = $this->personalReport($member, 'pending');
+        $this->repo()->addActivityToReport($pending, ['activity' => 'Kerja live', 'links' => ['https://live.id/1']]);
+        $pending->forceFill(['updated_at' => now()->subHour()])->save();
+
+        $draft = $this->personalReport($member, 'draft');
+        $this->repo()->addActivityToReport($draft, ['activity' => 'Draf rahasia', 'links' => ['https://draf.rahasia/1']]);
+        $draft->forceFill(['updated_at' => now()])->save();
+
+        $data = $this->repo()->getTeamReportData($team->id, now()->toDateString());
+
+        $this->assertSame(['https://live.id/1'], $data[0]['links']);
+    }
+
+    /** Anggota yang HANYA punya laporan rejected tetap tercetak di PDF
+     *  (rejected adalah status live), konsisten dengan halaman detail. */
+    public function test_team_pdf_data_rejected_only_member_still_prints(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $rejected = $this->personalReport($member, 'rejected');
+        $this->repo()->addActivityToReport($rejected, ['activity' => 'Kerja ditolak', 'links' => ['https://ditolak.id/1']]);
+
+        $data = $this->repo()->getTeamReportData($team->id, now()->toDateString());
+
+        $this->assertSame(['https://ditolak.id/1'], $data[0]['links']);
+    }
+
+    /** Foto presensi di PDF diambil dari laporan yang TERPILIH: presensi milik
+     *  laporan rejected tidak boleh muncul di bawah laporan live yang tidak
+     *  punya presensi. Indeks unik (user, date, session) hanya menutup baris
+     *  live, jadi presensi rejected + laporan live tanpa presensi bisa ada
+     *  bersamaan — tepat kasus yang dulu membocorkan foto di PDF. */
+    public function test_team_pdf_data_takes_photos_from_the_selected_report_only(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $rejected = $this->personalReport($member, 'rejected');
+        $this->repo()->addAttendanceToReport($rejected, ['session' => 'pagi', 'photo_path' => 'wfh/rejected.jpg']);
+        $rejected->forceFill(['updated_at' => now()->subHour()])->save();
+
+        $pending = $this->personalReport($member, 'pending');
+        $pending->forceFill(['updated_at' => now()])->save();
+
+        $data = $this->repo()->getTeamReportData($team->id, now()->toDateString());
+
+        $this->assertSame([], $data[0]['photos']);
+    }
+
+    /** Urutan anggota PDF tim deterministik (nama) — dua unduhan PDF untuk
+     *  tim yang sama tidak boleh mengurutkan staf berbeda. */
+    public function test_team_pdf_data_orders_members_by_name(): void
+    {
+        $field = Field::create(['name' => 'Bidang Urut Pdf']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Urut Pdf']);
+        User::factory()->create(['team_id' => $team->id, 'name' => 'Zulkifli', 'is_active' => true]);
+        User::factory()->create(['team_id' => $team->id, 'name' => 'Ahmad', 'is_active' => true]);
+
+        $data = $this->repo()->getTeamReportData($team->id, now()->toDateString());
+
+        $this->assertSame(['AHMAD', 'ZULKIFLI'], array_column($data, 'name'));
+    }
+
     public function test_detail_data_returns_empty_array_for_team_without_active_members(): void
     {
         $field = Field::create(['name' => 'Bidang Kosong']);
@@ -385,6 +468,23 @@ class TeamReportShowTest extends TestCase
         $this->assertSame('pending', $payload['status']);
         $this->assertCount(1, $payload['members']);
         $this->assertSame($member->id, $payload['members'][0]['user_id']);
+    }
+
+    /** Ship review #22: HTTP-level empty team — resource + envelope harus
+     *  meneruskan members: [] (repo-level sudah diuji, jalur HTTP belum). */
+    public function test_show_returns_empty_members_for_team_without_active_members(): void
+    {
+        $field = Field::create(['name' => 'Bidang Kosong Http']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Kosong Http']);
+        $report = $this->teamReport($team);
+
+        $admin = User::factory()->create(['team_id' => null]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.members', []);
     }
 
     // === Helpers ===

@@ -89,26 +89,11 @@ class ReportPdfController extends Controller
             return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
         }
 
-        // Same visibility rule as export(): the actor's OWN team is always
-        // exportable (daily-board use case), but a NEIGHBOURING team's PDF now
-        // carries the report creator's identity (name, NIP, signature) and,
-        // when approved, the field head's signature — data a plain staf must
-        // not harvest. Anyone else needs the monitoring permission, exactly
-        // like reading the same data on the monitoring board.
-        if ($admin->team?->id !== $team->id) {
-            $this->authorize('wfh.monitoring.view');
-        }
-
         // Untrusted input: a garbage date used to reach Carbon::parse and 500.
         $validated = $request->validate([
             'date' => ['nullable', 'date'],
             'team_report_id' => ['nullable', 'integer'],
         ]);
-
-        $date = $validated['date'] ?? now()->format('Y-m-d');
-
-        $team->load(['field.head']);
-        $head = $team->field?->head;
 
         // The maker column is signed by whoever created the team report
         // (created_by), never by the admin downloading the PDF. Scoped to this
@@ -119,8 +104,34 @@ class ReportPdfController extends Controller
             $teamReport = WfhTeamReport::where('team_id', $team->id)->find($teamReportId);
         } else {
             $teamReport = WfhTeamReport::where('team_id', $team->id)
-                ->where('report_date', $date)->first();
+                ->where('report_date', $validated['date'] ?? now()->format('Y-m-d'))->first();
         }
+
+        // One source of truth for the rendered day (ship review #22): when a
+        // team_report_id is supplied without `date`, printing today's roster
+        // under that report's signature/approval would mix two days in one
+        // document. The report's own date wins.
+        $date = $teamReport?->report_date?->format('Y-m-d')
+            ?? ($validated['date'] ?? now()->format('Y-m-d'));
+
+        // Visibility rule as before: the actor's OWN team is always exportable
+        // (daily-board use case), but a NEIGHBOURING team's PDF carries the
+        // report creator's identity (name, NIP, signature) and, when approved,
+        // the field head's signature — data a plain staf must not harvest.
+        // Anyone else needs the monitoring permission, exactly like reading the
+        // same data on the monitoring board.
+        if ($admin->team?->id !== $team->id) {
+            $this->authorize('wfh.monitoring.view');
+        } elseif ($date !== now()->format('Y-m-d')) {
+            // Own team, but a HISTORICAL day: a walked-back roster is exactly
+            // the monitoring-grade data the detail endpoint gates on
+            // `wfh.monitoring.view` (ship review #22). Today's board stays
+            // ungated for staf; anything older needs the permission.
+            $this->authorize('wfh.monitoring.view');
+        }
+
+        $team->load(['field.head']);
+        $head = $team->field?->head;
 
         $isApproved = $teamReport !== null && $teamReport->status === 'approved';
         $maker = $teamReport?->creator;

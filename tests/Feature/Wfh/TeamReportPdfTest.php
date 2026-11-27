@@ -333,12 +333,19 @@ class TeamReportPdfTest extends TestCase
 
         $user = User::factory()->create(['team_id' => $team->id, 'is_active' => true]);
 
+        // Presensi terikat ke laporan live (pending): PDF tim hanya mencetak
+        // foto dari laporan yang terpilih, bukan presensi lepas.
+        $report = WfhReport::factory()->status('pending')->create([
+            'user_id' => $user->id,
+            'report_date' => now()->toDateString(),
+        ]);
         WfhAttendance::create([
             'user_id' => $user->id,
             'date' => now()->toDateString(),
             'session' => 'pagi',
             'photo_path' => 'attendances/test/photo.jpg',
             'check_in_at' => now(),
+            'report_id' => $report->id,
         ]);
 
         $repo = app(WfhRepositoryInterface::class);
@@ -378,12 +385,18 @@ class TeamReportPdfTest extends TestCase
             'created_by' => $admin->id,
         ]);
 
+        // Presensi terikat ke laporan live agar terpilih oleh getTeamReportData.
+        $reportA = WfhReport::factory()->status('pending')->create([
+            'user_id' => $memberWithPhoto->id,
+            'report_date' => now()->toDateString(),
+        ]);
         WfhAttendance::create([
             'user_id' => $memberWithPhoto->id,
             'date' => now()->toDateString(),
             'session' => 'pagi',
             'photo_path' => 'attendances/test/pagi.jpg',
             'check_in_at' => now(),
+            'report_id' => $reportA->id,
         ]);
 
         // Fake the public disk: photos are private in production now, and the
@@ -499,6 +512,12 @@ class TeamReportPdfTest extends TestCase
             'team_id' => $team->id, 'is_active' => true, 'name' => 'User B',
         ]);
 
+        // Presensi terikat ke laporan live anggota: PDF hanya mencetak foto
+        // dari laporan yang terpilih.
+        $report1 = WfhReport::factory()->status('pending')->create([
+            'user_id' => $member1->id,
+            'report_date' => now()->toDateString(),
+        ]);
         // member1: attendance pagi + siang, no sore
         foreach (['pagi', 'siang'] as $session) {
             WfhAttendance::create([
@@ -507,6 +526,7 @@ class TeamReportPdfTest extends TestCase
                 'session' => $session,
                 'photo_path' => "attendances/test/{$session}.jpg",
                 'check_in_at' => now(),
+                'report_id' => $report1->id,
             ]);
         }
 

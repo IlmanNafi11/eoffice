@@ -101,35 +101,39 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
     public function getTeamReportData(int $teamId, string $date): array
     {
-        $members = User::where('team_id', $teamId)->where('is_active', true)->get();
+        // Urutan deterministik (nama): dua unduhan PDF tim yang sama tidak
+        // boleh mengurutkan staf berbeda antar query plan.
+        $members = User::where('team_id', $teamId)->where('is_active', true)->orderBy('name')->get();
 
+        // Draf adalah milik penulis (author-private); laporan tim tidak boleh
+        // mencetaknya. Pilih laporan live terbaru dan, bila anggota hanya
+        // punya rejected, pakai baris rejected itu — aturan yang sama dengan
+        // getTeamReportDetailData() (ship review #22: PDF dan halaman detail
+        // harus menjawab pertanyaan yang sama dengan cara yang sama).
         $reports = WfhReport::with(['activities.links', 'attendances'])
             ->where('report_date', $date)
             ->whereHas('user', fn ($q) => $q->where('team_id', $teamId))
             ->get()
-            ->keyBy('user_id');
+            ->groupBy('user_id')
+            ->map(fn ($group) => $group
+                ->sortByDesc(fn ($r) => [in_array($r->status, WfhReportStatus::LIVE, true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
+                ->first(fn ($r) => $r->status !== WfhReportStatus::DRAFT));
 
-        $attendances = WfhAttendance::where('date', $date)
-            ->whereHas('user', fn ($q) => $q->where('team_id', $teamId))
-            ->get()
-            ->groupBy('user_id');
-
-        return $members->map(function ($member) use ($reports, $attendances) {
+        return $members->map(function ($member) use ($reports) {
             $report = $reports->get($member->id);
 
             $links = $report
                 ? $report->activities->flatMap->links->pluck('url')->filter()->values()
                 : collect();
 
-            $photos = [];
-            if ($memberAttendances = $attendances->get($member->id)) {
-                foreach ($memberAttendances as $att) {
-                    $photos[] = [
-                        'session' => $att->session,
-                        'photo_path' => $att->photo_path,
-                    ];
-                }
-            }
+            // Foto diambil dari laporan yang SAMA dengan tautan di atas: query
+            // presensi terpisah akan membawa foto milik draf anggota lain.
+            $photos = $report
+                ? $report->attendances->map(fn ($att) => [
+                    'session' => $att->session,
+                    'photo_path' => $att->photo_path,
+                ])->values()->all()
+                : [];
 
             return [
                 'name' => strtoupper($member->name),

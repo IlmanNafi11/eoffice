@@ -170,6 +170,61 @@ class PdfExportGuardsTest extends TestCase
         $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
     }
 
+    /** Ship review #22: `team_report_id` tanpa `date` tidak boleh mencampur
+     *  roster hari ini dengan tanda tangan/persetujuan laporan tanggal lain —
+     *  tanggal diambil dari laporan itu sendiri. */
+    public function test_team_report_id_without_date_uses_the_report_date(): void
+    {
+        $this->withSignature($this->kepala);
+        Sanctum::actingAs($this->kepala);
+
+        $past = now()->subDays(3)->toDateString();
+        // Pembuat laporan ikut ditandatangani di PDF → wajib punya tanda tangan.
+        $this->withSignature($this->staff);
+        $creator = User::factory()->create(['team_id' => $this->teamA->id]);
+        $this->withSignature($creator);
+        $teamReport = WfhTeamReport::factory()->create([
+            'team_id' => $this->teamA->id,
+            'report_date' => $past,
+            'created_by' => $creator->id,
+        ]);
+
+        $response = $this->getJson(
+            '/api/admin/wfh/teams/'.$this->teamA->id.'/pdf?team_report_id='.$teamReport->id
+        );
+
+        $this->assertNotSame(500, $response->status(), $response->getContent());
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'filename="WFH-Team-'.$this->teamA->id.'-'.$past.'.pdf"',
+            (string) $response->headers->get('Content-Disposition'),
+        );
+    }
+
+    /** Ship review #22: pengguna tanpa `wfh.monitoring.view` (staf) hanya
+     *  boleh mengunduh PDF timnya sendiri untuk HARI INI — roster historis
+     *  adalah data monitoring-grade. */
+    public function test_own_team_pdf_for_a_past_date_requires_monitoring_view(): void
+    {
+        $this->withSignature($this->staff);
+        Sanctum::actingAs($this->staff);
+
+        $this->getJson(
+            '/api/admin/wfh/teams/'.$this->teamA->id.'/pdf?date='.now()->subDay()->toDateString()
+        )->assertForbidden();
+    }
+
+    public function test_own_team_pdf_for_today_still_exports_without_monitoring_view(): void
+    {
+        $this->withSignature($this->staff);
+        Sanctum::actingAs($this->staff);
+
+        $response = $this->getJson('/api/admin/wfh/teams/'.$this->teamA->id.'/pdf');
+
+        $this->assertNotSame(500, $response->status(), $response->getContent());
+        $response->assertOk();
+    }
+
     public function test_team_pdf_rejects_a_garbage_date_with_422_not_500(): void
     {
         $this->withSignature($this->kepala);

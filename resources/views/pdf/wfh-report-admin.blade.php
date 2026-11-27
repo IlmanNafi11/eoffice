@@ -163,8 +163,8 @@
                     <td class="no">{{ $i + 1 }}</td>
                     <td>{{ $member['name'] }}<br><span style="font-size:9px;">NIP. {{ $member['nip'] }}</span></td>
                     <td class="links">
-                        @forelse($member['links'] as $i => $link)
-                            <div>{{ $i + 1 }}. {{ $link }}</div>
+                        @forelse($member['links'] as $linkIndex => $link)
+                            <div>{{ $linkIndex + 1 }}. {{ $link }}</div>
                         @empty
                             -
                         @endforelse

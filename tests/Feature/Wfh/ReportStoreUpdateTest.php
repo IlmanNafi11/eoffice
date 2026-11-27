@@ -226,4 +226,49 @@ class ReportStoreUpdateTest extends TestCase
             ],
         ])->assertStatus(201);
     }
+
+    /** Ship review #22: `http://` (non-s) juga ditolak — bukan hanya skema
+     *  eksotis; pesan validasi mengarah ke tautan yang sama. */
+    public function test_store_rejects_http_bulk_link_with_422(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => now()->toDateString(),
+            'activities' => [
+                [
+                    'activity' => 'Kerja lapangan',
+                    'links' => ['http://intranet.kominfo.go.id/wfh'],
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['activities.0.links.0']);
+    }
+
+    /** Ship review #22: `starts_with:https://` peka huruf besar-kecil —
+     *  `HTTPS://` tidak lolos (perilaku validator, dipin agar tidak berubah
+     *  diam-diam). */
+    public function test_store_rejects_uppercase_https_bulk_link(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => now()->toDateString(),
+            'activities' => [
+                [
+                    'activity' => 'Kerja lapangan',
+                    'links' => ['HTTPS://git.kominfo.go.id/x'],
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['activities.0.links.0']);
+    }
 }
