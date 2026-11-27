@@ -296,10 +296,61 @@ export interface RejectTeamReportInput {
   reason: string;
 }
 
-/** Query `GET /admin/wfh/team-reports` — `per_page` (default 15, max 100). */
+/** Query `GET /admin/wfh/team-reports` — `per_page` (default 15, max 100) + filter Task 1. */
 export interface ListTeamReportsQuery {
   per_page?: number;
   page?: number;
+  status?: WfhReportStatus;
+  /** Inclusive lower bound of `report_date` (YYYY-MM-DD). */
+  date_from?: string;
+  /** Inclusive upper bound of `report_date` (YYYY-MM-DD). */
+  date_to?: string;
+  team_id?: number;
+}
+
+/**
+ * `#/components/schemas/WfhTeamReportMember.members[].activities[]` — kegiatan
+ * personal anggota pada tanggal laporan tim (bentuk ringkas, tanpa report_id).
+ */
+export interface WfhTeamReportMemberActivity {
+  id: number;
+  start_time: string | null;
+  end_time: string | null;
+  activity: string;
+  links: string[];
+}
+
+/**
+ * `#/components/schemas/WfhTeamReportMember.members[].attendances[]` — absensi
+ * per sesi milik laporan personal terpilih; `photo_url` null bila tanpa foto.
+ */
+export interface WfhTeamReportMemberAttendance {
+  id: number;
+  session: WfhSession;
+  photo_url: string | null;
+}
+
+/**
+ * `#/components/schemas/WfhTeamReportMember` — satu entri per anggota aktif
+ * tim pada tanggal laporan. Anggota tanpa laporan: `report_id`/`report_status`
+ * null, `activities`/`attendances` kosong.
+ */
+export interface WfhTeamReportMember {
+  user_id: number;
+  name: string;
+  nip?: string | null;
+  report_id: number | null;
+  report_status: WfhReportStatus | null;
+  activities: WfhTeamReportMemberActivity[];
+  attendances: WfhTeamReportMemberAttendance[];
+}
+
+/**
+ * `#/components/schemas/WfhTeamReportDetail` — `WfhTeamReport` + `members[]`
+ * live (resolved dari data terkini saat GET, bukan snapshot saat create).
+ */
+export interface WfhTeamReportDetail extends WfhTeamReport {
+  members: WfhTeamReportMember[];
 }
 
 /**

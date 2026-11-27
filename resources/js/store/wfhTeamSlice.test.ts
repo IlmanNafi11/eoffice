@@ -11,10 +11,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Mock } from "vitest";
-import type { PaginationMeta, WfhTeamReport } from "@/api/types";
+import type { PaginationMeta, WfhTeamReport, WfhTeamReportDetail } from "@/api/types";
 
 vi.mock("@/api/wfh-team", () => ({
   listWfhTeamReports: vi.fn(),
+  getWfhTeamReport: vi.fn(),
   createWfhTeamReport: vi.fn(),
   approveWfhTeamReport: vi.fn(),
   rejectWfhTeamReport: vi.fn(),
@@ -33,6 +34,8 @@ import {
   selectWfhTeamListMeta,
   selectWfhTeamListQuery,
   selectWfhTeamActionError,
+  fetchWfhTeamReportDetail,
+  selectWfhTeamDetail,
 } from "@/store/wfhTeamSlice";
 import { makeStore } from "@/store";
 
@@ -40,6 +43,7 @@ const mockedList = wfhTeamApi.listWfhTeamReports as unknown as Mock;
 const mockedCreate = wfhTeamApi.createWfhTeamReport as unknown as Mock;
 const mockedApprove = wfhTeamApi.approveWfhTeamReport as unknown as Mock;
 const mockedReject = wfhTeamApi.rejectWfhTeamReport as unknown as Mock;
+const mockedDetail = wfhTeamApi.getWfhTeamReport as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 10, total: 12 };
 
@@ -61,6 +65,21 @@ const reportSecond: WfhTeamReport = {
 
 const seeded = () => wfhTeamReducer(undefined, { type: "@@INIT" });
 
+const detail: WfhTeamReportDetail = {
+  ...reportPending,
+  members: [
+    {
+      user_id: 42,
+      name: "Budi Santoso",
+      nip: "1987654321",
+      report_id: 101,
+      report_status: "pending",
+      activities: [],
+      attendances: [],
+    },
+  ],
+};
+
 describe("wfhTeamSlice — initial state", () => {
   it("state awal bersih: list kosong, meta null, error null, status idle", () => {
     const state = seeded();
@@ -70,6 +89,7 @@ describe("wfhTeamSlice — initial state", () => {
     expect(state.list.status).toBe("idle");
     expect(state.list.error).toBeNull();
     expect(state.list.actionError).toBeNull();
+    expect(state.detail).toEqual({ data: null, status: "idle", error: null });
   });
 });
 
@@ -293,5 +313,72 @@ describe("wfhTeamSlice — mutasi create/approve/reject", () => {
     );
     // Tidak ada actionError asing (pesan mutasi). Gagal refetch = error fetch terpisah.
     expect(selectWfhTeamActionError(store.getState())).toBeNull();
+  });
+});
+
+describe("wfhTeamSlice — detail laporan tim", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetchWfhTeamReportDetail menyimpan data detail dan membuka status succeeded", async () => {
+    mockedDetail.mockResolvedValueOnce(detail);
+    const store = makeStore();
+
+    await store.dispatch(fetchWfhTeamReportDetail(1));
+
+    expect(mockedDetail).toHaveBeenCalledWith(1);
+    expect(selectWfhTeamDetail(store.getState())).toEqual({
+      data: detail,
+      status: "succeeded",
+      error: null,
+    });
+  });
+
+  it("fetchWfhTeamReportDetail gagal men-set status failed + pesan domain, data tetap null", async () => {
+    mockedDetail.mockRejectedValueOnce(
+      new ApiError("api", "Laporan tidak berada dalam bidang Anda."),
+    );
+    const store = makeStore();
+
+    await store.dispatch(fetchWfhTeamReportDetail(1));
+
+    const state = selectWfhTeamDetail(store.getState());
+    expect(state.status).toBe("failed");
+    expect(state.error).toBe("Laporan tidak berada dalam bidang Anda.");
+    expect(state.data).toBeNull();
+  });
+
+  it("approve sukses me-refetch detail yang sedang aktif selain list", async () => {
+    mockedList.mockResolvedValueOnce({ reports: [reportPending], meta });
+    mockedDetail.mockResolvedValueOnce(detail);
+    const store = makeStore();
+    await store.dispatch(fetchWfhTeamReports({}));
+    await store.dispatch(fetchWfhTeamReportDetail(1));
+
+    const approved: WfhTeamReport = { ...reportPending, status: "approved" };
+    const approvedDetail: WfhTeamReportDetail = { ...detail, status: "approved" };
+    mockedApprove.mockResolvedValueOnce(approved);
+    mockedList.mockResolvedValueOnce({ reports: [approved], meta });
+    mockedDetail.mockResolvedValueOnce(approvedDetail);
+
+    await store.dispatch(approveWfhTeamReport(1));
+
+    expect(mockedDetail).toHaveBeenCalledTimes(2);
+    expect(mockedDetail).toHaveBeenLastCalledWith(1);
+    expect(selectWfhTeamDetail(store.getState()).data?.status).toBe("approved");
+  });
+
+  it("approve tanpa detail aktif tidak memicu fetch detail", async () => {
+    mockedList.mockResolvedValueOnce({ reports: [reportPending], meta });
+    const store = makeStore();
+    await store.dispatch(fetchWfhTeamReports({}));
+
+    mockedApprove.mockResolvedValueOnce({ ...reportPending, status: "approved" });
+    mockedList.mockResolvedValueOnce({ reports: [{ ...reportPending, status: "approved" }], meta });
+
+    await store.dispatch(approveWfhTeamReport(1));
+
+    expect(mockedDetail).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ import {
   approveWfhTeamReport,
   rejectWfhTeamReport,
   listTeams,
+  getWfhTeamReport,
 } from "@/api/wfh-team";
 import { httpClient, setAuthToken } from "@/api/client";
 import type { WfhTeamReport, TeamResource } from "@/api/types";
@@ -77,6 +78,19 @@ const teamResource: TeamResource = {
   field_id: 1,
 };
 
+const member = {
+  user_id: 42,
+  name: "Budi Santoso",
+  nip: "1987654321",
+  report_id: 101,
+  report_status: "pending",
+  activities: [
+    { id: 501, start_time: "08:00", end_time: "10:00", activity: "Kerja lapangan", links: ["https://contoh.id/bukti"] },
+  ],
+  attendances: [{ id: 701, session: "pagi", photo_url: "/api/wfh/reports/101/attendances/701/photo" }],
+};
+const teamReportDetail = { ...teamReport, members: [member] };
+
 // Body JSON yang tiba di adapter: axios sudah serialize ke string.
 function jsonBody(i = 0): unknown {
   const raw = requests[i]?.data;
@@ -114,6 +128,31 @@ describe("api/wfh-team — list (envelope paginated)", () => {
     expect(requests[0]?.params).toBeUndefined();
     expect(out.reports).toEqual([]);
     expect(out.meta).toEqual({ current_page: 1, last_page: 1, per_page: 15, total: 0 });
+  });
+
+  it("listWfhTeamReports meneruskan filter status/date_from/date_to/team_id (Task 1)", async () => {
+    ok({ success: true, data: [], message: null, meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 } });
+
+    await listWfhTeamReports({ status: "pending", date_from: "2025-07-01", date_to: "2025-07-31", team_id: 3 });
+
+    expect(requests[0]?.params).toEqual({
+      status: "pending",
+      date_from: "2025-07-01",
+      date_to: "2025-07-31",
+      team_id: 3,
+    });
+  });
+
+  it("getWfhTeamReport melepas envelope {data} → WfhTeamReportDetail dengan members[]", async () => {
+    ok({ success: true, data: teamReportDetail, message: null, meta: null });
+
+    const out = await getWfhTeamReport(12);
+
+    expect(requests[0]?.method).toBe("get");
+    expect(requests[0]?.url).toBe("/admin/wfh/team-reports/12");
+    expect(out).toEqual(teamReportDetail);
+    expect(out.members).toHaveLength(1);
+    expect(out.members[0]).toEqual(member);
   });
 });
 

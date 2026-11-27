@@ -17,6 +17,7 @@ import {
   RejectTeamReportInput,
   TeamResource,
   WfhTeamReport,
+  WfhTeamReportDetail,
 } from "@/api/types";
 
 /**
@@ -32,7 +33,10 @@ export async function listWfhTeamReports(
   const params: Record<string, unknown> = {};
   if (query.per_page !== undefined) params.per_page = query.per_page;
   if (query.page !== undefined) params.page = query.page;
-
+  if (query.status !== undefined) params.status = query.status;
+  if (query.date_from !== undefined) params.date_from = query.date_from;
+  if (query.date_to !== undefined) params.date_to = query.date_to;
+  if (query.team_id !== undefined) params.team_id = query.team_id;
   const res = await api.get<WfhTeamReport[]>(
     "/admin/wfh/team-reports",
     Object.keys(params).length > 0 ? { params } : {},
@@ -47,6 +51,16 @@ export async function listWfhTeamReports(
       total: meta?.total ?? 0,
     },
   };
+}
+
+/**
+ * GET /admin/wfh/team-reports/{id} — envelope `ApiResponse::ok` `{data}`;
+ * detail = header laporan + `members[]` live per anggota aktif tim
+ * (openapi `getWfhTeamReport`, modul wfh-team-report-detail).
+ */
+export async function getWfhTeamReport(teamReportId: number): Promise<WfhTeamReportDetail> {
+  const res = await api.get<WfhTeamReportDetail>(`/admin/wfh/team-reports/${teamReportId}`);
+  return requireData(res.data, "getWfhTeamReport");
 }
 
 /** POST /admin/wfh/team-reports — server memaksa `status=pending` + `created_by`. */
