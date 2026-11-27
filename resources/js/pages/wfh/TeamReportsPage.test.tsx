@@ -179,7 +179,9 @@ describe("TeamReportsPage — fetch awal & render", () => {
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledTimes(1);
     });
-    expect(mockedList).toHaveBeenCalledWith({});
+    // Ship review #22 B2: mount selalu mulai dari halaman 1; filter aktif
+    // (kosong pada store baru) dipertahankan.
+    expect(mockedList).toHaveBeenCalledWith({ page: 1 });
 
     await screen.findByText("Tim Aplikasi");
     expect(screen.getByText("2026-08-10")).toBeTruthy();
@@ -861,6 +863,44 @@ describe("TeamReportsPage — filter list (Task 6)", () => {
     await waitFor(() => {
       expect(mockedList).toHaveBeenLastCalledWith({ team_id: 3, page: 1 });
     });
+  });
+
+  /** Ship review #22 (B2): filter terapan bertahan saat kembali ke halaman —
+   *  kontrol dan daftar menunjukkan query yang SAMA. */
+  it("kembali ke halaman mempertahankan filter terapan: kontrol dan daftar sinkron", async () => {
+    const store = renderPage();
+    await screen.findByText("Tim Aplikasi");
+
+    await openFilter();
+    await pickSelect("Status", "approved");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "approved", page: 1 });
+    });
+
+    // Remount: halaman "dikunjungi ulang" dengan store yang masih memuat
+    // query terapan (persis seperti navigasi kembali di aplikasi nyata).
+    cleanup();
+    render(
+      <Provider store={store}>
+        <Toaster position="top-right" richColors />
+        <MemoryRouter initialEntries={["/team-reports"]}>
+          <Routes>
+            <Route path="/team-reports" element={<TeamReportsPage />} />
+            <Route path="/team-reports/:id" element={<DetailRouteProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    await screen.findByText("Tim Aplikasi");
+
+    // Daftar di-fetch ulang dengan filter yang masih terpasang...
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "approved", page: 1 });
+    });
+    // ...dan kontrol menunjukkan filter yang sama (bukan "Semua status").
+    await openFilter();
+    expect(screen.getByLabelText("Status").textContent).toContain("approved");
   });
 });
 

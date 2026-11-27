@@ -132,13 +132,30 @@ export function TeamReportsPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
-
   useEffect(() => {
-    // Query redux bisa membawa sisa navigasi sebelumnya (page 2, per_page 25)
-    // sementara kontrol lokal halaman reset ke default — reset dulu supaya
-    // fetch ulang mount benar-benar query bersih dan refetch mutasi konsisten.
-    dispatch(setTeamListQuery({}));
-    dispatch(fetchWfhTeamReports({}));
+    // Query redux yang masih terpasang (filter terapan dari kunjungan
+    // sebelumnya) dipertahankan — kontrol lokal membaca query yang sama saat
+    // init, jadi membuangnya di sini justru mendesinkronkan kontrol vs daftar
+    // (ship review #22 B2). Yang dibuang hanya sisa paginasi: kembali ke
+    // halaman ini selalu mulai dari halaman 1.
+    dispatch(
+      setTeamListQuery({
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.team_id !== undefined ? { team_id: query.team_id } : {}),
+        ...(query.date_from !== undefined ? { date_from: query.date_from } : {}),
+        ...(query.date_to !== undefined ? { date_to: query.date_to } : {}),
+        page: 1,
+      }),
+    );
+    dispatch(
+      fetchWfhTeamReports({
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.team_id !== undefined ? { team_id: query.team_id } : {}),
+        ...(query.date_from !== undefined ? { date_from: query.date_from } : {}),
+        ...(query.date_to !== undefined ? { date_to: query.date_to } : {}),
+        page: 1,
+      }),
+    );
   }, [dispatch]);
 
   // Dropdown tim dimuat sekali: dipakai dialog create DAN filter list, jadi

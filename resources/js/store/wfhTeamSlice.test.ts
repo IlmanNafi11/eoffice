@@ -443,4 +443,29 @@ describe("wfhTeamSlice — detail laporan tim", () => {
     expect(state.status).toBe("succeeded");
     expect(state.error).toBeNull();
   });
+
+  /** Ship review #22: detail basi yang REJECTED juga dibuang guard — hanya
+   *  jalur fulfilled yang teruji sebelumnya. */
+  it("respons detail basi berupa rejection tidak menggantikan detail terbaru", async () => {
+    let rejectSlow!: (reason?: unknown) => void;
+    const slow = new Promise<WfhTeamReportDetail>((_, rej) => {
+      rejectSlow = rej;
+    });
+    const fresh: WfhTeamReportDetail = { ...detail, id: 15 } as WfhTeamReportDetail;
+
+    mockedDetail.mockReturnValueOnce(slow); // laporan 16 lambat, lalu gagal
+    mockedDetail.mockResolvedValueOnce(fresh); // laporan 15 cepat, sukses
+    const store = makeStore();
+
+    const first = store.dispatch(fetchWfhTeamReportDetail(16));
+    const second = store.dispatch(fetchWfhTeamReportDetail(15));
+    await second;
+    rejectSlow(new Error("stale failure"));
+    await first.catch(() => {});
+
+    const state = selectWfhTeamDetail(store.getState());
+    expect(state.data).toEqual(fresh);
+    expect(state.status).toBe("succeeded");
+    expect(state.error).toBeNull();
+  });
 });

@@ -262,6 +262,22 @@ describe("api/wfh-monitoring — exportTeamWfhPdf (blob bypass unwrap)", () => {
     });
   });
 
+  /** Ship review #22: pesan server 403 (bukan copy fallback) harus sampai
+   *  ke halaman — decodeBlobEnvelope bekerja untuk status non-422 juga. */
+  it("403 body Blob didekode ke pesan server (bukan fallback copy)", async () => {
+    const errBody = new Blob(
+      [JSON.stringify({ success: false, message: "Tim tidak ditemukan dalam bidang Anda." })],
+      { type: "application/json" },
+    );
+    queue.push({ status: 403, body: errBody });
+
+    await expect(exportTeamWfhPdf(3, { date: "2026-07-15" })).rejects.toMatchObject({
+      kind: "http",
+      status: 403,
+      message: "Tim tidak ditemukan dalam bidang Anda.",
+    });
+  });
+
   it("4xx body Blob non-JSON → fallback 'Gagal mengunduh PDF.' (bukan teks axios)", async () => {
     queue.push({ status: 500, body: new Blob(["<html>boom</html>"], { type: "text/html" }) });
 

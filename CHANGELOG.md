@@ -5,6 +5,41 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-27 — tuntas temuan ship review #22)
+- PDF tim tidak lagi mencetak draf pribadi anggota: `getTeamReportData`
+  memilih laporan live terbaru (fallback rejected) memakai aturan yang sama
+  dengan halaman detail. Foto presensi kini diambil dari laporan yang SAMA
+  dengan tautannya — presensi lepas milik draf/laporan lain tidak ikut
+  tercetak. Urutan staf deterministik (nama).
+- Filter laporan tim bertahan saat kembali ke halaman: mount hanya membuang
+  sisa paginasi (kembali ke halaman 1) dan me-refetch filter terapan, sehingga
+  kontrol dan daftar selalu menunjukkan query yang sama.
+- `submitReject` memakai guard ref sinkron (`busyRef`) seperti `submitApprove`
+  — dua klik beruntun sebelum re-render tidak mengirim reject dua kali.
+- PDF tim: `team_report_id` tanpa `date` memakai tanggal laporan itu sendiri
+  (roster, tanda tangan, dan `isApproved` tidak lagi dari hari yang berbeda);
+  unduhan tim sendiri untuk tanggal lampau mensyaratkan
+  `wfh.monitoring.view` (papan hari ini tetap tak bergerbang untuk staf).
+- Migrasi data `null`→kosong: tautan bukti kerja lama yang bukan `https://`
+  (mis. `javascript:`, `data:`) di-null-kan (kolom `url` NOT NULL, dipakai
+  string kosong) agar tidak lagi dirender ke `href`/PDF.
+- `config/dompdf.php`: `allowed_protocols` dipersempit ke `data://` +
+  `https://` — `file://`/`http://` (footgun bila `enable_remote` dinyalakan
+  kelak) dicabut; semua gambar PDF saat ini data-URI/chroot lokal.
+- `Cache-Control: no-store` kini hanya untuk request ber-kredensial atau
+  respons error — health check `/up` (tanpa sesi) tidak lagi dibekukan.
+  Regresi uji memastikan `/up` tetap tanpa `no-store`.
+- `team_id` pada filter laporan tim tidak lagi memakai `exists:teams,id`
+  (oracle keberadaan tim lintas bidang untuk non-admin): id tak dikenal
+  menghasilkan halaman kosong yang sama untuk semua peran.
+- Template PDF tim: variabel loop tautan dalam di-rename (`$linkIndex`) agar
+  tidak menutupi indeks staf.
+- Uji cakupan baru: HTTP show tim kosong, `meta.total` filter, `status=draft`
+  → kosong, rentang hari tunggal, KT menyempit dalam timnya sendiri,
+  `http://`/`HTTPS://` ditolak 422, foto gagal dimuat, tema Sistem gelap,
+  detail basi (rejected), toast gagal Unduh PDF di halaman detail, pesan
+  server 403 pada unduhan PDF tim.
+
 ### Fixed (backend+frontend, 2026-11-27 — tuntas temuan ship review #21)
 - Tautan kegiatan jalur bulk `POST/PUT /wfh/reports` kini juga dibatasi
   https (`starts_with:https://` di `StoreReportRequest`) — `url` saja masih

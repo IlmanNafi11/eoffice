@@ -86,6 +86,38 @@ describe("ThemeToggle — pemilihan tema", () => {
     expect(window.localStorage.getItem("theme")).toBe("dark");
   });
 
+  /** Ship review #22: jalur Sistem saat `prefers-color-scheme: dark`
+   *  (polyfill di-overrides ke matches: true) → class `dark` harus muncul. */
+  it("memilih Sistem mengikuti prefers-color-scheme (gelap saat matches true)", async () => {
+    const realMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes("dark"),
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+
+    try {
+      renderToggle();
+      await userEvent.click(screen.getByTestId("theme-toggle"));
+      await userEvent.click(
+        screen.getByRole("menuitemradio", { name: /sistem/i }),
+      );
+
+      expect(document.documentElement.classList.contains("dark")).toBe(true);
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
+  });
+
   it("menandai item tema aktif di dropdown", async () => {
     window.localStorage.setItem("theme", "dark");
     renderToggle();

@@ -277,7 +277,11 @@ export function TeamReportDetailPage() {
 
   async function submitReject() {
     const reason = rejectReason.trim();
-    if (reason === "" || rejecting) return;
+    // Ref sinkron menolak dua klik beruntun sebelum re-render — `rejecting`
+    // saja tidak cukup (state baru berlaku setelah render berikutnya), sama
+    // dengan guard submitApprove (ship review #22: paritas guard mutasi).
+    if (reason === "" || busyRef.current) return;
+    busyRef.current = true;
     setRejecting(true);
     const result = dispatch(rejectWfhTeamReport({ teamReportId: report!.id, reason }));
     try {
@@ -287,6 +291,7 @@ export function TeamReportDetailPage() {
       // `unwrap()` melempar payload slice (`messageOf`) — non-string tetap lewat seam.
       toast.error(typeof err === "string" && err ? err : toUiError(err).message);
     } finally {
+      busyRef.current = false;
       setRejecting(false);
     }
   }

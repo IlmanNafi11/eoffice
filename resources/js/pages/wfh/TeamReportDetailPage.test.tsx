@@ -17,7 +17,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { userEvent } from "@/test/portal";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { WfhTeamReportDetail, WfhTeamReportMember } from "@/api/types";
@@ -192,6 +192,16 @@ describe("TeamReportDetailPage — muat & render", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:attendance-photo");
   });
 
+  /** Ship review #22: foto yang gagal dimuat menampilkan pesan, bukan img
+   *  kosong — cabang `!objectUrl` belum teruji. */
+  it("foto gagal dimuat → pesan 'Foto tidak dapat dimuat.'", async () => {
+    mockedPhoto.mockRejectedValueOnce(new Error("404"));
+    renderDetail();
+
+    expect(await screen.findByText(/foto tidak dapat dimuat/i)).toBeTruthy();
+    expect(screen.queryByRole("img", { name: /foto absensi sesi pagi/i })).toBeNull();
+  });
+
   it("anggota tanpa laporan menampilkan tanda kosong, bukan crash", async () => {
     renderDetail();
 
@@ -306,6 +316,33 @@ describe("TeamReportDetailPage — approve/reject", () => {
     expect(toast?.textContent).toContain("Laporan tim berhasil ditolak.");
   });
 
+  it("klik Tolak dua kali saat in-flight → reject hanya sekali", async () => {
+    let resolveReject: (value: unknown) => void = () => {};
+    mockedReject.mockReturnValueOnce(new Promise((resolve) => (resolveReject = resolve)));
+    renderDetail();
+    await screen.findByText("Andi Prasetyo");
+
+    await userEvent.click(screen.getByRole("button", { name: /tolak/i }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(
+      within(dialog).getByLabelText(/alasan penolakan/i),
+      "Alasan penolakan ganda.",
+    );
+    const submit = within(dialog).getByRole("button", { name: /tolak laporan/i });
+
+    // Dua klik dalam SATU batch: tombol belum ter-disable saat klik kedua
+    // (state `rejecting` baru berlaku setelah re-render) — hanya ref sinkron
+    // yang bisa menahan dispatch kedua (paritas dengan submitApprove).
+    act(() => {
+      submit.click();
+      submit.click();
+    });
+    expect(mockedReject).toHaveBeenCalledTimes(1);
+
+    resolveReject({ ...detail, status: "rejected", message: "Laporan tim berhasil ditolak." });
+    await waitFor(() => expect(mockedReject).toHaveBeenCalledTimes(1));
+  });
+
   it("reject gagal 403 → dialog tetap terbuka dan pesan server tampil di dalamnya", async () => {
     renderDetail();
     await screen.findByText("Andi Prasetyo");
@@ -343,6 +380,24 @@ describe("TeamReportDetailPage — unduh PDF & navigasi", () => {
         date: "2026-08-10",
         team_report_id: 12,
       });
+    });
+  });
+
+  /** Ship review #22: PDF gagal di halaman detail → toast pesan server
+   *  (seam pdfErrorMessage), selaras dengan halaman daftar. */
+  it("Unduh PDF gagal → toast memakai pesan server", async () => {
+    mockedPdf.mockRejectedValueOnce(
+      new ApiError("http", "Tim tidak ditemukan dalam bidang Anda.", { status: 403 }),
+    );
+    renderDetail();
+    await screen.findByText("Andi Prasetyo");
+
+    await userEvent.click(screen.getByRole("button", { name: /unduh pdf/i }));
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast).toBeTruthy();
+      expect(toast!.textContent).toContain("Tim tidak ditemukan dalam bidang Anda.");
     });
   });
 
