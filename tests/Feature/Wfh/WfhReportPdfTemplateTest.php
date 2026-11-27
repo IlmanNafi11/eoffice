@@ -137,6 +137,29 @@ class WfhReportPdfTemplateTest extends TestCase
         $this->assertSignatureImageSitsInsideTheBox($html);
     }
 
+    public function test_team_template_numbers_every_evidence_link(): void
+    {
+        $html = view('pdf.wfh-report-admin', array_merge($this->adminData(), [
+            'staff' => [[
+                'name' => 'USER A',
+                'nip' => '1',
+                'links' => ['https://a.example/1', 'https://a.example/2', 'https://b.example/1'],
+            ]],
+        ]))->render();
+
+        $this->assertStringContainsString('<div>1. https://a.example/1</div>', $html);
+        $this->assertStringContainsString('<div>2. https://a.example/2</div>', $html);
+        $this->assertStringContainsString('<div>3. https://b.example/1</div>', $html);
+    }
+
+    public function test_team_template_keeps_dash_when_member_has_no_links(): void
+    {
+        $html = view('pdf.wfh-report-admin', $this->adminData())->render();
+
+        $this->assertStringContainsString('<td class="links">', $html);
+        $this->assertMatchesRegularExpression('/<td class="links">\s*-\s*<\/td>/', $html);
+    }
+
     private function adminData(): array
     {
         return array_merge($this->data(), [

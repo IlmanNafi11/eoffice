@@ -4,6 +4,13 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.1.0).
 Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
+
+### Fixed (backend, 2026-11-25 — ekspor PDF laporan tim WFH)
+- Kolom "Link Bukti Kerja" pada PDF rekap tim kini menampilkan seluruh tautan
+  dari semua kegiatan anggota dengan penomoran berurutan (`1.`, `2.`, …),
+  bukan daftar tanpa nomor; placeholder `-` untuk anggota tanpa tautan tetap
+  dipertahankan.
+
 ### Fixed (backend+frontend, 2026-11-24 — ship review #20 dashboard)
 - `today.scope` kini diberi gate eksplisit pada `wfh.monitoring.view` (plus
   scope riil), bukan sekadar efek samping role seeding — sesuai kontrak

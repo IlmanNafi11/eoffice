@@ -2,7 +2,9 @@
 
 > Module id: `dashboard` (satu modul; endpoint + halaman tidak bisa dipisah tanpa menulis ulang
 > kontrak — Phase 0 capability map terpisah tidak diperlukan).
-> Spec: `SPEC.md` (approved 2026-11-24). Intent: `docs/superpowers/specs/2026-11-24-dashboard-design.md`.
+> Spec: `SPEC-dashboard.md` (approved 2026-11-24; dipindah dari `SPEC.md` saat
+> spec team-reports-detail-filter-theme mengambil alih nama root).
+> Intent: `docs/superpowers/specs/2026-11-24-dashboard-design.md`.
 > Plan: `docs/superpowers/plans/2026-11-24-dashboard.md` (Tasks 1–8).
 
 | Module id | Responsibility | Depends on | Backend change | Status |

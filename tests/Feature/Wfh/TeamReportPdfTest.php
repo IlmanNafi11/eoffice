@@ -3,6 +3,7 @@
 namespace Tests\Feature\Wfh;
 
 use App\Domains\Wfh\Models\WfhAttendance;
+use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\Field;
@@ -562,6 +563,48 @@ class TeamReportPdfTest extends TestCase
                 $this->assertNull($entry['photo']);
             }
         }
+    }
+
+    public function test_team_pdf_renders_all_activity_links_numbered(): void
+    {
+        $field = Field::create(['name' => 'Bidang Test']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
+        $adminTeam = Team::create(['field_id' => $field->id, 'name' => 'Tim Admin']);
+        $admin = User::factory()->create(['team_id' => $adminTeam->id]);
+        $admin->assignRole('admin');
+        $this->setUserSignature($admin);
+        Sanctum::actingAs($admin);
+
+        $member = User::factory()->create([
+            'team_id' => $team->id, 'is_active' => true, 'name' => 'Anggota Tim',
+        ]);
+        $report = WfhReport::factory()->create([
+            'user_id' => $member->id,
+            'report_date' => now()->toDateString(),
+            'status' => 'pending',
+        ]);
+
+        $repo = app(WfhRepositoryInterface::class);
+        $repo->addActivityToReport($report, [
+            'activity' => 'Kegiatan satu',
+            'links' => ['https://a.example/1', 'https://a.example/2'],
+        ]);
+        $repo->addActivityToReport($report, [
+            'activity' => 'Kegiatan dua',
+            'links' => ['https://b.example/1'],
+        ]);
+
+        $captured = $this->capturePdfViewData($team, null);
+
+        $this->assertSame(
+            ['https://a.example/1', 'https://a.example/2', 'https://b.example/1'],
+            $captured['staff'][0]['links'],
+        );
+
+        $html = view('pdf.wfh-report-admin', $captured)->render();
+        $this->assertStringContainsString('<div>1. https://a.example/1</div>', $html);
+        $this->assertStringContainsString('<div>2. https://a.example/2</div>', $html);
+        $this->assertStringContainsString('<div>3. https://b.example/1</div>', $html);
     }
 
     /**
