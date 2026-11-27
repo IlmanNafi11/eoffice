@@ -8,6 +8,7 @@ use App\Domains\Wfh\Models\WfhTeamReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportPdfData;
 use App\Models\Team;
+use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
 use App\Support\Signature\SignatureGuard;
@@ -80,8 +81,10 @@ class ReportPdfController extends Controller
         $admin->loadMissing('team.field');
         $fieldId = $admin->team?->field?->id;
 
-        // Verify team belongs to admin's field
-        if (! $fieldId || $team->field_id !== $fieldId) {
+        // Admin is the one role that sees every team report in the list, so
+        // it may also download any team's PDF; every other role stays
+        // field-locked (D4: no role string literals).
+        if (! $admin->hasRole(Roles::ADMIN) && (! $fieldId || $team->field_id !== $fieldId)) {
             return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
         }
 

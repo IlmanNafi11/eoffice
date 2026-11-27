@@ -77,6 +77,14 @@ class PdfExportGuardsTest extends TestCase
         ]);
     }
 
+    private function admin(): User
+    {
+        $admin = User::factory()->create(['team_id' => $this->teamA->id]);
+        $admin->assignRole('admin');
+
+        return $admin;
+    }
+
     public function test_draft_report_cannot_be_exported(): void
     {
         $this->withSignature($this->staff);
@@ -126,6 +134,40 @@ class PdfExportGuardsTest extends TestCase
         Sanctum::actingAs($this->kepala);
 
         $this->getJson('/api/admin/wfh/teams/'.$this->teamB->id.'/pdf')->assertForbidden();
+    }
+
+    public function test_admin_can_export_a_team_pdf_from_any_field(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $response = $this->getJson('/api/admin/wfh/teams/'.$this->teamB->id.'/pdf');
+
+        $this->assertNotSame(500, $response->status(), $response->getContent());
+        $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    }
+
+    public function test_non_admin_cross_field_team_pdf_still_refused(): void
+    {
+        $kb = User::factory()->create(['team_id' => $this->teamA->id]);
+        $kb->assignRole('kepala_bidang');
+        $this->fieldA->update(['head_id' => $kb->id]);
+        $this->withSignature($kb);
+        Sanctum::actingAs($kb);
+
+        $this->getJson('/api/admin/wfh/teams/'.$this->teamB->id.'/pdf')
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Tim tidak ditemukan dalam bidang Anda.');
+    }
+
+    public function test_non_admin_own_team_pdf_still_exports(): void
+    {
+        $this->withSignature($this->kepala);
+        Sanctum::actingAs($this->kepala);
+
+        $response = $this->getJson('/api/admin/wfh/teams/'.$this->teamA->id.'/pdf');
+
+        $this->assertNotSame(500, $response->status(), $response->getContent());
+        $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
     }
 
     public function test_team_pdf_rejects_a_garbage_date_with_422_not_500(): void
