@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { logout, selectUser } from "@/store/authSlice";
 
@@ -53,6 +54,8 @@ export function Header() {
       <Separator orientation="vertical" className="mr-2 h-4" />
 
       <div className="ml-auto flex items-center gap-2">
+        {/* Toggle tema Terang/Gelap/Sistem (modul theme-modes). */}
+        <ThemeToggle />
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
