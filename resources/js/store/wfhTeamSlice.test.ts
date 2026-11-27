@@ -35,6 +35,7 @@ import {
   selectWfhTeamListQuery,
   selectWfhTeamActionError,
   fetchWfhTeamReportDetail,
+  setTeamListQuery,
   selectWfhTeamDetail,
 } from "@/store/wfhTeamSlice";
 import { makeStore } from "@/store";
@@ -89,7 +90,12 @@ describe("wfhTeamSlice — initial state", () => {
     expect(state.list.status).toBe("idle");
     expect(state.list.error).toBeNull();
     expect(state.list.actionError).toBeNull();
-    expect(state.detail).toEqual({ data: null, status: "idle", error: null });
+    expect(state.detail).toEqual({
+      data: null,
+      status: "idle",
+      error: null,
+      latestRequestId: null,
+    });
   });
 });
 
@@ -113,6 +119,17 @@ describe("wfhTeamSlice — fetch list", () => {
     expect(selectWfhTeamListItems(store.getState())).toEqual([reportPending, reportSecond]);
     expect(selectWfhTeamListMeta(store.getState())).toEqual(meta);
     expect(selectWfhTeamListQuery(store.getState())).toEqual({ page: 2, per_page: 10 });
+  });
+
+  /** Ship review: `setTeamListQuery` dipakai mount untuk reset — merge
+   *  membuat sisa `page`/`per_page` navigasi sebelumnya selamat, lalu refetch
+   *  mutasi melompat balik ke halaman basi. Reset penuh memangkasnya. */
+  it("setTeamListQuery reset penuh: kunci yang tidak dikirim ikut hilang", () => {
+    const store = makeStore();
+    store.dispatch(fetchWfhTeamReports.pending("", { page: 3, per_page: 25 }, ""));
+    store.dispatch(setTeamListQuery({}));
+
+    expect(selectWfhTeamListQuery(store.getState())).toEqual({});
   });
 
   it("fetchWfhTeamReports gagal men-set status failed + error", async () => {
@@ -328,11 +345,11 @@ describe("wfhTeamSlice — detail laporan tim", () => {
     await store.dispatch(fetchWfhTeamReportDetail(1));
 
     expect(mockedDetail).toHaveBeenCalledWith(1);
-    expect(selectWfhTeamDetail(store.getState())).toEqual({
-      data: detail,
-      status: "succeeded",
-      error: null,
-    });
+    const state = selectWfhTeamDetail(store.getState());
+    expect(state.data).toEqual(detail);
+    expect(state.status).toBe("succeeded");
+    expect(state.error).toBeNull();
+    expect(state.latestRequestId).not.toBeNull();
   });
 
   it("fetchWfhTeamReportDetail gagal men-set status failed + pesan domain, data tetap null", async () => {
@@ -400,5 +417,30 @@ describe("wfhTeamSlice — detail laporan tim", () => {
     expect(mockedDetail).toHaveBeenCalledTimes(2);
     expect(mockedDetail).toHaveBeenLastCalledWith(1);
     expect(selectWfhTeamDetail(store.getState()).data?.status).toBe("rejected");
+  });
+
+  it("respons detail basi (out-of-order) tidak menggantikan detail terbaru", async () => {
+    let resolveSlow!: (value: WfhTeamReportDetail) => void;
+    const slow = new Promise<WfhTeamReportDetail>((res) => {
+      resolveSlow = res;
+    });
+    const stale: WfhTeamReportDetail = { ...detail, id: 13 } as WfhTeamReportDetail;
+    const fresh: WfhTeamReportDetail = { ...detail, id: 14 } as WfhTeamReportDetail;
+
+    mockedDetail.mockReturnValueOnce(slow); // laporan 13 lambat
+    mockedDetail.mockResolvedValueOnce(fresh); // laporan 14 cepat
+    const store = makeStore();
+
+    const first = store.dispatch(fetchWfhTeamReportDetail(13));
+    const second = store.dispatch(fetchWfhTeamReportDetail(14));
+    await second;
+    resolveSlow(stale);
+    await first;
+
+    // Yang menang: dispatch TERAKHIR (14), bukan resolver terakhir (13).
+    const state = selectWfhTeamDetail(store.getState());
+    expect(state.data).toEqual(fresh);
+    expect(state.status).toBe("succeeded");
+    expect(state.error).toBeNull();
   });
 });

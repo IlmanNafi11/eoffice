@@ -184,4 +184,46 @@ class ReportStoreUpdateTest extends TestCase
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['report_date']);
     }
+
+    /** Ship review: `url` menerima skema berbahaya yang lolos
+     *  FILTER_VALIDATE_URL (`file://host/...`, `about://` — terverifikasi lolos
+     *  `Str::isUrl`) dan tautan dirender ke `href` di halaman detail laporan
+     *  tim, jadi skema dibatasi https di boundary, selaras dengan
+     *  StoreActivityRequest. */
+    public function test_store_rejects_non_https_bulk_link_with_422(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => now()->toDateString(),
+            'activities' => [
+                [
+                    'activity' => 'Kerja lapangan',
+                    'links' => ['file://host/etc/passwd'],
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['activities.0.links.0']);
+    }
+
+    public function test_store_accepts_https_bulk_link(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/wfh/reports', [
+            'report_date' => now()->toDateString(),
+            'activities' => [
+                [
+                    'activity' => 'Kerja lapangan',
+                    'links' => ['https://git.kominfo.go.id/intern/wfh-api/-/merge_requests/12'],
+                ],
+            ],
+        ])->assertStatus(201);
+    }
 }

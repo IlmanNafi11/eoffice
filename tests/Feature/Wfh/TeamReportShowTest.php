@@ -103,6 +103,42 @@ class TeamReportShowTest extends TestCase
         $this->assertStringContainsString('/wfh/reports/'.$pending->id.'/attendances/', $data[0]['attendances'][0]['photo_url']);
     }
 
+    /** Ship review: anggota yang hanya punya draf tidak boleh mengekspos isi
+     *  drafnya lewat detail laporan tim — draf adalah milik penulis
+     *  (author-private di seluruh sistem). Konsisten dengan halaman daftar,
+     *  anggota draf tampil "belum ada laporan". */
+    public function test_detail_data_ignores_draft_only_member(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $draft = $this->personalReport($member, 'draft');
+        $this->repo()->addActivityToReport($draft, ['activity' => 'Draf rahasia']);
+
+        $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
+
+        $this->assertNull($data[0]['report_id']);
+        $this->assertNull($data[0]['report_status']);
+        $this->assertSame([], $data[0]['activities']);
+        $this->assertSame([], $data[0]['attendances']);
+    }
+
+    /** Draf yang lebih baru tidak menggeser laporan live yang dipilih. */
+    public function test_detail_data_prefers_live_report_over_newer_draft(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $pending = $this->personalReport($member, 'pending');
+        $pending->forceFill(['updated_at' => now()->subHour()])->save();
+
+        $draft = $this->personalReport($member, 'draft');
+        $draft->forceFill(['updated_at' => now()])->save();
+
+        $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
+
+        $this->assertSame($pending->id, $data[0]['report_id']);
+        $this->assertSame('pending', $data[0]['report_status']);
+    }
+
     public function test_detail_data_prefers_pending_over_newer_rejected(): void
     {
         [$team, $member] = $this->teamWithMember();
@@ -116,6 +152,33 @@ class TeamReportShowTest extends TestCase
         $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
 
         $this->assertSame($pending->id, $data[0]['report_id']);
+    }
+
+    /** Anggota yang HANYA punya laporan rejected tetap tampil dengan status
+     *  rejected (live) — bukan jatuh ke "belum ada laporan". */
+    public function test_detail_data_rejected_only_member_surfaces_rejected_status(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+
+        $this->personalReport($member, 'rejected');
+
+        $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
+
+        $this->assertSame('rejected', $data[0]['report_status']);
+    }
+
+    /** Urutan anggota deterministik (nama) agar kartu detail stabil antar
+     *  query plan — tanpa test ini urutan mengikuti plan DB. */
+    public function test_detail_data_orders_members_by_name(): void
+    {
+        $field = Field::create(['name' => 'Bidang Urut']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Urut']);
+        User::factory()->create(['team_id' => $team->id, 'name' => 'Zulkifli']);
+        User::factory()->create(['team_id' => $team->id, 'name' => 'Ahmad']);
+
+        $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
+
+        $this->assertSame(['Ahmad', 'Zulkifli'], array_column($data, 'name'));
     }
 
     public function test_detail_data_returns_null_photo_url_when_attendance_has_no_photo(): void
@@ -158,14 +221,17 @@ class TeamReportShowTest extends TestCase
         $viewer->assignRole('kepala_tim');
         Sanctum::actingAs($viewer);
 
-        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+        $response = $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
             ->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.id', $report->id)
             ->assertJsonPath('data.status', 'pending')
-            ->assertJsonPath('data.team.id', $team->id)
-            ->assertJsonPath('data.members.0.user_id', $member->id)
-            ->assertJsonPath('data.members.0.report_id', $personal->id);
+            ->assertJsonPath('data.team.id', $team->id);
+
+        // Urutan kartu deterministik per nama, jadi cari anggota by id.
+        $row = collect($response->json('data.members'))->firstWhere('user_id', $member->id);
+        $this->assertNotNull($row);
+        $this->assertSame($personal->id, $row['report_id']);
     }
 
     public function test_show_returns_422_for_user_without_field(): void

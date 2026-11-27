@@ -25,8 +25,11 @@ class StoreReportRequest extends FormRequest
             'activities.*.start_time' => ['required_with:activities.*.end_time', 'date_format:H:i'],
             'activities.*.end_time' => ['required_with:activities.*.start_time', 'date_format:H:i', 'after:activities.*.start_time'],
             'activities.*.activity' => ['required', 'string'],
-            'activities.*.links' => ['nullable', 'array'],
-            'activities.*.links.*' => ['url'],
+            // `url` saja menerima skema berbahaya yang lolos FILTER_VALIDATE_URL
+            // (mis. `data:`, `file://`, `about://`); halaman detail laporan tim
+            // me-render tautan ke `href`, jadi skema dibatasi https di
+            // boundary, selaras dengan StoreActivityRequest.
+            'activities.*.links.*' => ['url', 'starts_with:https://'],
             'attendances' => ['sometimes', 'array:pagi,siang,sore'],
             'attendances.*.photo' => ['sometimes', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ];

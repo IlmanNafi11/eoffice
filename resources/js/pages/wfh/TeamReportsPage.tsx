@@ -402,7 +402,6 @@ export function TeamReportsPage() {
     </DropdownMenu>
   );
 
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -498,6 +497,7 @@ export function TeamReportsPage() {
                                 }
                                 filename={`WFH-Team-${r.team_id}-${r.report_date}.pdf`}
                                 getError={pdfErrorMessage}
+                                onError={(e) => toast.error(pdfErrorMessage(e))}
                               >
                                 Unduh PDF
                               </PdfDownloadButton>

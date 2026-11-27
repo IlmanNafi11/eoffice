@@ -244,8 +244,9 @@ class TeamReportFilterTest extends TestCase
 
     private function createReport(Team $team, string $status, ?string $date = null): WfhTeamReport
     {
+        // created_by hanya butuh user apa pun — jangan beri role admin pada
+        // actor uji yang tidak memerlukannya (ship review).
         $creator = User::factory()->create(['team_id' => $team->id]);
-        $creator->assignRole('admin');
 
         return WfhTeamReport::factory()->status($status)->create([
             'team_id' => $team->id,

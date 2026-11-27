@@ -71,6 +71,32 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     }
 
+    /** Ship review: respons JSON terautentikasi memuat data pribadi (nama,
+     *  NIP, aktivitas, URL foto) — jangan sampai tersimpan di cache browser/
+     *  proxy. Selaras endpoint foto yang sudah `no-store`. */
+    public function test_authenticated_json_responses_are_no_store(): void
+    {
+        $admin = $this->createAdmin();
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/auth/me')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private');
+    }
+
+    /** Respons error terautentikasi (403/422) juga membawa konteks — sama
+     *  perlakuan. Respons publik (login) tidak disentuh. */
+    public function test_authenticated_json_error_responses_are_no_store(): void
+    {
+        $this->createAdmin(); // menyiapkan field + team untuk staf
+        $staf = $this->createStaf();
+        Sanctum::actingAs($staf);
+
+        $response = $this->getJson('/api/admin/wfh/team-reports/1');
+        $response->assertClientError()
+            ->assertHeader('Cache-Control', 'no-store, private');
+    }
+
     /**
      * Guard posisi: satu-satunya environment tanpa CSP adalah `local`, karena
      * hanya di sana `vite dev` menyuntik script HMR inline dari dev-server
@@ -104,6 +130,11 @@ class SecurityHardeningTest extends TestCase
      */
     public function test_csp_allows_the_rendered_inline_theme_script(): void
     {
+        // Pin eksplisit (selaras uji di atas): APP_ENV dari runner (docker
+        // compose = local) tidak ikut phpunit.xml, dan di local CSP sengaja
+        // dilewati — uji hash harus berjalan di env yang memakai CSP.
+        app()['env'] = 'testing';
+
         $shell = view('app')->render();
         preg_match('/<script>(.*?)<\/script>/s', $shell, $matches);
         $this->assertNotEmpty($matches[1], 'Shell harus memuat skrip anti-flash tema.');

@@ -49,6 +49,9 @@ export interface WfhTeamDetailState {
   data: WfhTeamReportDetail | null;
   status: WfhTeamFetchStatus;
   error: string | null;
+  /** requestId dispatch detail terakhir — membuang respons basi (race,
+   *  selaras guard list). */
+  latestRequestId: string | null;
 }
 
 export interface WfhTeamState {
@@ -67,7 +70,7 @@ export function initialWfhTeamState(): WfhTeamState {
       actionError: null,
       latestRequestId: null,
     },
-    detail: { data: null, status: "idle", error: null },
+    detail: { data: null, status: "idle", error: null, latestRequestId: null },
   };
 }
 
@@ -223,9 +226,12 @@ const slice = createSlice({
   name: "wfhTeam",
   initialState: initialWfhTeamState,
   reducers: {
-    /** Reset/ganti query filter list tanpa menyentuh items/status (dipakai mount). */
+    /** Reset/ganti query filter list tanpa menyentuh items/status (dipakai
+     *  mount). Reset PENUH, bukan merge: kunci yang tidak dikirim hilang,
+     *  supaya sisa `page`/`per_page` navigasi sebelumnya tidak selamat dan
+     *  refetch mutasi konsisten dengan fetch mount (ship review). */
     setTeamListQuery(state, action: PayloadAction<ListTeamReportsQuery>) {
-      state.list.query = { ...state.list.query, ...action.payload };
+      state.list.query = { ...action.payload };
     },
     /** Buang pesan mutasi lama (dipanggil saat dialog create dibuka ulang). */
     clearWfhTeamActionError(state) {
@@ -257,16 +263,19 @@ const slice = createSlice({
           (action.payload as string | undefined) ?? action.error.message ?? "Gagal memuat daftar.";
       })
       // ── Fetch detail ──────────────────────────────────────────
-      .addCase(fetchWfhTeamReportDetail.pending, (state) => {
+      .addCase(fetchWfhTeamReportDetail.pending, (state, action) => {
         state.detail.status = "loading";
         state.detail.error = null;
+        state.detail.latestRequestId = action.meta.requestId;
       })
       .addCase(fetchWfhTeamReportDetail.fulfilled, (state, action) => {
+        if (state.detail.latestRequestId !== action.meta.requestId) return;
         state.detail.status = "succeeded";
         state.detail.data = action.payload;
         state.detail.error = null;
       })
       .addCase(fetchWfhTeamReportDetail.rejected, (state, action) => {
+        if (state.detail.latestRequestId !== action.meta.requestId) return;
         state.detail.status = "failed";
         state.detail.error =
           (action.payload as string | undefined) ??

@@ -26,6 +26,15 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        // Data terautentikasi (nama, NIP, aktivitas, URL foto) tidak boleh
+        // tersimpan di cache browser/proxy. Panggilan terautentikasi
+        // mengandalkan default `no-cache, private`, yang masih boleh
+        // disimpan; `no-store` melarang penyimpanan sama sekali (paritas
+        // dengan endpoint foto yang sudah no-store).
+        if ($response->headers->has('Cache-Control')
+            && str_contains((string) $response->headers->get('Cache-Control'), 'private')) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+        }
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
         // CSP + HSTS dinyalakan untuk SEMUA environment selain local (bukan

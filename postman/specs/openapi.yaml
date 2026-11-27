@@ -5049,14 +5049,17 @@ paths:
         Generates a combined PDF report for all staff in a team for a specific date.
         The admin (maker) signs from their profile.
         The Kepala Bidang (field head) appears as "Atasan Langsung".
-        Requires `wfh.report.export_pdf` permission. Team must belong to admin\'s field.
+        Requires `wfh.report.export_pdf` permission. Team must belong to the
+        caller's field — except the admin role, which may export ANY team
+        (matching the admin's cross-field visibility on the team-report list).
+        Non-own-team export additionally requires `wfh.monitoring.view`.
       parameters:
         - name: team
           in: path
           required: true
           schema:
             type: integer
-          description: Team ID (must be within admin\'s field)
+          description: Team ID (must be within the caller's field; the admin role may use any team)
           example: 3
         - name: date
           in: query
@@ -5090,7 +5093,7 @@ paths:
                 type: string
                 format: binary
         "403":
-          description: Team not in admin\'s field or missing permission
+          description: Team outside the caller's field (admins exempt), non-own-team export without `wfh.monitoring.view`, or missing permission
           content:
             application/json:
               schema:
@@ -5244,7 +5247,11 @@ paths:
         holder of `wfh.team_report.view` also holds it). Scope mirrors the
         list endpoint: admin sees any report; kepala_bidang (field head) sees
         reports of teams in their field; kepala_tim and other users only
-        their own team's reports. Requires `wfh.team_report.view`.
+        their own team's reports. Requires BOTH `wfh.team_report.view`
+        (route gate) and `wfh.monitoring.view` (the payload embeds
+        monitoring-grade content); a caller holding only the first gets 403.
+        Draft personal reports are never included — a member whose only
+        report for the date is a draft appears with a null `report_id`.
       parameters:
         - name: id
           in: path

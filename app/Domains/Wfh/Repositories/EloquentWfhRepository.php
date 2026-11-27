@@ -142,7 +142,8 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
     public function getTeamReportDetailData(int $teamId, string $date): array
     {
-        $members = User::where('team_id', $teamId)->where('is_active', true)->get();
+        // Urutan deterministik (nama) — kartu detail stabil antar query plan.
+        $members = User::where('team_id', $teamId)->where('is_active', true)->orderBy('name')->get();
 
         $reports = WfhReport::with(['activities.links', 'attendances'])
             ->where('report_date', $date)
@@ -150,10 +151,13 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
             ->get()
             ->groupBy('user_id')
             // No-revision flow allows a rejected report plus a fresh one for
-            // the same date; show the live one, newest first (D3).
+            // the same date; show the live one, newest first (D3), falling
+            // back to a rejected-only row (surfaced as `rejected`). Drafts are
+            // author-private (ship review): a member with only a draft shows
+            // "belum ada laporan", consistent with the list page.
             ->map(fn ($group) => $group
                 ->sortByDesc(fn ($r) => [in_array($r->status, WfhReportStatus::LIVE, true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
-                ->first());
+                ->first(fn ($r) => $r->status !== WfhReportStatus::DRAFT));
 
         return $members->map(function ($member) use ($reports) {
             $report = $reports->get($member->id);

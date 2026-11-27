@@ -5,6 +5,34 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-27 — tuntas temuan ship review #21)
+- Tautan kegiatan jalur bulk `POST/PUT /wfh/reports` kini juga dibatasi
+  https (`starts_with:https://` di `StoreReportRequest`) — `url` saja masih
+  menerima `file://`/`about://` yang lolos FILTER_VALIDATE_URL dan dirender
+  ke `href` di halaman detail laporan tim. Uji 422 + uji positif https.
+- `phpunit.xml` mem-pin `APP_ENV=testing` dengan `force="true"`: docker
+  compose menyetel `APP_ENV=local` sehingga perintah uji bawaan repo
+  menjalankan suite sebagai `local` (CSP terlewati) dan uji hash CSP RED.
+- Respons detail laporan tim tidak lagi memuat isi draf pribadi anggota —
+  draf bersifat privat penulis; anggota yang hanya punya draf tampil
+  "belum ada laporan" (konsisten dengan halaman daftar). Anggota yang hanya
+  punya laporan rejected tetap tampil sebagai `rejected`, dan urutan kartu
+  anggota kini deterministik (nama).
+- Guard `latestRequestId` pada thunk detail (`wfhTeamSlice`) — respons basi
+  akibat navigasi detail-ke-detail tidak lagi menimpa detail terbaru atau
+  menyisipkan pesan error laporan lama; selaras guard daftar.
+- `setTeamListQuery` kini reset penuh (bukan merge) — sisa `page`/`per_page`
+  navigasi sebelumnya tidak lagi selamat saat mount dan refetch mutasi.
+- Header `Cache-Control: no-store, private` untuk semua respons API yang
+  membawa konteks `private` (data pribadi tidak tersimpan cache browser/
+  proxy; paritas endpoint foto).
+- Toast error Unduh PDF di halaman daftar kini selaras halaman detail;
+  `pdfErrorMessage` diberi uji langsung (termasuk fallback non-Error).
+- `openapi.yaml`: gate ganda (`wfh.team_report.view` + `wfh.monitoring.view`)
+  pada show dan admin lintas-tim pada PDF tim terdokumentasi.
+- Uji unit `TeamReportScope` (fail-closed `1 = 0` tanpa field, admin tanpa
+  batasan, kunci tim sendiri, kepala bidang lintas tim, 403/`null` denial).
+
 ### Fixed (backend+frontend, 2026-11-27 — ship review: tuntas temuan review)
 - Skrip anti-flash tema di `app.blade.php` kini diizinkan CSP melalui hash
   sha256 eksplisit di `script-src` (`SecurityHeaders`); sebelumnya skrip inline

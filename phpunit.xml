@@ -22,7 +22,11 @@
              di PdfImage (ship review). Pin eksplisit agar setiap runner
              (CI, docker, lokal) memakai batas yang sama. -->
         <ini name="memory_limit" value="1G"/>
-        <env name="APP_ENV" value="testing"/>
+        <!-- force: variabel lingkungan yang sudah diset runner (docker-compose
+             menyetel APP_ENV=local) TIDAK ditimpa tanpa atribut ini, sehingga
+             suite berjalan sebagai `local` — CSP terlewati dan uji hash CSP
+             gagal (ship review). Pin eksplisit untuk setiap runner. -->
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
         <!-- <env name="DB_CONNECTION" value="sqlite"/> -->

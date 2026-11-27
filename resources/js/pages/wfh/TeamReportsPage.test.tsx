@@ -901,4 +901,24 @@ describe("TeamReportsPage — aksi baris Detail & Unduh PDF (Task 6)", () => {
       within(screen.getByTestId("team-report-row-1")).queryByRole("button", { name: /unduh pdf/i }),
     ).toBeNull();
   });
+
+  /** Ship review: permukaan error Unduh PDF diselaraskan dengan halaman
+   *  detail — banner inline + toast memakai pesan yang sama. */
+  it("Unduh PDF gagal → banner inline dan toast memakai pesan server", async () => {
+    mockedPdf.mockRejectedValueOnce(new ApiError("api", "Andi belum mengatur tanda tangan."));
+    renderPageAs({ permissions: ["wfh.team_report.view", "wfh.report.export_pdf"] });
+    await screen.findByTestId("team-report-row-1");
+
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", { name: /unduh pdf/i }),
+    );
+
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast?.textContent).toContain("Andi belum mengatur tanda tangan.");
+    });
+    expect(
+      within(screen.getByTestId("team-report-row-1")).getByText(/belum mengatur tanda tangan/i),
+    ).toBeTruthy();
+  });
 });
