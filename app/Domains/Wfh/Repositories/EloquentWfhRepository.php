@@ -8,6 +8,7 @@ use App\Domains\Wfh\Models\WfhReportActivity;
 use App\Exceptions\ApiException;
 use App\Models\User;
 use App\Repositories\EloquentRepository;
+use App\Support\Media\PrivateMediaPath;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -136,6 +137,54 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
                 'photos' => $photos,
             ];
         })->toArray();
+    }
+
+    public function getTeamReportDetailData(int $teamId, string $date): array
+    {
+        $members = User::where('team_id', $teamId)->where('is_active', true)->get();
+
+        $reports = WfhReport::with(['activities.links', 'attendances'])
+            ->where('report_date', $date)
+            ->whereHas('user', fn ($q) => $q->where('team_id', $teamId))
+            ->get()
+            ->groupBy('user_id')
+            // No-revision flow allows a rejected report plus a fresh one for
+            // the same date; show the live one, newest first (D3).
+            ->map(fn ($group) => $group
+                ->sortByDesc(fn ($r) => [in_array($r->status, ['pending', 'approved'], true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
+                ->first());
+
+        return $members->map(function ($member) use ($reports) {
+            $report = $reports->get($member->id);
+
+            $activities = $report
+                ? $report->activities->map(fn ($activity) => [
+                    'id' => $activity->id,
+                    'start_time' => $activity->start_time?->format('H:i'),
+                    'end_time' => $activity->end_time?->format('H:i'),
+                    'activity' => $activity->activity,
+                    'links' => $activity->links->pluck('url')->filter()->values()->all(),
+                ])->values()->all()
+                : [];
+
+            $attendances = $report
+                ? $report->attendances->map(fn ($attendance) => [
+                    'id' => $attendance->id,
+                    'session' => $attendance->session,
+                    'photo_url' => PrivateMediaPath::attendanceUrl($report->id, $attendance->id, $attendance->photo_path),
+                ])->values()->all()
+                : [];
+
+            return [
+                'user_id' => $member->id,
+                'name' => $member->name,
+                'nip' => $member->nip,
+                'report_id' => $report?->id,
+                'report_status' => $report?->status,
+                'activities' => $activities,
+                'attendances' => $attendances,
+            ];
+        })->values()->all();
     }
 
     public function createReportWithRelations(array $reportData, array $activities, array $attendances = []): WfhReport

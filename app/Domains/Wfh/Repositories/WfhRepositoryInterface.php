@@ -26,6 +26,14 @@ interface WfhRepositoryInterface extends RepositoryInterface
 
     public function getTeamReportData(int $teamId, string $date): array;
 
+    /**
+     * Per-member content for the team report detail page: the selected
+     * personal report, its activities and its attendances.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getTeamReportDetailData(int $teamId, string $date): array;
+
     public function getUsersWithoutAttendance(string $date, ?int $teamId = null, ?int $fieldId = null): array;
 
     public function getUsersWithoutReport(string $date, ?int $teamId = null, ?int $fieldId = null): array;
