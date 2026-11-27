@@ -850,6 +850,34 @@ describe("TeamReportsPage — filter list (Task 6)", () => {
     });
   });
 
+  /** Ship #23: `Terapkan` mereset kontrol per halaman ke default (15) —
+   *  query redux yang tersisa tidak boleh masih membawa `per_page` lama,
+   *  kalau tidak pagination mengirim nilai yang berbeda dari yang
+   *  ditampilkan kontrol (desinkronisasi kelas #22 B2, pada `per_page`). */
+  it("Terapkan setelah ubah per halaman membuang per_page dari query aktif", async () => {
+    renderPage();
+    await screen.findByText("Tim Aplikasi");
+
+    await pickSelect(/per halaman/i, "25");
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ per_page: 25, page: 1 });
+    });
+
+    await openFilter();
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
+    });
+
+    mockedList.mockClear();
+    await userEvent.click(pageButton("Berikutnya"));
+    await waitFor(() => {
+      // Kontrol menampilkan 15 (default) — pagination tidak boleh diam-diam
+      // mengirim per_page: 25 yang tersisa di redux.
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 2 });
+    });
+  });
+
   it("dropdown Tim terisi untuk pemegang view-only (bukan hanya pembuat)", async () => {
     renderPageAs();
     await screen.findByText("Tim Aplikasi");

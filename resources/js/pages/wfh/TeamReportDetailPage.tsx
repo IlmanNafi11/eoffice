@@ -67,10 +67,15 @@ const SESSION_LABEL: Record<WfhSession, string> = {
 /** Foto absensi ber-otorisasi: object URL di-load per `photo_url`, revoke saat unmount. */
 function MemberAttendancePhoto({ url, session }: { url: string; session: WfhSession }) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  // Ship #23: `null` objectUrl has two meanings — still downloading, and
+  // failed. Without this flag the card flashes "Foto tidak dapat dimuat."
+  // before flipping to the image on slow links.
+  const [loading, setLoading] = useState(true);
   const urlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     fetchAttendanceObjectUrl(url)
       .then((next) => {
         if (cancelled) {
@@ -80,9 +85,12 @@ function MemberAttendancePhoto({ url, session }: { url: string; session: WfhSess
         if (urlRef.current) URL.revokeObjectURL(urlRef.current);
         urlRef.current = next;
         setObjectUrl(next);
+        setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setObjectUrl(null);
+        if (cancelled) return;
+        setObjectUrl(null);
+        setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -95,6 +103,16 @@ function MemberAttendancePhoto({ url, session }: { url: string; session: WfhSess
     },
     [],
   );
+
+  if (loading) {
+    return (
+      <span
+        data-testid="attendance-photo-loading"
+        className="block h-8 w-24 animate-pulse rounded-md border border-border bg-muted"
+        aria-label={`Memuat foto absensi sesi ${SESSION_LABEL[session]}`}
+      />
+    );
+  }
 
   if (!objectUrl) {
     return (
@@ -161,9 +179,12 @@ function MemberCard({ member }: { member: WfhTeamReportMember }) {
                     {act.start_time ?? "--:--"}–{act.end_time ?? "--:--"}
                   </span>{" "}
                   {act.activity}
-                  {act.links.map((link) => (
+                  {act.links.map((link, i) => (
                     <a
-                      key={link}
+                      // Ship #23: key on index — two identical evidence URLs
+                      // are two rows (the PDF numbers them individually);
+                      // `key={link}` collided and warned React.
+                      key={`${i}-${link}`}
                       href={link}
                       target="_blank"
                       rel="noreferrer"

@@ -178,9 +178,16 @@ class TeamReportController extends Controller
             return ApiResponse::fail('Pembuat laporan tidak dapat menyetujui laporannya sendiri.', 403);
         }
 
-        $guard = $this->ensureSameField($request, $report->team?->field_id);
-        if ($guard) {
+        // Ship #23: two layers, deliberately. (1) The FIELD boundary — admin
+        // included — stays the approval rule (a cross-field admin approval is
+        // a pinned 403; the read scope alone would widen it back).
+        // (2) The READ scope on top: within the field, only the field head
+        // acts on a sibling team's report; everyone else stays on their own.
+        if ($guard = $this->ensureSameField($request, $report->team?->field_id)) {
             return $guard;
+        }
+        if ($denial = $this->teamReportScope->denialFor($request->user(), $report)) {
+            return $denial;
         }
 
         try {
@@ -209,9 +216,9 @@ class TeamReportController extends Controller
             return ApiResponse::fail('Pembuat laporan tidak dapat menolak laporannya sendiri.', 403);
         }
 
-        $guard = $this->ensureSameField($request, $report->team?->field_id);
-        if ($guard) {
-            return $guard;
+        // Read-scope boundary, not merely "same field" (ship #23).
+        if ($denial = $this->teamReportScope->denialFor($request->user(), $report)) {
+            return $denial;
         }
 
         try {

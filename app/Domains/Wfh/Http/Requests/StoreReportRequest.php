@@ -28,7 +28,10 @@ class StoreReportRequest extends FormRequest
             // `url` saja menerima skema berbahaya yang lolos FILTER_VALIDATE_URL
             // (mis. `data:`, `file://`, `about://`); halaman detail laporan tim
             // me-render tautan ke `href`, jadi skema dibatasi https di
-            // boundary, selaras dengan StoreActivityRequest.
+            // boundary, selaras dengan StoreActivityRequest. Aturan `array`
+            // dipertahankan supaya nilai skalar gagal dengan pesan yang benar
+            // (bukan "format tautan tidak valid" dari `url`).
+            'activities.*.links' => ['nullable', 'array'],
             'activities.*.links.*' => ['url', 'starts_with:https://'],
             'attendances' => ['sometimes', 'array:pagi,siang,sore'],
             'attendances.*.photo' => ['sometimes', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],

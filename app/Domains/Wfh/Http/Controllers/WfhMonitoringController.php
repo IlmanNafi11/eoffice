@@ -3,10 +3,10 @@
 namespace App\Domains\Wfh\Http\Controllers;
 
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
-use App\Models\Field;
 use App\Models\Team;
 use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
+use App\Support\Organization\FieldLeadership;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,9 +41,10 @@ class WfhMonitoringController extends Controller
             $teamId = null;
             $fieldId = null;
         } else {
-            // Resolve actor's field: either field head, or via own team
-            $actorFieldId = Field::where('head_id', $user->id)->value('id')
-                ?? $user->team?->field_id;
+            // Shared resolver (ship #23): the field they head, else their
+            // own team's field — one answer across dashboard, monitoring and
+            // the team-report scope.
+            $actorFieldId = FieldLeadership::ledFieldId($user);
 
             if ($teamId !== null) {
                 // Validate team belongs to actor's field (prevent cross-field leak)
@@ -51,7 +52,7 @@ class WfhMonitoringController extends Controller
                 if (! $team || ! $actorFieldId || $team->field_id !== $actorFieldId) {
                     return ApiResponse::fail('Tim tidak berada dalam bidang Anda.', 403);
                 }
-            } elseif ($actorFieldId && Field::where('id', $actorFieldId)->where('head_id', $user->id)->exists()) {
+            } elseif (FieldLeadership::isHeadOf($user, $actorFieldId)) {
                 // Field head without explicit team_id → entire field
                 $fieldId = $actorFieldId;
             } else {

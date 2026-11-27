@@ -6,6 +6,7 @@ use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\Constants\Roles;
+use Database\Seeders\AdminUserSeeder;
 use Database\Seeders\DemoUsersSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,5 +142,22 @@ class DemoUsersSeederTest extends TestCase
         $this->assertFalse(Hash::check('', $staf->password));
         $this->assertTrue($staf->must_change_password);
         $this->assertNotSame('password123', Str::slug($staf->password));
+    }
+
+    /** Ship #23 (info temuan review): AdminUserSeeder membuat akun ADMIN —
+     *  harus skip di luar local/testing, sama seperti DemoUsersSeeder.
+     *  Password-nya sudah fail-closed (acak + wajib ganti), tapi seeding
+     *  akun admin di produksi tetap bukan perilaku yang diinginkan. */
+    public function test_admin_user_seeder_seeds_nothing_outside_local_and_testing(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+
+        (new AdminUserSeeder)->run();
+
+        $this->assertSame(
+            0,
+            User::where('email', 'admin@kominfo.go.id')->count(),
+            'Admin account must not be seeded outside local/testing.',
+        );
     }
 }

@@ -3,10 +3,10 @@
 namespace App\Domains\Wfh\Services;
 
 use App\Domains\Wfh\Models\WfhTeamReport;
-use App\Models\Field;
 use App\Models\User;
 use App\Support\Constants\Roles;
 use App\Support\Http\ApiResponse;
+use App\Support\Organization\FieldLeadership;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 
@@ -103,10 +103,13 @@ class TeamReportScope
         return $actor->team?->field?->id;
     }
 
-    /** Field head = the `head_id` on the field row, read from the DB (not a role string). */
+    /**
+     * Field head = the `head_id` on the field row, read from the DB (not a
+     * role string). Delegates to the shared resolver (ship #23) so the
+     * dashboard and monitoring board cannot answer this question differently.
+     */
     public function isFieldHead(User $actor, ?int $fieldId): bool
     {
-        return $fieldId !== null
-            && Field::where('id', $fieldId)->where('head_id', $actor->id)->exists();
+        return FieldLeadership::isHeadOf($actor, $fieldId);
     }
 }

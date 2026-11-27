@@ -5,6 +5,47 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-27 — tuntas temuan ship review #23)
+- **Security (config, benar-benar ini kali):** hardening
+  `allowed_protocols` dari ship #22 ternyata NO-OP — kuncinya ditaruh di level
+  atas `config/dompdf.php` padahal provider paket hanya membaca
+  `dompdf.options`. Opsi EFEKTIF Dompdf tetap memuat `file://` dan `http://`.
+  Kunci dipindah ke `options.allowed_protocols`; `DompdfConfigTest` mengunci
+  opsi efektif (bukan `config()` mentah), dan sudah dibuktikan RED pada
+  bentuk nesting lama.
+- Respons error yang dirender SETELAH pipeline terurai (`RequestHandled`
+  listener) kini ikut memuat upgrade `Cache-Control: no-store, private`,
+  bukan hanya header keamanan dasar. Parameter `applyNoStore` diganti nama
+  `mayContainPrivateData` agar semantiknya tidak menyiratkan "hanya auth".
+- `approve`/`reject` laporan tim memakai batas baca yang sama dengan
+  list/detail: kepala bidang yang BUKAN kepala bidang-terkait tidak lagi bisa
+  menyetujui/menolak laporan tim saudara (403); kepala bidang-terkait tetap
+  bisa. `approve` mempertahankan gerbang field (admin lintas bidang tetap 403)
+  lalu menambah scope baca di atasnya.
+- Pencarian "bidang yang dipimpin, jika tidak bidang tim sendiri" disatukan
+  di `App\Support\Organization\FieldLeadership` — dipakai dashboard,
+  papan monitoring, dan scope laporan tim, sehingga tidak mungkin lagi
+  saling menyimpang (`headIdOf` untuk otorisasi, `ledFieldId` untuk scope).
+- `AdminUserSeeder` tidak lagi menyemai akun admin di luar `local`/`testing`
+  (paritas `DemoUsersSeeder`); password tetap fail-closed.
+- `StoreReportRequest`: `activities.*.links` kembali memakai aturan `array`
+  sehingga nilai skalar gagal 422 dengan pesan yang benar.
+- Halaman detail laporan tim: selama foto absensi masih diunduh tampil
+  placeholder, bukan kilasan palsu "Foto tidak dapat dimuat."
+- Tautan bukti identik dalam satu kegiatan dirender sebagai dua baris
+  (`key` per indeks — `key={link}` memicu peringatan key ganda React).
+- Tabel daftar laporan tim: `Terapkan` mereset kontrol per halaman ke default
+  (15) dan mengganti query (bukan merge) — `per_page` tidak lagi tertinggal
+  dari nilai yang dikirim.
+- Kontrak API: `verification_token` dihapus dari skema `WfhTeamReport`
+  (OpenAPI + tipe FE) — resource memang tidak pernah mengirimkannya.
+- Konfigurasi `ThemeProvider` produksi diekstrak ke
+  `resources/js/lib/theme-provider-config.ts` dan diimpor oleh `app.tsx` serta
+  tes toggle; tes paritas mengunci keselarasan dengan skrip anti-flash blade.
+- Uji cakupan baru: renderer PDF gagal → envelope JSON 500 (personal & tim),
+  badan PDF diawali `%PDF`, opsi dompdf efektif, approve/reject kepala bidang
+  vs anggota bidang, error pasca-pipeline `no-store`, guard `AdminUserSeeder`.
+
 ### Fixed (backend+frontend, 2026-11-27 — tuntas temuan ship review #22)
 - PDF tim tidak lagi mencetak draf pribadi anggota: `getTeamReportData`
   memilih laporan live terbaru (fallback rejected) memakai aturan yang sama

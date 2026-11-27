@@ -179,6 +179,34 @@ describe("TeamReportDetailPage — muat & render", () => {
     expect(link.getAttribute("href")).toBe("https://example.test/notulen");
   });
 
+  /** Ship #23: dua tautan identik dalam satu kegiatan dirender DUA baris —
+   *  PDF menomori keduanya (blade menomori semua link), jadi FE tidak boleh
+   *  meruntuhkan duplikat karena `key={link}` yang bentrok. */
+  it("tautan bukti duplikat tetap dirender dua baris", async () => {
+    mockedGet.mockResolvedValueOnce({
+      ...detail,
+      members: [
+        {
+          ...memberWithReport,
+          activities: [
+            {
+              ...memberWithReport.activities[0],
+              links: [
+                "https://example.test/notulen",
+                "https://example.test/notulen",
+              ],
+            },
+          ],
+        },
+        memberWithoutReport,
+      ],
+    });
+    renderDetail();
+
+    const links = await screen.findAllByRole("link", { name: "https://example.test/notulen" });
+    expect(links).toHaveLength(2);
+  });
+
   it("absensi per sesi memakai label sesi dan foto lewat fetchAttendanceObjectUrl (revoke saat unmount)", async () => {
     renderDetail();
 
@@ -200,6 +228,28 @@ describe("TeamReportDetailPage — muat & render", () => {
 
     expect(await screen.findByText(/foto tidak dapat dimuat/i)).toBeTruthy();
     expect(screen.queryByRole("img", { name: /foto absensi sesi pagi/i })).toBeNull();
+  });
+
+  /** Ship #23: selama foto masih diunduh, kartu TIDAK boleh menampilkan
+   *  "Foto tidak dapat dimuat." — itu error palsu yang berkedip lalu berganti
+   *  menjadi gambar pada koneksi lambat. Yang tampil adalah placeholder
+   *  memuat. */
+  it("foto masih diunduh → placeholder memuat, bukan error palsu", async () => {
+    let resolvePhoto: (value: string) => void = () => {};
+    mockedPhoto.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolvePhoto = resolve;
+      }),
+    );
+    renderDetail();
+
+    expect(await screen.findByTestId("attendance-photo-loading")).toBeTruthy();
+    expect(screen.queryByText(/foto tidak dapat dimuat/i)).toBeNull();
+
+    await act(async () => resolvePhoto("blob:attendance-photo"));
+
+    expect(await screen.findByRole("img", { name: /foto absensi sesi pagi/i })).toBeTruthy();
+    expect(screen.queryByTestId("attendance-photo-loading")).toBeNull();
   });
 
   it("anggota tanpa laporan menampilkan tanda kosong, bukan crash", async () => {

@@ -271,4 +271,28 @@ class ReportStoreUpdateTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['activities.0.links.0']);
     }
+
+    /** Ship #23: `activities.*.links` harus berbentuk array — tanpa aturan
+     *  `array` di sini, nilai skalar/array asosiatif melewati `url` dan gagal
+     *  dengan pesan "format tautan tidak valid" yang menyesatkan (asimetri
+     *  dengan StoreActivityRequest yang mempertahankan aturan `array`). */
+    public function test_store_rejects_scalar_links_with_array_error(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => now()->toDateString(),
+            'activities' => [
+                [
+                    'activity' => 'Kerja lapangan',
+                    'links' => 'https://git.kominfo.go.id/not-an-array',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['activities.0.links']);
+    }
 }

@@ -101,52 +101,72 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
     public function getTeamReportData(int $teamId, string $date): array
     {
-        // Urutan deterministik (nama): dua unduhan PDF tim yang sama tidak
-        // boleh mengurutkan staf berbeda antar query plan.
-        $members = User::where('team_id', $teamId)->where('is_active', true)->orderBy('name')->get();
-
-        // Draf adalah milik penulis (author-private); laporan tim tidak boleh
-        // mencetaknya. Pilih laporan live terbaru dan, bila anggota hanya
-        // punya rejected, pakai baris rejected itu — aturan yang sama dengan
-        // getTeamReportDetailData() (ship review #22: PDF dan halaman detail
-        // harus menjawab pertanyaan yang sama dengan cara yang sama).
-        $reports = WfhReport::with(['activities.links', 'attendances'])
-            ->where('report_date', $date)
-            ->whereHas('user', fn ($q) => $q->where('team_id', $teamId))
-            ->get()
-            ->groupBy('user_id')
-            ->map(fn ($group) => $group
-                ->sortByDesc(fn ($r) => [in_array($r->status, WfhReportStatus::LIVE, true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
-                ->first(fn ($r) => $r->status !== WfhReportStatus::DRAFT));
-
-        return $members->map(function ($member) use ($reports) {
-            $report = $reports->get($member->id);
-
-            $links = $report
-                ? $report->activities->flatMap->links->pluck('url')->filter()->values()
-                : collect();
-
-            // Foto diambil dari laporan yang SAMA dengan tautan di atas: query
-            // presensi terpisah akan membawa foto milik draf anggota lain.
-            $photos = $report
-                ? $report->attendances->map(fn ($att) => [
-                    'session' => $att->session,
-                    'photo_path' => $att->photo_path,
-                ])->values()->all()
-                : [];
-
-            return [
-                'name' => strtoupper($member->name),
-                'nip' => $member->nip ?? '-',
-                'links' => $links->toArray(),
-                'photos' => $photos,
-            ];
-        })->toArray();
+        return collect($this->teamMembersWithSelectedReport($teamId, $date))
+            ->map(fn (array $pair) => [
+                'name' => strtoupper($pair['member']->name),
+                'nip' => $pair['member']->nip ?? '-',
+                'links' => $pair['report']
+                    ? $pair['report']->activities->flatMap->links->pluck('url')->filter()->values()->toArray()
+                    : [],
+                // Foto diambil dari laporan yang SAMA dengan tautan di atas:
+                // query presensi terpisah akan membawa foto milik draf
+                // anggota lain.
+                'photos' => $pair['report']
+                    ? $pair['report']->attendances
+                        ->map(fn ($att) => ['session' => $att->session, 'photo_path' => $att->photo_path])
+                        ->values()->all()
+                    : [],
+            ])
+            ->toArray();
     }
 
     public function getTeamReportDetailData(int $teamId, string $date): array
     {
-        // Urutan deterministik (nama) — kartu detail stabil antar query plan.
+        return collect($this->teamMembersWithSelectedReport($teamId, $date))
+            ->map(fn (array $pair) => [
+                'user_id' => $pair['member']->id,
+                'name' => $pair['member']->name,
+                'nip' => $pair['member']->nip,
+                'report_id' => $pair['report']?->id,
+                'report_status' => $pair['report']?->status,
+                'activities' => $pair['report']
+                    ? $pair['report']->activities->map(fn ($activity) => [
+                        'id' => $activity->id,
+                        'start_time' => $activity->start_time?->format('H:i'),
+                        'end_time' => $activity->end_time?->format('H:i'),
+                        'activity' => $activity->activity,
+                        'links' => $activity->links->pluck('url')->filter()->values()->all(),
+                    ])->values()->all()
+                    : [],
+                'attendances' => $pair['report']
+                    ? $pair['report']->attendances->map(fn ($attendance) => [
+                        'id' => $attendance->id,
+                        'session' => $attendance->session,
+                        'photo_url' => PrivateMediaPath::attendanceUrl(
+                            $pair['report']->id,
+                            $attendance->id,
+                            $attendance->photo_path,
+                        ),
+                    ])->values()->all()
+                    : [],
+            ])
+            ->values()->all();
+    }
+
+    /**
+     * Members of a team with the ONE personal report the PDF and the detail
+     * page agree on (ship review #22: both surfaces must answer the same
+     * question the same way — now enforced by construction, not copy-paste).
+     *
+     * Members come back name-ordered (deterministic between query plans);
+     * drafts are author-private and never selected; a member with only a
+     * rejected report keeps that row (surfaced as `rejected`); live reports
+     * win over rejected ones, newest first (D3).
+     *
+     * @return array<int, array{member: User, report: WfhReport|null}>
+     */
+    private function teamMembersWithSelectedReport(int $teamId, string $date): array
+    {
         $members = User::where('team_id', $teamId)->where('is_active', true)->orderBy('name')->get();
 
         $reports = WfhReport::with(['activities.links', 'attendances'])
@@ -154,46 +174,16 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
             ->whereHas('user', fn ($q) => $q->where('team_id', $teamId))
             ->get()
             ->groupBy('user_id')
-            // No-revision flow allows a rejected report plus a fresh one for
-            // the same date; show the live one, newest first (D3), falling
-            // back to a rejected-only row (surfaced as `rejected`). Drafts are
-            // author-private (ship review): a member with only a draft shows
-            // "belum ada laporan", consistent with the list page.
             ->map(fn ($group) => $group
                 ->sortByDesc(fn ($r) => [in_array($r->status, WfhReportStatus::LIVE, true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
                 ->first(fn ($r) => $r->status !== WfhReportStatus::DRAFT));
 
-        return $members->map(function ($member) use ($reports) {
-            $report = $reports->get($member->id);
-
-            $activities = $report
-                ? $report->activities->map(fn ($activity) => [
-                    'id' => $activity->id,
-                    'start_time' => $activity->start_time?->format('H:i'),
-                    'end_time' => $activity->end_time?->format('H:i'),
-                    'activity' => $activity->activity,
-                    'links' => $activity->links->pluck('url')->filter()->values()->all(),
-                ])->values()->all()
-                : [];
-
-            $attendances = $report
-                ? $report->attendances->map(fn ($attendance) => [
-                    'id' => $attendance->id,
-                    'session' => $attendance->session,
-                    'photo_url' => PrivateMediaPath::attendanceUrl($report->id, $attendance->id, $attendance->photo_path),
-                ])->values()->all()
-                : [];
-
-            return [
-                'user_id' => $member->id,
-                'name' => $member->name,
-                'nip' => $member->nip,
-                'report_id' => $report?->id,
-                'report_status' => $report?->status,
-                'activities' => $activities,
-                'attendances' => $attendances,
-            ];
-        })->values()->all();
+        return $members
+            ->map(fn (User $member) => [
+                'member' => $member,
+                'report' => $reports->get($member->id),
+            ])
+            ->all();
     }
 
     public function createReportWithRelations(array $reportData, array $activities, array $attendances = []): WfhReport

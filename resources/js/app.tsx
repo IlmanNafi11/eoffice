@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { RouterProvider } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { themeProviderConfig } from "@/lib/theme-provider-config";
 import { store } from "@/store";
 import { router } from "@/routes";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,13 +19,7 @@ if (!rootEl) {
 }
 
 createRoot(rootEl).render(
-  <ThemeProvider
-    attribute="class"
-    defaultTheme="system"
-    enableSystem
-    storageKey="theme"
-    disableTransitionOnChange
-  >
+  <ThemeProvider {...themeProviderConfig}>
     <Provider store={store}>
       <RouterProvider router={router} />
       {/* Toast global ui-feedback: satu instance untuk seluruh SPA. */}

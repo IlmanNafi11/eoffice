@@ -13,9 +13,13 @@ class SecurityHeaders
         $response = $next($request);
         self::apply($response);
 
-        // `no-store` upgrade is auth-gated (see applyNoStore()): a request carrying a
-        // credential answered 2xx is private data, and its errors are too.
-        self::applyNoStore($response, authenticated: $request->user() !== null || $response->getStatusCode() >= 400);
+        // `no-store` upgrade is content-gated (see applyNoStore()): a request
+        // carrying a credential answered 2xx is private data, and its errors
+        // are too.
+        self::applyNoStore(
+            $response,
+            mayContainPrivateData: $request->user() !== null || $response->getStatusCode() >= 400,
+        );
 
         return $response;
     }
@@ -26,15 +30,16 @@ class SecurityHeaders
      * `no-cache, private`, which still allows storage; `no-store` forbids it
      * entirely (parity with the photo endpoint, already `no-store`).
      *
-     * Auth-gated on purpose (ship review #22): the earlier content-agnostic
-     * rule keyed on `private` alone, and Laravel marks *everything* private —
-     * so the session-less health check `/up` was frozen to `no-store, private`
-     * too. Only responses to a credentialed request, or any error response,
-     * are upgraded; anonymous success responses keep the framework default.
+     * Gated on `mayContainPrivateData` (ship review #22): the earlier
+     * content-agnostic rule keyed on `private` alone, and Laravel marks
+     * *everything* private — so the session-less health check `/up` was
+     * frozen to `no-store, private` too. Only responses that may carry
+     * private data — a credentialed request, or any error response — are
+     * upgraded; anonymous success responses keep the framework default.
      */
-    public static function applyNoStore(Response $response, bool $authenticated): void
+    public static function applyNoStore(Response $response, bool $mayContainPrivateData): void
     {
-        if (! $authenticated) {
+        if (! $mayContainPrivateData) {
             return;
         }
 

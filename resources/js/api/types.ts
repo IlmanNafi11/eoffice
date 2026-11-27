@@ -269,7 +269,6 @@ export interface WfhTeamReport {
   maker_signed_at?: string | null;
   supervisor_signed_at?: string | null;
   reject_reason?: string | null;
-  verification_token?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   team?: TeamNested | null;

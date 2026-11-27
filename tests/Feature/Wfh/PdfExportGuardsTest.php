@@ -266,4 +266,83 @@ class PdfExportGuardsTest extends TestCase
             'A foreign team_report_id must be ignored: this PDF is not approved.',
         );
     }
+
+    /** Ship #23: dompdf yang gagal (font hilang, gambar korup, memori) tidak
+     *  boleh bocor sebagai HTML 500 — Handler merender /api/* sebagai JSON
+     *  envelope. Dipin dengan menukar binding `dompdf.wrapper` dengan double
+     *  yang melempar saat `output()`. */
+    public function test_renderer_failure_on_personal_pdf_returns_json_envelope(): void
+    {
+        $this->withSignature($this->staff);
+        Sanctum::actingAs($this->staff);
+        $this->failRenderer();
+
+        $response = $this->getJson('/api/wfh/reports/'.$this->report('pending')->id.'/pdf');
+
+        $response->assertStatus(500);
+        $response->assertJsonPath('success', false);
+        $response->assertHeader('Content-Type', 'application/json');
+        $this->assertStringNotContainsString('<html', (string) $response->getContent());
+    }
+
+    public function test_renderer_failure_on_team_pdf_returns_json_envelope(): void
+    {
+        $this->withSignature($this->kepala);
+        Sanctum::actingAs($this->kepala);
+        $this->failRenderer();
+
+        $response = $this->getJson('/api/admin/wfh/teams/'.$this->teamA->id.'/pdf');
+
+        $response->assertStatus(500);
+        $response->assertJsonPath('success', false);
+        $response->assertHeader('Content-Type', 'application/json');
+        $this->assertStringNotContainsString('<html', (string) $response->getContent());
+    }
+
+    /** Ship #23: 200 + Content-Type bukan bukti PDF — badan respons harus
+     *  benar-benar berawalan `%PDF`. */
+    public function test_team_pdf_body_is_a_real_pdf(): void
+    {
+        $this->withSignature($this->kepala);
+        Sanctum::actingAs($this->kepala);
+
+        $response = $this->getJson('/api/admin/wfh/teams/'.$this->teamA->id.'/pdf');
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', (string) $response->getContent());
+    }
+
+    public function test_personal_pdf_body_is_a_real_pdf(): void
+    {
+        $this->withSignature($this->staff);
+        Sanctum::actingAs($this->staff);
+
+        $response = $this->getJson('/api/wfh/reports/'.$this->report('pending')->id.'/pdf');
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', (string) $response->getContent());
+    }
+
+    /** Menukar binding dompdf dengan double yang gagal saat render. */
+    private function failRenderer(): void
+    {
+        $double = new class
+        {
+            public function loadView(...$args): self
+            {
+                return $this;
+            }
+
+            public function __call(string $method, array $parameters): mixed
+            {
+                if ($method === 'output') {
+                    throw new \RuntimeException('font not found');
+                }
+
+                return $this;
+            }
+        };
+
+        $this->app->bind('dompdf.wrapper', fn () => $double);
+    }
 }

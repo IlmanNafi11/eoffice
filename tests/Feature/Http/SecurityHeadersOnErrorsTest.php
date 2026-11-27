@@ -109,6 +109,20 @@ class SecurityHeadersOnErrorsTest extends TestCase
 
         $this->assertSecurityHeaders($this->getJson('/api/health'));
     }
+
+    /** Ship #23: respons error yang dirender SETELAH pipeline terurai
+     *  (RequestHandled listener) harus memuat upgrade `no-store, private`
+     *  yang sama dengan respons error di dalam pipeline — bukan hanya
+     *  header keamanan dasar. */
+    public function test_listener_rendered_error_is_no_store(): void
+    {
+        $this->app->make(HttpKernel::class)->prependMiddleware(BoomMiddleware::class);
+
+        $response = $this->getJson('/api/health');
+
+        $this->assertSecurityHeaders($response);
+        $this->assertSame('no-store, private', $response->headers->get('Cache-Control'));
+    }
 }
 
 class BoomMiddleware

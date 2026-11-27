@@ -157,6 +157,9 @@ export function TeamReportsPage() {
       }),
     );
   }, [dispatch]);
+  // Sengaja tidak reaktif terhadap `query` (run-once-on-mount): nilai yang
+  // dibaca adalah snapshot filter saat mount, bukan efek dari perubahan
+  // filter di tengah sesi — exhaustive-deps di sini memang diabaikan.
 
   // Dropdown tim dimuat sekali: dipakai dialog create DAN filter list, jadi
   // tidak digate `canCreate` (pemegang view-only juga butuh filter tim).
@@ -286,17 +289,19 @@ export function TeamReportsPage() {
     setPerPage(null);
     setFilterOpen(false);
 
-    dispatch(
-      fetchWfhTeamReports({
-        ...(filterStatus
-          ? { status: filterStatus as WfhReportStatus }
-          : {}),
-        ...(filterTeamId ? { team_id: Number(filterTeamId) } : {}),
-        ...(dateFrom ? { date_from: dateFrom } : {}),
-        ...(dateTo ? { date_to: dateTo } : {}),
-        page: 1,
-      }),
-    );
+    const nextQuery = {
+      ...(filterStatus ? { status: filterStatus as WfhReportStatus } : {}),
+      ...(filterTeamId ? { team_id: Number(filterTeamId) } : {}),
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo ? { date_to: dateTo } : {}),
+      page: 1,
+    };
+    // REPLACE, bukan merge (ship #23): kontrol per halaman kembali ke default,
+    // jadi `per_page` lama tidak boleh selamat di query redux — kalau tidak
+    // pagination mengirim nilai yang berbeda dari yang ditampilkan kontrol
+    // (kelas desinkronisasi #22 B2, kini pada `per_page`).
+    dispatch(setTeamListQuery(nextQuery));
+    dispatch(fetchWfhTeamReports(nextQuery));
   }
 
   const canExportPdf = can(user, "wfh.report.export_pdf");

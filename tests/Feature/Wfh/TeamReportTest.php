@@ -483,6 +483,66 @@ class TeamReportTest extends TestCase
             ->assertJsonPath('message', 'Laporan tidak berada dalam bidang Anda.');
     }
 
+    /** Ship #23 (info temuan review): approve/reject should use the same
+     *  read boundary as list/detail. A kepala_bidang who is NOT the field
+     *  head must not approve a sibling team's report — "same field" is not
+     *  "party to this report". Only the field head may act on any team in
+     *  their field; everyone else is limited to their own team. */
+    public function test_kb_who_is_not_field_head_cannot_approve_sibling_team_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $teamA = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $teamB = Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+
+        $deputy = User::factory()->create(['team_id' => $teamA->id]);
+        $deputy->assignRole('kepala_bidang');
+
+        $report = $this->createTeamReport($teamB);
+        Sanctum::actingAs($deputy);
+
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/approve")
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Laporan tidak berada dalam bidang Anda.');
+    }
+
+    /** The field head still approves any team inside their field. */
+    public function test_field_head_can_approve_sibling_team_report(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $teamA = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $teamB = Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+
+        $head = User::factory()->create(['team_id' => $teamA->id]);
+        $head->assignRole('kepala_bidang');
+        $field->update(['head_id' => $head->id]);
+
+        $report = $this->createTeamReport($teamB);
+        Sanctum::actingAs($head);
+
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/approve")
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'approved');
+    }
+
+    /** A kepala_tim granted reject (defensive: no grant today) stays limited
+     *  to their own team. */
+    public function test_kepala_tim_with_reject_permission_is_limited_to_own_team(): void
+    {
+        $field = Field::create(['name' => 'Bidang A']);
+        $teamA = Team::create(['field_id' => $field->id, 'name' => 'Tim A']);
+        $teamB = Team::create(['field_id' => $field->id, 'name' => 'Tim B']);
+
+        $kt = User::factory()->create(['team_id' => $teamA->id]);
+        $kt->assignRole('kepala_tim');
+        $kt->givePermissionTo('wfh.team_report.reject');
+
+        $report = $this->createTeamReport($teamB);
+        Sanctum::actingAs($kt);
+
+        $this->postJson("/api/admin/wfh/team-reports/{$report->id}/reject", ['reason' => 'Tidak sesuai.'])
+            ->assertStatus(403);
+    }
+
     // === Helpers ===
 
     private function createTeamReport(Team $team): mixed

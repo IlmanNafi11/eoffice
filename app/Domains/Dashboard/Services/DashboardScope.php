@@ -2,9 +2,9 @@
 
 namespace App\Domains\Dashboard\Services;
 
-use App\Models\Field;
 use App\Models\User;
 use App\Support\Constants\Roles;
+use App\Support\Organization\FieldLeadership;
 use Illuminate\Database\Eloquent\Builder;
 use LogicException;
 
@@ -49,12 +49,12 @@ final class DashboardScope
         }
 
         if ($user->hasRole(Roles::KEPALA_BIDANG)) {
-            // Same field resolution as WfhMonitoringController: the field they
-            // head, else the field of their own team.
-            $fieldId = Field::where('head_id', $user->id)->orderBy('id')->value('id')
-                ?? $user->team?->field_id;
+            // Shared resolver (ship #23): the field they head, else the field
+            // of their own team — identical to WfhMonitoringController and
+            // TeamReportScope.
+            $fieldId = FieldLeadership::ledFieldId($user);
 
-            return $fieldId === null ? null : new self(self::FIELD, (int) $fieldId);
+            return $fieldId === null ? null : new self(self::FIELD, $fieldId);
         }
 
         return new self(self::SELF, $user->id);

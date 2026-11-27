@@ -14,6 +14,18 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Ship #23: seeding a privileged account outside local/testing is not
+        // a production behaviour — parity with DemoUsersSeeder. The password
+        // is already fail-closed (random + must_change_password), so this is
+        // about not creating an admin row where nobody asked for one.
+        if (! app()->environment('local', 'testing')) {
+            $this->command?->warn(
+                'AdminUserSeeder dilewati: akun admin hanya untuk environment local/testing.',
+            );
+
+            return;
+        }
+
         $field = Field::firstOrCreate(
             ['name' => DemoOrganization::FIELD],
         );

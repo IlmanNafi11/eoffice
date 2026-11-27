@@ -27,6 +27,14 @@ class AppServiceProvider extends ServiceProvider
         // pass that guarantees the headers on all API responses.
         $this->app['events']->listen(RequestHandled::class, function (RequestHandled $event): void {
             SecurityHeaders::apply($event->response);
+
+            // Same `no-store` upgrade as the middleware path (ship #23):
+            // an exception-rendered response is error context for everyone,
+            // and private data when the request carried a credential.
+            SecurityHeaders::applyNoStore(
+                $event->response,
+                mayContainPrivateData: $event->request->user() !== null || $event->response->getStatusCode() >= 400,
+            );
         });
     }
 }
