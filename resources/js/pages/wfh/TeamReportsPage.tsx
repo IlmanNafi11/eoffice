@@ -24,12 +24,15 @@
  * - list kosong → pesan bahasa Indonesia; fetch gagal → pesan `list.error`.
  */
 import { useEffect, useState } from "react";
-import { UsersRound } from "lucide-react";
+import type { FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { ListFilter, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -54,7 +57,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Pagination } from "@/components/wfh/pagination";
+import { PdfDownloadButton } from "@/components/wfh/pdf-download";
 import { WfhStatusBadge } from "@/components/wfh/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -71,14 +80,27 @@ import {
 } from "@/store/wfhTeamSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { listTeams } from "@/api/wfh-team";
+import { exportTeamWfhPdf } from "@/api/wfh-monitoring";
 import { can } from "@/lib/permissions";
 import { selectUser } from "@/store/authSlice";
-import type { TeamResource, WfhTeamReport } from "@/api/types";
+import type { TeamResource, WfhTeamReport, WfhReportStatus } from "@/api/types";
 
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
+const WFH_REPORT_STATUSES = ["draft", "pending", "approved", "rejected"] as const;
+
+/**
+ * Pesan dari `exportTeamWfhPdf` SUDAH lewat seam: API membungkus pesan
+ * blob ter-dekode ke `ApiError` dengan copy aman ("Gagal mengunduh PDF.")
+ * dan fallback generik di bawah menutup non-Error (pola MonitoringPage).
+ */
+function pdfErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return "Gagal mengunduh PDF. Coba lagi.";
+}
 
 export function TeamReportsPage() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
 
   const user = useAppSelector(selectUser);
   const { status, error, query } = useAppSelector(selectWfhTeamList);
@@ -88,6 +110,15 @@ export function TeamReportsPage() {
 
   // `perPage` null = pakai default backend 15 (tidak dikirim).
   const [perPage, setPerPage] = useState<number | null>(null);
+
+  // Filter list: kontrol lokal sampai "Terapkan" (pola MonitoringPage).
+  // Dropdown dikontrol agar popover kalender/Select di dalamnya tidak menutup
+  // dropdown saat interaksi (portal terpisah dianggap "outside" oleh Radix).
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterTeamId, setFilterTeamId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   // Dialog create: hanya pemegang `wfh.team_report.create` (permission, bukan role).
   const canCreate = can(user, "wfh.team_report.create");
@@ -114,13 +145,13 @@ export function TeamReportsPage() {
     dispatch(fetchWfhTeamReports({}));
   }, [dispatch]);
 
-  // Dropdown tim dimuat sekali saat form tersedia (listTeams tanpa gate).
+  // Dropdown tim dimuat sekali: dipakai dialog create DAN filter list, jadi
+  // tidak digate `canCreate` (pemegang view-only juga butuh filter tim).
   useEffect(() => {
-    if (!canCreate) return;
     listTeams()
       .then((rows) => setTeams(rows))
       .catch(() => setTeams([])); // dropdown tetap tampil, pilihan kosong
-  }, [canCreate]);
+  }, []);
 
   /**
    * Buka dialog → reset pilihan lama. `actionError` disimpan di redux dan
@@ -202,27 +233,60 @@ export function TeamReportsPage() {
 
   const loading = status === "loading";
 
-  /** Halaman tujuan dari pagination — per_page aktif dipertahankan. */
+  /** Halaman tujuan dari pagination — filter & per_page aktif dipertahankan. */
   function fetchPage(page: number) {
     dispatch(
       fetchWfhTeamReports({
         ...(query.per_page !== undefined ? { per_page: query.per_page } : {}),
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.team_id !== undefined ? { team_id: query.team_id } : {}),
+        ...(query.date_from !== undefined ? { date_from: query.date_from } : {}),
+        ...(query.date_to !== undefined ? { date_to: query.date_to } : {}),
         page,
       }),
     );
   }
 
-  /** Ganti per halaman → reset ke halaman 1. */
+  /** Ganti per halaman → reset ke halaman 1, filter aktif (slice query) tetap. */
   function applyPerPage(value: string) {
     const n = Number.parseInt(value, 10);
     setPerPage(Number.isFinite(n) ? n : null);
     dispatch(
       fetchWfhTeamReports({
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.team_id !== undefined ? { team_id: query.team_id } : {}),
+        ...(query.date_from !== undefined ? { date_from: query.date_from } : {}),
+        ...(query.date_to !== undefined ? { date_to: query.date_to } : {}),
         ...(Number.isFinite(n) ? { per_page: n } : {}),
         page: 1,
       }),
     );
   }
+
+  /**
+   * Terapkan filter dari input lokal → selalu kembali ke halaman 1.
+   * Rentang inklusif: from/to boleh diberikan sendiri-sendiri (hari tunggal
+   * = from sama dengan to); keduanya kosong = semua laporan.
+   */
+  function applyFilter(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPerPage(null);
+    setFilterOpen(false);
+
+    dispatch(
+      fetchWfhTeamReports({
+        ...(filterStatus
+          ? { status: filterStatus as WfhReportStatus }
+          : {}),
+        ...(filterTeamId ? { team_id: Number(filterTeamId) } : {}),
+        ...(dateFrom ? { date_from: dateFrom } : {}),
+        ...(dateTo ? { date_to: dateTo } : {}),
+        page: 1,
+      }),
+    );
+  }
+
+  const canExportPdf = can(user, "wfh.report.export_pdf");
 
   const perPageSelect = (
     <Select value={perPage?.toString() ?? "15"} onValueChange={applyPerPage}>
@@ -242,6 +306,104 @@ export function TeamReportsPage() {
         ))}
       </SelectContent>
     </Select>
+  );
+
+  const filterMenu = (
+    <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Filter laporan"
+          data-testid="team-reports-filter-trigger"
+        >
+          <ListFilter aria-hidden="true" />
+          Filter
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-56 p-2.5"
+        onInteractOutside={(event) => {
+          // Kalender DateInput & opsi Select me-render portal terpisah, jadi
+          // klik di sana dianggap "outside" oleh Radix — biarkan dropdown tetap
+          // terbuka agar pemilihan filter tidak terputus.
+          const target = event.target as HTMLElement | null;
+          if (target?.closest('[data-slot="popover-content"], [data-slot="select-content"]')) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <form className="flex flex-col gap-3" onSubmit={applyFilter}>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="team-reports-filter-status">Status</FieldLabel>
+            <Select
+              value={filterStatus === "" ? undefined : filterStatus}
+              onValueChange={(v) => setFilterStatus(v ?? "")}
+            >
+              <SelectTrigger
+                id="team-reports-filter-status"
+                aria-label="Status"
+                className="w-full"
+              >
+                <SelectValue placeholder="Semua status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Semua status</SelectItem>
+                {WFH_REPORT_STATUSES.map((st) => (
+                  <SelectItem key={st} value={st}>
+                    {st}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="team-reports-filter-team">Tim</FieldLabel>
+            <Select
+              value={filterTeamId === "" ? undefined : filterTeamId}
+              onValueChange={(v) => setFilterTeamId(v ?? "")}
+            >
+              <SelectTrigger
+                id="team-reports-filter-team"
+                aria-label="Tim"
+                className="w-full"
+              >
+                <SelectValue placeholder="Semua tim" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Semua tim</SelectItem>
+                {(teams ?? []).map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="team-reports-filter-date-from">Dari tanggal</FieldLabel>
+            <DateInput
+              id="team-reports-filter-date-from"
+              value={dateFrom}
+              onChange={setDateFrom}
+            />
+          </Field>
+          <Field orientation="vertical">
+            <FieldLabel htmlFor="team-reports-filter-date-to">Sampai tanggal</FieldLabel>
+            <DateInput
+              id="team-reports-filter-date-to"
+              value={dateTo}
+              onChange={setDateTo}
+            />
+          </Field>
+          <Button type="submit" className="mt-1 w-full">
+            Terapkan
+          </Button>
+        </form>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
 
@@ -278,6 +440,7 @@ export function TeamReportsPage() {
         <CardHeader>
           <CardTitle>Daftar Laporan Tim</CardTitle>
           <CardDescription>Total {meta?.total ?? 0} laporan</CardDescription>
+          <CardAction>{filterMenu}</CardAction>
         </CardHeader>
         <CardContent>
           {loading && items.length === 0 ? (
@@ -321,30 +484,53 @@ export function TeamReportsPage() {
                           <WfhStatusBadge status={r.status} />
                         </td>
                         <td className="py-2">
-                          {r.status === "pending" && (canApprove || canReject) ? (
-                            <div className="flex gap-2">
-                              {canApprove ? (
-                                <Button
-                                  size="sm"
-                                  pending={mutatingId === r.id}
-                                  disabled={mutatingId !== null}
-                                  onClick={() => void submitApprove(r)}
-                                >
-                                  Setujui
-                                </Button>
-                              ) : null}
-                              {canReject ? (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  disabled={mutatingId !== null}
-                                  onClick={() => openReject(r)}
-                                >
-                                  Tolak
-                                </Button>
-                              ) : null}
-                            </div>
-                          ) : null}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/team-reports/${r.id}`)}
+                            >
+                              Detail
+                            </Button>
+                            {canExportPdf ? (
+                              <PdfDownloadButton
+                                getBlob={() =>
+                                  exportTeamWfhPdf(r.team_id, {
+                                    date: r.report_date,
+                                    team_report_id: r.id,
+                                  })
+                                }
+                                filename={`WFH-Team-${r.team_id}-${r.report_date}.pdf`}
+                                getError={pdfErrorMessage}
+                              >
+                                Unduh PDF
+                              </PdfDownloadButton>
+                            ) : null}
+                            {r.status === "pending" && (canApprove || canReject) ? (
+                              <>
+                                {canApprove ? (
+                                  <Button
+                                    size="sm"
+                                    pending={mutatingId === r.id}
+                                    disabled={mutatingId !== null}
+                                    onClick={() => void submitApprove(r)}
+                                  >
+                                    Setujui
+                                  </Button>
+                                ) : null}
+                                {canReject ? (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={mutatingId !== null}
+                                    onClick={() => openReject(r)}
+                                  >
+                                    Tolak
+                                  </Button>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}

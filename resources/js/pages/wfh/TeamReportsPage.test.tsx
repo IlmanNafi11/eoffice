@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { userEvent, pickDate, pickSelect } from "@/test/portal";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { PaginationMeta, WfhTeamReport } from "@/api/types";
 import { Toaster } from "@/components/ui/sonner";
@@ -26,7 +26,12 @@ vi.mock("@/api/wfh-team", () => ({
   listTeams: vi.fn(),
 }));
 
+vi.mock("@/api/wfh-monitoring", () => ({
+  exportTeamWfhPdf: vi.fn(),
+}));
+
 import * as wfhTeamApi from "@/api/wfh-team";
+import * as wfhMonitoringApi from "@/api/wfh-monitoring";
 import { TeamReportsPage } from "@/pages/wfh/TeamReportsPage";
 import { makeStore } from "@/store";
 import { setUser } from "@/store/authSlice";
@@ -36,6 +41,7 @@ const mockedCreate = wfhTeamApi.createWfhTeamReport as unknown as Mock;
 const mockedListTeams = wfhTeamApi.listTeams as unknown as Mock;
 const mockedApprove = wfhTeamApi.approveWfhTeamReport as unknown as Mock;
 const mockedReject = wfhTeamApi.rejectWfhTeamReport as unknown as Mock;
+const mockedPdf = wfhMonitoringApi.exportTeamWfhPdf as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 10, total: 12 };
 
@@ -101,6 +107,7 @@ function renderPageAs(overrides?: Partial<typeof user>) {
       <MemoryRouter initialEntries={["/team-reports"]}>
         <Routes>
           <Route path="/team-reports" element={<TeamReportsPage />} />
+          <Route path="/team-reports/:id" element={<DetailRouteProbe />} />
         </Routes>
       </MemoryRouter>
     </Provider>,
@@ -118,6 +125,7 @@ function renderPage() {
       <MemoryRouter initialEntries={["/team-reports"]}>
         <Routes>
           <Route path="/team-reports" element={<TeamReportsPage />} />
+          <Route path="/team-reports/:id" element={<DetailRouteProbe />} />
         </Routes>
       </MemoryRouter>
     </Provider>,
@@ -126,10 +134,43 @@ function renderPage() {
   return store;
 }
 
+/** Probe lokasi: merekam URL rute tujuan saat Detail diklik. */
+let detailPath: string | null = null;
+
+function DetailRouteProbe() {
+  useParams();
+  detailPath = useLocation().pathname;
+  return <p>team-detail-stub</p>;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockedList.mockResolvedValue({ reports: [reportA, reportB], meta });
+  mockedListTeams.mockResolvedValue([teamResource]);
+  mockedPdf.mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" }));
+  URL.createObjectURL = vi.fn(() => `blob:stub-${Math.random().toString(36).slice(2)}`);
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 });
+
+/** Buka dropdown filter (kontrol status/tim/tanggal berada di dalamnya). */
+async function openFilter() {
+  await userEvent.click(screen.getByTestId("team-reports-filter-trigger"));
+}
+
+/** Kosongkan DateInput lewat tombol hapus (no-op bila memang sudah kosong). */
+async function clearDate(label: string) {
+  const trigger = screen.getByLabelText(label);
+  const clearBtn = trigger.parentElement?.querySelector<HTMLButtonElement>(
+    'button[aria-label="hapus tanggal"]',
+  );
+  if (clearBtn) await userEvent.click(clearBtn);
+}
+
+/** Tombol paginasi halaman (aria-label), bukan navigasi kalender/popover. */
+function pageButton(name: "Berikutnya" | "Sebelumnya"): HTMLElement {
+  return screen.getByRole("button", { name });
+}
 
 describe("TeamReportsPage — fetch awal & render", () => {
   it("mount mem-fetch daftar dan baris render team.name + tanggal + badge + pembuat", async () => {
@@ -407,9 +448,17 @@ describe("TeamReportsPage — approve/reject journey", () => {
         name: /tolak/i,
       }),
     ).toBeTruthy();
-    // Baris approved (status !== pending) → tanpa aksi.
+    // Baris approved (status !== pending) → tanpa aksi approve/reject
+    // (aksi Detail selalu ada; Unduh PDF hanya pemegang export_pdf).
     expect(
-      within(screen.getByTestId("team-report-row-2")).queryByRole("button"),
+      within(screen.getByTestId("team-report-row-2")).queryByRole("button", {
+        name: /setujui/i,
+      }),
+    ).toBeNull();
+    expect(
+      within(screen.getByTestId("team-report-row-2")).queryByRole("button", {
+        name: /tolak/i,
+      }),
     ).toBeNull();
 
     // Tanpa permission approve/reject → tanpa tombol sama sekali.
@@ -726,5 +775,130 @@ describe("TeamReportsPage — spinner pending + toast (T7b)", () => {
       expect(toast!.textContent).toContain("Laporan tidak berada dalam bidang Anda.");
     });
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+});
+
+describe("TeamReportsPage — filter list (Task 6)", () => {
+  it("Terapkan mengirim status + tim + rentang tanggal + halaman 1 dalam satu query", async () => {
+    renderPage();
+    await screen.findByText("Tim Aplikasi");
+
+    await openFilter();
+    await pickSelect("Status", "approved");
+    await pickSelect("Tim", "Tim Aplikasi");
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
+    await pickDate(screen.getByLabelText("Sampai tanggal"), "2026-07-31");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({
+        status: "approved",
+        team_id: 3,
+        date_from: "2026-07-01",
+        date_to: "2026-07-31",
+        page: 1,
+      });
+    });
+  });
+
+  it("kebersihan query: rentang boleh from saja, dikosongkan = tanpa filter", async () => {
+    renderPage();
+    await screen.findByText("Tim Aplikasi");
+
+    await openFilter();
+    await pickDate(screen.getByLabelText("Dari tanggal"), "2026-07-01");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ date_from: "2026-07-01", page: 1 });
+    });
+
+    await openFilter();
+    await clearDate("Dari tanggal");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ page: 1 });
+    });
+  });
+
+  it("pagination + per halaman mempertahankan filter aktif; Terapkan balik ke halaman 1", async () => {
+    renderPage();
+    await screen.findByText("Tim Aplikasi");
+
+    await openFilter();
+    await pickSelect("Status", "pending");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
+    });
+
+    await userEvent.click(pageButton("Berikutnya"));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 2 });
+    });
+
+    await pickSelect(/per halaman/i, "25");
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", per_page: 25, page: 1 });
+    });
+
+    await openFilter();
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ status: "pending", page: 1 });
+    });
+  });
+
+  it("dropdown Tim terisi untuk pemegang view-only (bukan hanya pembuat)", async () => {
+    renderPageAs();
+    await screen.findByText("Tim Aplikasi");
+    await waitFor(() => {
+      expect(mockedListTeams).toHaveBeenCalledTimes(1);
+    });
+
+    await openFilter();
+    await pickSelect("Tim", "Tim Aplikasi");
+    await userEvent.click(screen.getByRole("button", { name: /terapkan/i }));
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenLastCalledWith({ team_id: 3, page: 1 });
+    });
+  });
+});
+
+describe("TeamReportsPage — aksi baris Detail & Unduh PDF (Task 6)", () => {
+  it("Detail menavigasi ke /team-reports/:id baris itu", async () => {
+    renderPage();
+    await screen.findByTestId("team-report-row-2");
+
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-2")).getByRole("button", { name: /detail/i }),
+    );
+
+    expect(await screen.findByText("team-detail-stub")).toBeTruthy();
+    expect(detailPath).toBe("/team-reports/2");
+  });
+
+  it("Unduh PDF memanggil exportTeamWfhPdf dengan tim, tanggal, dan id laporan tim", async () => {
+    renderPageAs({ permissions: ["wfh.team_report.view", "wfh.report.export_pdf"] });
+    await screen.findByTestId("team-report-row-1");
+
+    await userEvent.click(
+      within(screen.getByTestId("team-report-row-1")).getByRole("button", { name: /unduh pdf/i }),
+    );
+
+    await waitFor(() => {
+      expect(mockedPdf).toHaveBeenCalledWith(3, {
+        date: "2026-08-10",
+        team_report_id: 1,
+      });
+    });
+  });
+
+  it("tombol Unduh PDF hanya untuk pemegang wfh.report.export_pdf", async () => {
+    renderPageAs();
+    await screen.findByTestId("team-report-row-1");
+
+    expect(
+      within(screen.getByTestId("team-report-row-1")).queryByRole("button", { name: /unduh pdf/i }),
+    ).toBeNull();
   });
 });
