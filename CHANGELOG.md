@@ -5,6 +5,26 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Added (backend+frontend, 2026-11-27 — Laporan Tim: detail, filter, toggle tema)
+- Daftar Laporan Tim (`/team-reports`) mendapat filter berlapis di atas scope
+  peran (status, rentang tanggal, tim) yang hanya mempersempit hasil; kepala
+  tim yang memilih tim lain melihat data kosong, bukan kebocoran data.
+- Halaman detail `GET /admin/wfh/team-reports/{report}` + `/team-reports/:id`
+  menyusun konten laporan per anggota (absensi + foto, kegiatan) dengan aksi
+  approve/reject ber-alasan wajib dan unduh PDF; guard `exportTeam` kini
+  menerima admin lintas bidang (sebelumnya 403 di depan tombol yang sudah
+  tampil), tanpa mengubah isi PDF.
+- Header mendapat toggle tema Terang/Gelap/Sistem (`next-themes`, storageKey
+  `theme`, default Sistem) dengan class `dark` di `<html>`; script inline di
+  blade mencegah kilatan tema saat reload; toast mengikuti tema.
+- Smoke 2026-11-27 (browser, stack dev localhost:8000): filter status
+  approved menyaring 3→2 baris; detail laporan 2026-11-06 ditolak dengan
+  alasan tampil di detail; PDF tim via endpoint mengembalikan 200
+  `application/pdf` (~0.9 MB); tema Gelap/Terang/Sistem terverifikasi termasuk
+  persist setelah reload tanpa kilatan dan toast mengikuti tema. Guard admin
+  lintas bidang dibuktikan test (`PdfExportGuardsTest`, 29 passed). Gate:
+  backend 920 passed, FE 829 passed, Pint bersih, typecheck + build hijau.
+
 ### Fixed (backend, 2026-11-25 — ekspor PDF laporan tim WFH)
 - Kolom "Link Bukti Kerja" pada PDF rekap tim kini menampilkan seluruh tautan
   dari semua kegiatan anggota dengan penomoran berurutan (`1.`, `2.`, …),
