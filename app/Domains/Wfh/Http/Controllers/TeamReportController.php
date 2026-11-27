@@ -16,6 +16,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\Rule;
 
 class TeamReportController extends Controller
 {
@@ -31,12 +32,29 @@ class TeamReportController extends Controller
     {
         $this->authorize('wfh.team_report.view');
 
+        $request->validate([
+            'status' => ['nullable', Rule::in(['draft', 'pending', 'approved', 'rejected'])],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+            'team_id' => ['nullable', 'integer', 'exists:teams,id'],
+        ]);
+
         $user = $request->user();
         $perPage = self::perPage($request);
+
+        // Filters narrow within the role scope below; they never widen it.
+        $filters = $request->only(['status', 'date_from', 'date_to', 'team_id']);
+        $applyFilters = function ($q) use ($filters) {
+            $q->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+                ->when($filters['date_from'] ?? null, fn ($q, $v) => $q->whereDate('report_date', '>=', $v))
+                ->when($filters['date_to'] ?? null, fn ($q, $v) => $q->whereDate('report_date', '<=', $v))
+                ->when($filters['team_id'] ?? null, fn ($q, $v) => $q->where('team_id', $v));
+        };
 
         // Admin sees all team reports
         if ($user->hasRole(Roles::ADMIN)) {
             $reports = WfhTeamReport::with(['team', 'creator', 'supervisor'])
+                ->where($applyFilters)
                 ->orderByDesc('report_date')
                 ->paginate($perPage);
 
@@ -60,6 +78,7 @@ class TeamReportController extends Controller
                     $q->where('id', $user->team_id);
                 }
             })
+            ->where($applyFilters)
             ->orderByDesc('report_date')
             ->paginate($perPage);
 
