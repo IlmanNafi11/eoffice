@@ -37,6 +37,7 @@ const VerifyPage = lazy(() => import("@/pages/verification/VerifyPage").then((m)
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const WfhReportsPage = lazy(() => import("@/pages/wfh/WfhReportsPage").then((m) => ({ default: m.WfhReportsPage })));
 const WfhReportDetailPage = lazy(() => import("@/pages/wfh/WfhReportDetailPage").then((m) => ({ default: m.WfhReportDetailPage })));
+const TeamReportDetailPage = lazy(() => import("@/pages/wfh/TeamReportDetailPage").then((m) => ({ default: m.TeamReportDetailPage })));
 const TeamReportsPage = lazy(() => import("@/pages/wfh/TeamReportsPage").then((m) => ({ default: m.TeamReportsPage })));
 const MonitoringPage = lazy(() => import("@/pages/wfh/MonitoringPage").then((m) => ({ default: m.MonitoringPage })));
 const ChangesPage = lazy(() => import("@/pages/changes/ChangesPage").then((m) => ({ default: m.ChangesPage })));
@@ -75,6 +76,7 @@ export const router = createBrowserRouter([
           { path: "/wfh/:reportId", element: <WfhReportDetailPage /> },
           { path: "/monitoring", element: <MonitoringPage /> },
           { path: "/team-reports", element: <TeamReportsPage /> },
+          { path: "/team-reports/:reportId", element: <TeamReportDetailPage /> },
           { path: "/changes", element: <ChangesPage /> },
           { path: "/changes/new", element: <ChangePackageFormPage /> },
           { path: "/changes/:packageId/edit", element: <ChangePackageFormPage /> },
