@@ -38,7 +38,13 @@ class SecurityHeaders
         if (! app()->environment('local')) {
             // CSP untuk shell SPA: token bearer disimpan di localStorage;
             // connect-src 'self' memblokir eksfiltrasi token ke origin lain.
-            // - script-src 'self': bundel Vite pada `vite build`.
+            // - script-src 'self' + hash inline: bundel Vite pada `vite build`,
+            //   plus hash sha256 skrip anti-flash tema di app.blade.php
+            //   (ship review: skrip inline diblokir CSP non-local sehingga
+            //   kilatan tema kembali — smoke asli hanya berjalan di local
+            //   yang CSP-nya nonaktif). Hash mengizinkan SKRIP ITU SAJA;
+            //   bila isi skrip berubah, hitung ulang:
+            //   sha256(body persis antara <script>...</script>).
             // - style-src 'unsafe-inline': dibutuhkan oleh `motion` (framer
             //   motion) yang menyuntik <style> runtime; Vite build sendiri
             //   mengekstrak CSS ke berkas eksternal.
@@ -46,7 +52,7 @@ class SecurityHeaders
             // - frame-ancestors 'none': padanan modern X-Frame-Options: DENY.
             $response->headers->set(
                 'Content-Security-Policy',
-                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+                "default-src 'self'; script-src 'self' 'sha256-TJz+Yu1g1SzfB0OY76Uzoqdyz+RPq/OiSkaXOPTauaY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
             );
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }

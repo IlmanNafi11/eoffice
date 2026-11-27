@@ -158,6 +158,12 @@ describe("AppShell — Header", () => {
     expect(screen.getByText(/staf bidang infrastruktur/i)).toBeTruthy();
   });
 
+  it("Header merender toggle tema (modul theme-modes terpasang di shell)", () => {
+    renderShell(userWith(["staf"], STAF_PERMISSIONS));
+
+    expect(screen.getByRole("button", { name: "Tema" })).toBeTruthy();
+  });
+
   it("dropdown avatar memuat item Profil Saya di atas Keluar", async () => {
     renderShell(userWith(["staf"], STAF_PERMISSIONS));
 

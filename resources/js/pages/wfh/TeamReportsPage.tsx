@@ -83,20 +83,11 @@ import { listTeams } from "@/api/wfh-team";
 import { exportTeamWfhPdf } from "@/api/wfh-monitoring";
 import { can } from "@/lib/permissions";
 import { selectUser } from "@/store/authSlice";
+import { WFH_REPORT_STATUSES } from "@/lib/wfh-report-statuses";
+import { pdfErrorMessage } from "@/lib/pdf-error-message";
 import type { TeamResource, WfhTeamReport, WfhReportStatus } from "@/api/types";
 
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
-const WFH_REPORT_STATUSES = ["draft", "pending", "approved", "rejected"] as const;
-
-/**
- * Pesan dari `exportTeamWfhPdf` SUDAH lewat seam: API membungkus pesan
- * blob ter-dekode ke `ApiError` dengan copy aman ("Gagal mengunduh PDF.")
- * dan fallback generik di bawah menutup non-Error (pola MonitoringPage).
- */
-function pdfErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return "Gagal mengunduh PDF. Coba lagi.";
-}
 
 export function TeamReportsPage() {
   const dispatch = useAppDispatch();
@@ -114,11 +105,16 @@ export function TeamReportsPage() {
   // Filter list: kontrol lokal sampai "Terapkan" (pola MonitoringPage).
   // Dropdown dikontrol agar popover kalender/Select di dalamnya tidak menutup
   // dropdown saat interaksi (portal terpisah dianggap "outside" oleh Radix).
+  // Nilai awal diambil dari query redux yang aktif: kembali ke halaman ini
+  // menampilkan filter yang benar-benar diterapkan, bukan "Semua status"
+  // padahal daftar masih terfilter (ship review: desinkron kontrol vs query).
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterTeamId, setFilterTeamId] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [filterStatus, setFilterStatus] = useState(query.status ?? "");
+  const [filterTeamId, setFilterTeamId] = useState(
+    query.team_id !== undefined ? String(query.team_id) : "",
+  );
+  const [dateFrom, setDateFrom] = useState(query.date_from ?? "");
+  const [dateTo, setDateTo] = useState(query.date_to ?? "");
 
   // Dialog create: hanya pemegang `wfh.team_report.create` (permission, bukan role).
   const canCreate = can(user, "wfh.team_report.create");

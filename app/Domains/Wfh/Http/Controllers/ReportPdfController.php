@@ -9,6 +9,7 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportPdfData;
 use App\Models\Team;
 use App\Support\Constants\Roles;
+use App\Support\Constants\WfhReportStatus;
 use App\Support\Http\ApiResponse;
 use App\Support\Pdf\PdfRendererService;
 use App\Support\Signature\SignatureGuard;
@@ -49,7 +50,7 @@ class ReportPdfController extends Controller
             }
         }
 
-        if (! in_array($report->status, ['pending', 'approved'])) {
+        if (! in_array($report->status, WfhReportStatus::LIVE)) {
             return ApiResponse::fail('PDF hanya dapat di-generate untuk laporan yang sudah disubmit atau disetujui.');
         }
 

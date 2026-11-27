@@ -9,6 +9,7 @@ use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Support\Constants\Roles;
+use App\Support\Constants\WfhReportStatus;
 use App\Support\Dates\DateRangeHelper;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
@@ -62,7 +63,7 @@ class ReportController extends Controller
             'date_to' => ['nullable', 'date'],
             // Passed raw into whereHas() below; unvalidated garbage reaches
             // Postgres as a bigint cast and 500s (22P02). Ship review SEC-01.
-            'status' => ['nullable', Rule::in(['draft', 'pending', 'approved', 'rejected'])],
+            'status' => ['nullable', Rule::in(WfhReportStatus::ALL)],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
         ]);
 

@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class TeamReportShowTest extends TestCase
@@ -117,6 +118,28 @@ class TeamReportShowTest extends TestCase
         $this->assertSame($pending->id, $data[0]['report_id']);
     }
 
+    public function test_detail_data_returns_null_photo_url_when_attendance_has_no_photo(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+        $report = $this->personalReport($member, 'pending');
+        $this->repo()->addAttendanceToReport($report, ['session' => 'pagi', 'photo_path' => '']);
+
+        $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
+
+        $this->assertCount(1, $data[0]['attendances']);
+        $this->assertNull($data[0]['attendances'][0]['photo_url']);
+    }
+
+    public function test_detail_data_returns_empty_array_for_team_without_active_members(): void
+    {
+        $field = Field::create(['name' => 'Bidang Kosong']);
+        $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Kosong']);
+
+        $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
+
+        $this->assertSame([], $data);
+    }
+
     // === HTTP endpoint ===
 
     public function test_show_returns_envelope_with_resource_fields_and_members(): void
@@ -207,6 +230,65 @@ class TeamReportShowTest extends TestCase
             ->assertJsonPath('data.members.0.report_id', $personal->id);
     }
 
+    /**
+     * Ship review High gap: the privilege-GRANTING branch of show() — a field
+     * head reading a sibling team's report inside their own field — was only
+     * exercised negatively. A regression flipping `||` to `&&` in
+     * TeamReportScope::denialFor would 403 every kepala_bidang detail view
+     * while the current suite stays green; this test pins it.
+     */
+    public function test_show_allows_field_head_to_read_sibling_team_in_own_field(): void
+    {
+        [$team, $member] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+        $personal = $this->personalReport($member, 'pending');
+
+        // kepala_bidang of the field: head_id on the field row, own team different.
+        $fieldHead = User::factory()->create(['team_id' => null]);
+        $fieldHead->assignRole('kepala_bidang');
+        Field::where('id', $team->field_id)->update(['head_id' => $fieldHead->id]);
+        $fieldHeadTeam = Team::create(['field_id' => $team->field_id, 'name' => 'Tim Kepala']);
+        $fieldHead->update(['team_id' => $fieldHeadTeam->id]);
+        Sanctum::actingAs($fieldHead);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.id', $report->id)
+            ->assertJsonPath('data.members.0.report_id', $personal->id);
+    }
+
+    public function test_show_returns_404_for_nonexistent_report(): void
+    {
+        $viewer = User::factory()->create(['team_id' => null]);
+        $viewer->assignRole('admin');
+        Sanctum::actingAs($viewer);
+
+        $this->getJson('/api/admin/wfh/team-reports/999999')
+            ->assertStatus(404);
+    }
+
+    /**
+     * Dual permission (ship review): the payload embeds monitoring-grade
+     * content, so `wfh.monitoring.view` is required on top of
+     * `wfh.team_report.view`. Uses a dedicated role carrying only
+     * `wfh.team_report.view`, because the standard roles bundle both
+     * permissions and a direct revoke would not strip the role-granted one.
+     */
+    public function test_show_refuses_viewer_without_monitoring_permission(): void
+    {
+        [$team] = $this->teamWithMember();
+        $report = $this->teamReport($team);
+
+        $role = Role::firstOrCreate(['name' => 'view-only-test', 'guard_name' => 'web']);
+        $role->syncPermissions(['wfh.team_report.view']);
+        $viewer = User::factory()->create(['team_id' => $team->id]);
+        $viewer->assignRole($role);
+        Sanctum::actingAs($viewer);
+
+        $this->getJson("/api/admin/wfh/team-reports/{$report->id}")
+            ->assertStatus(403);
+    }
+
     public function test_show_requires_view_permission(): void
     {
         [$team] = $this->teamWithMember();
@@ -226,10 +308,12 @@ class TeamReportShowTest extends TestCase
     {
         [$team, $member] = $this->teamWithMember();
         $teamReport = $this->teamReport($team);
-        $this->personalReport($member, 'pending');
 
         $teamReport->load(['team', 'creator', 'supervisor']);
-        $payload = (new TeamReportDetailResource($teamReport))->toArray(request());
+        // Members are resolved by the caller (controller) and passed in — the
+        // resource is a plain serializer, never a service locator.
+        $members = $this->repo()->getTeamReportDetailData($team->id, $teamReport->report_date->format('Y-m-d'));
+        $payload = (new TeamReportDetailResource($teamReport, $members))->toArray(request());
 
         $this->assertSame($teamReport->id, $payload['id']);
         $this->assertSame('pending', $payload['status']);

@@ -90,6 +90,44 @@ class ReportActivitySubResourceTest extends TestCase
             ->assertJsonPath('data.activities.0.end_time', '02:25');
     }
 
+    /** Ship review: `url` menerima skema apa pun yang lolos FILTER_VALIDATE_URL
+     *  (mis. `javascript:`); halaman detail me-render tautan ke `href`, jadi
+     *  skema dibatasi https di boundary. */
+    public function test_create_activity_rejects_non_https_link_with_422(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user);
+
+        $response = $this->postJson("/api/wfh/reports/{$report->id}/activities", [
+            'activity' => 'Kerja lapangan',
+            'links' => [
+                ['url' => 'javascript:alert(document.domain)'],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['links.0.url']);
+    }
+
+    public function test_create_activity_accepts_https_link(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user);
+
+        $this->postJson("/api/wfh/reports/{$report->id}/activities", [
+            'activity' => 'Kerja lapangan',
+            'links' => [
+                ['url' => 'https://git.kominfo.go.id/intern/wfh-api/-/merge_requests/12'],
+            ],
+        ])->assertStatus(201);
+    }
+
     public function test_create_activity_on_approved_report_returns_422(): void
     {
         $user = User::factory()->create();

@@ -381,4 +381,24 @@ describe("wfhTeamSlice — detail laporan tim", () => {
 
     expect(mockedDetail).not.toHaveBeenCalled();
   });
+
+  it("reject sukses me-refetch detail yang sedang aktif selain list", async () => {
+    mockedList.mockResolvedValueOnce({ reports: [reportPending], meta });
+    mockedDetail.mockResolvedValueOnce(detail);
+    const store = makeStore();
+    await store.dispatch(fetchWfhTeamReports({}));
+    await store.dispatch(fetchWfhTeamReportDetail(1));
+
+    const rejected: WfhTeamReport = { ...reportPending, status: "rejected" };
+    const rejectedDetail: WfhTeamReportDetail = { ...detail, status: "rejected" };
+    mockedReject.mockResolvedValueOnce(rejected);
+    mockedList.mockResolvedValueOnce({ reports: [rejected], meta });
+    mockedDetail.mockResolvedValueOnce(rejectedDetail);
+
+    await store.dispatch(rejectWfhTeamReport({ teamReportId: 1, reason: "Tidak lengkap." }));
+
+    expect(mockedDetail).toHaveBeenCalledTimes(2);
+    expect(mockedDetail).toHaveBeenLastCalledWith(1);
+    expect(selectWfhTeamDetail(store.getState()).data?.status).toBe("rejected");
+  });
 });

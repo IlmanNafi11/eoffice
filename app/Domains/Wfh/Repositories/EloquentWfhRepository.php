@@ -8,6 +8,7 @@ use App\Domains\Wfh\Models\WfhReportActivity;
 use App\Exceptions\ApiException;
 use App\Models\User;
 use App\Repositories\EloquentRepository;
+use App\Support\Constants\WfhReportStatus;
 use App\Support\Media\PrivateMediaPath;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -151,7 +152,7 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
             // No-revision flow allows a rejected report plus a fresh one for
             // the same date; show the live one, newest first (D3).
             ->map(fn ($group) => $group
-                ->sortByDesc(fn ($r) => [in_array($r->status, ['pending', 'approved'], true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
+                ->sortByDesc(fn ($r) => [in_array($r->status, WfhReportStatus::LIVE, true) ? 1 : 0, $r->updated_at?->timestamp ?? 0])
                 ->first());
 
         return $members->map(function ($member) use ($reports) {

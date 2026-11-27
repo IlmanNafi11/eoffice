@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- PDF render (dompdf/GD) membutuhkan >128M; default CLI 128M fatal
+             di PdfImage (ship review). Pin eksplisit agar setiap runner
+             (CI, docker, lokal) memakai batas yang sama. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>

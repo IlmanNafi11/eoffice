@@ -6,10 +6,11 @@ use App\Domains\Wfh\Http\Controllers\Concerns\EnsuresSameField;
 use App\Domains\Wfh\Http\Resources\TeamReportDetailResource;
 use App\Domains\Wfh\Http\Resources\TeamReportResource;
 use App\Domains\Wfh\Models\WfhTeamReport;
+use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
+use App\Domains\Wfh\Services\TeamReportScope;
 use App\Domains\Wfh\Services\TeamReportStateMachine;
-use App\Models\Field;
 use App\Models\Team;
-use App\Support\Constants\Roles;
+use App\Support\Constants\WfhReportStatus;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
 use Illuminate\Database\QueryException;
@@ -27,6 +28,8 @@ class TeamReportController extends Controller
 
     public function __construct(
         private TeamReportStateMachine $stateMachine,
+        private TeamReportScope $teamReportScope,
+        private WfhRepositoryInterface $wfhRepository,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -34,7 +37,9 @@ class TeamReportController extends Controller
         $this->authorize('wfh.team_report.view');
 
         $request->validate([
-            'status' => ['nullable', Rule::in(['draft', 'pending', 'approved', 'rejected'])],
+            // Enum shared with the personal-report board via WfhReportStatus —
+            // one vocabulary, no drift between the two filters.
+            'status' => ['nullable', Rule::in(WfhReportStatus::ALL)],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
@@ -42,6 +47,13 @@ class TeamReportController extends Controller
 
         $user = $request->user();
         $perPage = self::perPage($request);
+
+        // Field-less actor: 422 before any query (TeamReportScope is the one
+        // place this rule lives; show() answers identically).
+        $noField = $this->teamReportScope->noFieldDenial($user);
+        if ($noField) {
+            return $noField;
+        }
 
         // Filters narrow within the role scope below; they never widen it.
         $filters = $request->only(['status', 'date_from', 'date_to', 'team_id']);
@@ -52,33 +64,8 @@ class TeamReportController extends Controller
                 ->when($filters['team_id'] ?? null, fn ($q, $v) => $q->where('team_id', $v));
         };
 
-        // Admin sees all team reports
-        if ($user->hasRole(Roles::ADMIN)) {
-            $reports = WfhTeamReport::with(['team', 'creator', 'supervisor'])
-                ->where($applyFilters)
-                ->orderByDesc('report_date')
-                ->paginate($perPage);
-
-            return ApiResponse::paginated($reports, TeamReportResource::class);
-        }
-
-        $user->loadMissing('team.field');
-        $fieldId = $user->team?->field?->id;
-        if (! $fieldId) {
-            return ApiResponse::fail('User tidak terhubung dengan bidang manapun.');
-        }
-
-        $isFieldHead = Field::where('id', $fieldId)->where('head_id', $user->id)->exists();
-
-        $reports = WfhTeamReport::with(['team', 'creator', 'supervisor'])
-            ->whereHas('team', function ($q) use ($fieldId, $user, $isFieldHead) {
-                $q->where('field_id', $fieldId);
-
-                // Field head sees all teams in the field; others (KT, staf) see own team only
-                if (! $isFieldHead) {
-                    $q->where('id', $user->team_id);
-                }
-            })
+        $reports = $this->teamReportScope
+            ->applyTo(WfhTeamReport::with(['team', 'creator', 'supervisor']), $user)
             ->where($applyFilters)
             ->orderByDesc('report_date')
             ->paginate($perPage);
@@ -86,32 +73,40 @@ class TeamReportController extends Controller
         return ApiResponse::paginated($reports, TeamReportResource::class);
     }
 
+    /**
+     * Detail of one team report + per-member live content.
+     *
+     * Dual permission: `wfh.team_report.view` gates the route, but the payload
+     * embeds monitoring-grade content (draft personal reports, attendance
+     * photos), so `wfh.monitoring.view` is required too. The seeder grants the
+     * pair together; requiring both here keeps the endpoint safe if that
+     * coupling is ever loosened in RolePermissionSeeder.
+     */
     public function show(Request $request, WfhTeamReport $report): JsonResponse
     {
         $this->authorize('wfh.team_report.view');
+        $this->authorize('wfh.monitoring.view');
 
         $user = $request->user();
 
-        // Same scope as index(): admin any field; non-admin must have a field,
-        // and only a field head may read a sibling team within that field.
-        if (! $user->hasRole(Roles::ADMIN)) {
-            $user->loadMissing('team.field');
-            $fieldId = $user->team?->field?->id;
-            if (! $fieldId) {
-                return ApiResponse::fail('User tidak terhubung dengan bidang manapun.');
-            }
-
-            $isFieldHead = Field::where('id', $fieldId)->where('head_id', $user->id)->exists();
-            $inScope = $report->team?->field_id === $fieldId
-                && ($isFieldHead || $report->team_id === $user->team_id);
-
-            if (! $inScope) {
-                return ApiResponse::fail('Laporan tidak berada dalam bidang Anda.', 403);
-            }
+        // Same scope as index() — one rule, one implementation (TeamReportScope).
+        $denial = $this->teamReportScope->denialFor($user, $report);
+        if ($denial) {
+            return $denial;
         }
 
+        // Members are resolved here, not inside the resource, so the resource
+        // stays a plain serializer (no service location, no hidden queries).
+        $members = $this->wfhRepository->getTeamReportDetailData(
+            $report->team_id,
+            $report->report_date->format('Y-m-d'),
+        );
+
         return ApiResponse::ok(
-            new TeamReportDetailResource($report->load(['team', 'creator', 'supervisor'])),
+            new TeamReportDetailResource(
+                $report->loadMissing(['team', 'creator', 'supervisor']),
+                $members,
+            ),
         );
     }
 

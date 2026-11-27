@@ -54,6 +54,20 @@ class TeamReportFilterTest extends TestCase
         $this->assertSame(['2026-11-01', '2026-11-15', '2026-11-30'], $dates->all());
     }
 
+    /** Rentang terbalik (from > to) tidak 422/500: hasil kosong, perilaku
+     *  whereDate>=from AND whereDate<=to yang alami. Dipin agar tidak drift. */
+    public function test_inverted_date_range_returns_empty_list(): void
+    {
+        $admin = $this->adminWithTeam();
+        $this->createReport($admin->team, 'pending', '2026-11-15');
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/admin/wfh/team-reports?date_from=2026-11-30&date_to=2026-11-01')
+            ->assertStatus(200);
+
+        $this->assertSame([], $response->json('data'));
+    }
+
     public function test_team_id_filter_narrows_list(): void
     {
         $admin = $this->adminWithTeam();

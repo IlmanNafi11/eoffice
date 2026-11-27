@@ -5,6 +5,37 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend+frontend, 2026-11-27 — ship review: tuntas temuan review)
+- Skrip anti-flash tema di `app.blade.php` kini diizinkan CSP melalui hash
+  sha256 eksplisit di `script-src` (`SecurityHeaders`); sebelumnya skrip inline
+  diblokir di semua env selain local sehingga kilatan tema kembali saat
+  deploy. Regresi uji membandingkan hash skrip yang dirender dengan hash CSP.
+- `GET /admin/wfh/team-reports/{report}` kini menuntut `wfh.monitoring.view`
+  selain `wfh.team_report.view` (payload memuat konten grade monitoring);
+  cabang positif kepala bidang lintas tim dalam bidang dipin uji 200, ditambah
+  uji 404 dan uji role tanpa `wfh.monitoring.view`.
+- Aturan tautan kegiatan dibatasi https di boundary (`starts_with:https://`);
+  `url` saja menerima skema `javascript:` yang kemudian dirender ke `href`.
+- Scope baca laporan tim (admin/kepala bidang/anggota) disatukan ke
+  `TeamReportScope` — `index()` dan `show()` kini memakai satu implementasi;
+  anggota detail diselesaikan di controller dan diinjeksikan ke
+  `TeamReportDetailResource` (tanpa service location di serializer).
+- Enum status laporan WFH disatukan: konstanta `WfhReportStatus` (backend,
+  termasuk `LIVE`) dan modul `lib/wfh-report-statuses` (frontend) menggantikan
+  daftar literal terduplikasi; pesan error PDF dibagi lewat
+  `lib/pdf-error-message`.
+- FE: kontrol filter daftar laporan tim kini terinisialisasi dari query redux
+  aktif (tidak lagi menampilkan "Semua status" padahal daftar terfilter),
+  pindah antar laporan menampilkan skeleton alih-alih isi laporan lama, dan
+  permukaan error Unduh PDF di halaman detail diselaraskan dengan daftar
+  (banner inline + toast memakai pesan yang sama). Uji tambahan: approve
+  gagal + guard double-submit, reject me-refetch detail aktif, toggle tema di
+  Header.
+- `openapi.yaml`: field `session` pada detail anggota diberi enum
+  `[pagi, siang, sore]` dan deskripsi roster diperjelas (keanggotaan saat
+  ini, bukan per tanggal laporan). `phpunit.xml` mem-pin `memory_limit=1G`
+  untuk render PDF dompdf.
+
 ### Added (backend+frontend, 2026-11-27 — Laporan Tim: detail, filter, toggle tema)
 - Daftar Laporan Tim (`/team-reports`) mendapat filter berlapis di atas scope
   peran (status, rentang tanggal, tim) yang hanya mempersempit hasil; kepala

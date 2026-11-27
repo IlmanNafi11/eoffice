@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
+import { pdfErrorMessage } from "@/lib/pdf-error-message";
 import { ArrowLeft } from "lucide-react";
 
 import { WfhStatusBadge } from "@/components/wfh/status-badge";
@@ -239,7 +240,19 @@ export function TeamReportDetailPage() {
     );
   }
 
+  // Stale-data guard: while a DIFFERENT report is loading (detail→detail
+  // navigation without waiting for unmount), show the skeleton instead of the
+  // previous report's content.
   if (!report) return null;
+  if (fetchStatus === "loading" && report.id !== id) {
+    return (
+      <div className="space-y-2" data-testid="team-report-detail-loading">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
 
   const canApprove = report.status === "pending" && can(user, "wfh.team_report.approve");
   const canReject = report.status === "pending" && can(user, "wfh.team_report.reject");
@@ -317,7 +330,8 @@ export function TeamReportDetailPage() {
               })
             }
             filename={`WFH-Team-${report!.team_id}-${report!.report_date}.pdf`}
-            onError={(e) => toast.error(toUiError(e).message)}
+            getError={pdfErrorMessage}
+            onError={(e) => toast.error(pdfErrorMessage(e))}
           >
             Unduh PDF
           </PdfDownloadButton>

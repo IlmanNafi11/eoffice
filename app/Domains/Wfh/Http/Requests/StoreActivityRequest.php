@@ -20,7 +20,10 @@ class StoreActivityRequest extends FormRequest
             'id' => ['nullable', 'integer'],
             'links' => ['nullable', 'array'],
             'links.*.id' => ['nullable', 'integer'],
-            'links.*.url' => ['required_with:links', 'url'],
+            // `url` accepts any scheme FILTER_VALIDATE_URL allows (e.g.
+            // `javascript:`); the detail page renders links into `href`, so
+            // restrict to https at the boundary (ship review security).
+            'links.*.url' => ['required_with:links', 'url', 'starts_with:https://'],
         ];
     }
 
@@ -30,6 +33,7 @@ class StoreActivityRequest extends FormRequest
             'activity.required' => 'Kegiatan wajib diisi.',
             'end_time.after' => 'Waktu selesai harus setelah waktu mulai.',
             'links.*.url.url' => 'Format tautan tidak valid.',
+            'links.*.url.starts_with' => 'Tautan harus diawali https://.',
             'links.*.url.required_with' => 'Tautan wajib diisi.',
         ];
     }

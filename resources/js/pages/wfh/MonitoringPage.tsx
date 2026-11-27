@@ -67,28 +67,16 @@ import type { MonitoringUser, TeamResource, WfhSession } from "@/api/types";
 import { can } from "@/lib/permissions";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectUser } from "@/store/authSlice";
+import { WFH_REPORT_STATUSES } from "@/lib/wfh-report-statuses";
+import { pdfErrorMessage } from "@/lib/pdf-error-message";
 import {
   fetchAdminReports,
   fetchWfhBoard,
   selectWfhMonitoringBoard,
   selectWfhMonitoringList,
 } from "@/store/wfhMonitoringSlice";
-
-/**
- * Pesan dari `exportTeamWfhPdf` SUDAH lewat seam: API membungkus pesan
- * blob ter-dekode ke `ApiError` dengan copy aman ("Gagal mengunduh PDF.")
- * dan fallback generik di bawah menutup non-Error. T10 dipenuhi — ApiError
- * yang sampai di sini tidak membawa teks axios mentah.
- */
-function pdfErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return "Gagal mengunduh PDF. Coba lagi.";
-}
-
 const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100];
-const WFH_REPORT_STATUSES = ["draft", "pending", "approved", "rejected"] as const;
 
-/** Tanggal lokal hari ini sebagai YYYY-MM-DD (default tampilan papan). */
 function todayLocal(): string {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, "0");

@@ -2,24 +2,34 @@
 
 namespace App\Domains\Wfh\Http\Resources;
 
-use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
-
 /**
- * Team report header (TeamReportResource fields) plus the per-member content
- * used by the detail page. Members are resolved from the report's team and
- * date so the payload is always fresh on deep-link/refresh.
+ * Team report detail: the base team-report fields plus the per-member live
+ * content used by the detail page.
+ *
+ * Members are RESOLVED BY THE CALLER (the controller) and passed in — the
+ * resource is a plain serializer, not a service locator. Resolving inside
+ * `toArray()` would hide two queries behind a serialization call and pull the
+ * repository in via `app()` (ship review: architecture).
  */
 class TeamReportDetailResource extends TeamReportResource
 {
+    /**
+     * @param  array<int, array<string, mixed>>  $members  Output of
+     *                                                     `WfhRepositoryInterface::getTeamReportDetailData` for this
+     *                                                     report's team and date.
+     */
+    public function __construct(
+        $resource,
+        private array $members = [],
+    ) {
+        parent::__construct($resource);
+    }
+
     public function toArray($request): array
     {
-        $data = parent::toArray($request);
-
-        $data['members'] = $this->report_date
-            ? app(WfhRepositoryInterface::class)
-                ->getTeamReportDetailData($this->team_id, $this->report_date->format('Y-m-d'))
-            : [];
-
-        return $data;
+        return [
+            ...parent::toArray($request),
+            'members' => $this->members,
+        ];
     }
 }

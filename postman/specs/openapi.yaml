@@ -2297,9 +2297,12 @@ components:
             members:
               type: array
               description: |
-                One entry per active member of the report's team on the report
-                date, resolved from live data so a deep-link/refresh is always
-                fresh. The chosen personal report is the newest live one
+                One entry per member currently active in the report's team
+                (roster reflects the team's present membership, not membership
+                as of the report date — a member added after the report date
+                appears with "no report" rather than being excluded), resolved
+                from live data so a deep-link/refresh is always fresh. The
+                chosen personal report is the newest live one
                 (`pending|approved` beat `draft|rejected`, then `updated_at`).
               items:
                 $ref: "#/components/schemas/WfhTeamReportMember"
@@ -2363,6 +2366,7 @@ components:
                 example: 701
               session:
                 type: string
+                enum: [pagi, siang, sore]
                 example: pagi
               photo_url:
                 type: string

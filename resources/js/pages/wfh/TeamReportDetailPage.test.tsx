@@ -18,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { userEvent } from "@/test/portal";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { Provider } from "react-redux";
 import type { WfhTeamReportDetail, WfhTeamReportMember } from "@/api/types";
 import { Toaster } from "@/components/ui/sonner";
@@ -372,5 +372,90 @@ describe("TeamReportDetailPage — kegagalan fetch", () => {
     expect(
       await screen.findByText("Laporan tidak berada dalam bidang Anda."),
     ).toBeTruthy();
+  });
+});
+
+describe("TeamReportDetailPage — guard mutasi & pindah laporan", () => {
+  it("approve gagal → toast pesan server, detail TIDAK di-refetch, tombol aktif lagi", async () => {
+    mockedApprove.mockRejectedValueOnce(
+      new ApiError("http", "Pembuat laporan tidak dapat menyetujui laporannya sendiri.", {
+        status: 403,
+      }),
+    );
+    renderDetail();
+    await screen.findByText("Andi Prasetyo");
+
+    await userEvent.click(screen.getByRole("button", { name: /setujui/i }));
+
+    await waitFor(() => {
+      expect(mockedApprove).toHaveBeenCalledWith(12);
+    });
+    await waitFor(() => {
+      const toast = document.querySelector("[data-sonner-toast]");
+      expect(toast?.textContent).toContain(
+        "Pembuat laporan tidak dapat menyetujui laporannya sendiri.",
+      );
+    });
+    // Gagal → tidak refetch detail (hanya fetch mount).
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole("button", { name: /setujui/i }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("klik Setujui dua kali saat in-flight → approve hanya sekali", async () => {
+    let resolveApprove: (value: unknown) => void = () => {};
+    mockedApprove.mockReturnValueOnce(new Promise((resolve) => (resolveApprove = resolve)));
+    renderDetail();
+    await screen.findByText("Andi Prasetyo");
+
+    const approveButton = screen.getByRole("button", { name: /setujui/i });
+    await userEvent.click(approveButton);
+
+    await waitFor(() => expect(mockedApprove).toHaveBeenCalledTimes(1));
+    expect((approveButton as HTMLButtonElement).disabled).toBe(true);
+    // Klik kedua pada tombol yang sudah mati tidak mengirim ulang.
+    await userEvent.click(approveButton);
+    expect(mockedApprove).toHaveBeenCalledTimes(1);
+
+    resolveApprove({ ...detail, status: "approved", message: "Laporan tim berhasil disetujui." });
+    await waitFor(() => expect(mockedApprove).toHaveBeenCalledTimes(1));
+  });
+
+  it("pindah ke laporan lain yang masih dimuat → skeleton, bukan isi laporan lama", async () => {
+    const store = makeStore();
+    store.dispatch(setUser(approver));
+
+    mockedGet.mockResolvedValueOnce(detail); // mount laporan 12
+    mockedGet.mockReturnValueOnce(new Promise(() => {})); // laporan 13 tidak pernah selesai
+
+    function Harness() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button onClick={() => navigate("/team-reports/13")}>pindah</button>
+          <Routes>
+            <Route path="/team-reports/:reportId" element={<TeamReportDetailPage />} />
+          </Routes>
+        </>
+      );
+    }
+
+    render(
+      <Provider store={store}>
+        <Toaster position="top-right" richColors />
+        <MemoryRouter initialEntries={["/team-reports/12"]}>
+          <Harness />
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    expect(await screen.findByText("Andi Prasetyo")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: /pindah/i }));
+
+    // Skeleton tampil dan isi laporan lama (Tim Aplikasi) tidak dibiarkan.
+    expect(await screen.findByTestId("team-report-detail-loading")).toBeTruthy();
+    expect(screen.queryByText("Tim Aplikasi")).toBeNull();
   });
 });

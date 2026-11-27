@@ -95,6 +95,29 @@ class SecurityHardeningTest extends TestCase
         }
     }
 
+    /**
+     * Ship review: skrip anti-flash tema di app.blade.php adalah inline, jadi
+     * tanpa hash/nonce CSP `script-src 'self'` menolaknya di semua env selain
+     * local. Hitung hash dari isi skrip yang benar-benar dirender dan pastikan
+     * sama dengan yang diizinkan header — bila skrip diubah tanpa mengubah
+     * CSP, test ini RED (bukan bug diam yang hanya terlihat di browser).
+     */
+    public function test_csp_allows_the_rendered_inline_theme_script(): void
+    {
+        $shell = view('app')->render();
+        preg_match('/<script>(.*?)<\/script>/s', $shell, $matches);
+        $this->assertNotEmpty($matches[1], 'Shell harus memuat skrip anti-flash tema.');
+
+        $hash = 'sha256-'.base64_encode(hash('sha256', $matches[1], true));
+
+        $response = $this->get('/up');
+        $response->assertOk();
+        $this->assertStringContainsString(
+            "'{$hash}'",
+            $response->headers->get('Content-Security-Policy') ?? '',
+        );
+    }
+
     public function test_login_rate_limited_after_five_attempts(): void
     {
         $this->createAdmin();
