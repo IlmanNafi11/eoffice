@@ -62,22 +62,23 @@ class ImageSignatureServiceTest extends TestCase
         $this->assertInstanceOf(ImageSignatureService::class, $resolved);
     }
 
-    public function test_trim_keeps_isolated_thin_stroke(): void
+    public function test_trim_retains_an_isolated_off_grid_ink_dot(): void
     {
-        $file = UploadedFile::fake()->image('thin.png', 1200, 400);
+        // (101,101) is deliberately off the 4-px sampling grid. The full
+        // resolution scan crops to the dot, so the 1200x400 canvas shrinks to
+        // roughly 11x11 before scale(); a coarse scan that finds no ink leaves
+        // the canvas intact and yields a 300x100 image instead.
+        $file = UploadedFile::fake()->image('off-grid.png', 1200, 400);
         $gd = imagecreatetruecolor(1200, 400);
         imagefill($gd, 0, 0, imagecolorallocate($gd, 255, 255, 255));
-        $ink = imagecolorallocate($gd, 0, 0, 0);
-        imagesetpixel($gd, 1, 1, $ink);
-        imagesetpixel($gd, 1198, 398, $ink);
+        imagesetpixel($gd, 101, 101, imagecolorallocate($gd, 0, 0, 0));
         imagepng($gd, $file->getRealPath());
+        imagedestroy($gd);
 
         $path = $this->service->normalize($file->getRealPath(), 7);
         $saved = imagecreatefrompng(Storage::disk('local')->path($path));
 
-        $this->assertLessThan(240, (imagecolorat($saved, 0, 0) >> 16) & 0xFF);
-        $bottomRight = imagecolorat($saved, imagesx($saved) - 1, imagesy($saved) - 1);
-        $this->assertLessThan(240, ($bottomRight >> 16) & 0xFF);
+        $this->assertLessThanOrEqual(150, imagesx($saved));
     }
 
     public function test_trim_handles_large_image_without_error(): void

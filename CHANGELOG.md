@@ -5,6 +5,32 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend + frontend, 2026-11-28 — tuntas temuan ship review #26)
+- Trim tanda tangan kembali memindai tiap piksel. Eksperimen grid scan 4 px
+  melewatkan goresan di luar grid (299 dari 300 fixture) dan mengubah hasil
+  crop; karena total waktu `normalize()` praktis tidak berubah, optimasi
+  dibatalkan. Test `ImageSignatureServiceTest` sekarang mengunci titik
+  off-grid yang gagal pada implementasi grid scan.
+- Foto presensi PNG kini mempertahankan kanal alpha saat diperkecil (sebelum
+  ini alpha 127 menjadi 0). Format sumber JPEG/PNG/WebP tetap dipertahankan;
+  konten rusak tetap disimpan apa adanya dan foto sudah ≤600 px tidak
+  di-encode ulang.
+- `media:resize-attendance` kini hanya menyentuh path berprefix
+  `attendances/`, memproses data per chunk, mengisolasi baris pixel-bomb
+  (baris berikutnya tetap diproses), dan melaporkan `diubah`/`dilewati`/
+  `gagal` secara jujur; `--dry-run` tidak lagi mengklaim "diubah".
+- Upload foto presensi dengan header dimensi di atas budget dekode kini
+  ditolak 422 oleh rule validasi bersama, bukan 500 dari helper. Kedua jalur
+  upload (create report dan append attendance) memakai rule yang sama.
+- Test yang sebelumnya vacuous diperkuat: query-count admin kini membuktikan
+  log query tidak kosong, memuat leader lewat `IN (...)`, dan memeriksa
+  payload; assertion konstanta 16_000_000 diganti uji batas N/N+1.
+
+### Changed (frontend, 2026-11-28 — ship review #26)
+- Chunk `TrendChart` (recharts) kini dimuat hanya saat data trend tersedia,
+  dengan skeleton berukuran tetap saat chunk sedang dimuat — sebelumnya chunk
+  diminta pada setiap mount halaman beranda.
+
 ### Fixed (backend, 2026-11-28 — tuntas temuan ship review #25)
 - Memindah `report_date` draft via `PUT /api/wfh/reports/{report}` kini
   menyinkronkan `date` baris absensinya dalam transaksi yang sama — sebelumnya

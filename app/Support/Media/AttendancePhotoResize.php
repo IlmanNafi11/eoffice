@@ -3,6 +3,7 @@
 namespace App\Support\Media;
 
 use App\Support\Pdf\PdfImage;
+use App\Support\Signature\SignaturePath;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,6 +25,11 @@ class AttendancePhotoResize
      */
     public static function store(UploadedFile $photo, string $directory, string $filename): string
     {
+        $path = trim($directory, '/').'/'.$filename;
+        if (! SignaturePath::contained($path) || ! str_starts_with($path, 'attendances/')) {
+            throw new \InvalidArgumentException('Path foto presensi tidak valid.');
+        }
+
         $bytes = (string) file_get_contents($photo->getRealPath());
         $info = @getimagesizefromstring($bytes);
 
@@ -56,6 +62,11 @@ class AttendancePhotoResize
                     );
 
                     if ($scaled !== false) {
+                        if ($mime === 'image/png') {
+                            imagealphablending($scaled, false);
+                            imagesavealpha($scaled, true);
+                        }
+
                         $encoded = self::encode($scaled, (string) $mime);
 
                         if ($encoded !== null) {
@@ -70,7 +81,6 @@ class AttendancePhotoResize
             }
         }
 
-        $path = trim($directory, '/').'/'.$filename;
         Storage::disk('local')->put($path, $bytes);
 
         return $path;

@@ -102,20 +102,26 @@ class AdminUserListQueryCountTest extends TestCase
 
         // Distinct non-admin leader per team: a lazy load cannot be served
         // from any cache, so every row would cost one SELECT.
+        $leaderIds = [];
+        $memberIds = [];
         foreach (range(1, 10) as $i) {
             $leader = User::factory()->create();
+            $leaderIds[] = $leader->id;
             $team = Team::factory()->create(['leader_id' => $leader->id]);
             $member = User::factory()->create(['team_id' => $team->id]);
+            $memberIds[$member->id] = $leader->id;
             $member->assignRole('staf');
         }
 
         DB::enableQueryLog();
         DB::flushQueryLog();
-        $this->getJson('/api/admin/users?per_page=100')->assertOk();
+        $response = $this->getJson('/api/admin/users?per_page=100')->assertOk();
+
+        $queries = collect(DB::getQueryLog());
 
         // The lazy-load signature is a by-key users SELECT (the eager load uses
         // a WHERE ... IN (...), which this pattern does not match).
-        $lazyLeaderLoads = collect(DB::getQueryLog())
+        $lazyLeaderLoads = $queries
             ->filter(fn (array $query) => str_contains(
                 $query['query'],
                 '"users"."id" = ? and "users"."deleted_at" is null',
@@ -127,6 +133,15 @@ class AdminUserListQueryCountTest extends TestCase
             $lazyLeaderLoads,
             'team.leader must be batch-eager-loaded, never one users SELECT per row.',
         );
+        $this->assertGreaterThan(0, $queries->count(), 'Query log must not be empty.');
+        $this->assertTrue(
+            $queries->contains(fn (array $query) => str_contains(strtolower($query['query']), ' in (')),
+            'Leaders must be loaded in one WHERE IN query.',
+        );
+        $rows = collect($response->json('data'))->keyBy('id');
+        foreach ($memberIds as $memberId => $leaderId) {
+            $this->assertSame($leaderId, $rows->get($memberId)['team']['leader']['id'] ?? null);
+        }
     }
 
     /**

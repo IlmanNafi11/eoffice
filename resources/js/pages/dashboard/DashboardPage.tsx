@@ -54,9 +54,13 @@ export function DashboardPage() {
 
       <div className={refetching ? "space-y-6 opacity-60 transition-opacity" : "space-y-6"}>
         <TodayCards section={data?.today} status={status} />
-        <Suspense fallback={null}>
-          <TrendChart trend={data?.trend} />
-        </Suspense>
+        {data?.trend && (
+          <Suspense
+            fallback={<div data-testid="trend-chart-skeleton" className="h-64 animate-pulse rounded-lg bg-muted/50" />}
+          >
+            <TrendChart trend={data.trend} />
+          </Suspense>
+        )}
         <QueueCard queue={data?.queue} />
         <AttentionCard attention={data?.attention} />
       </div>

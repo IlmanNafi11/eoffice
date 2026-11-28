@@ -78,7 +78,6 @@ class AttendancePhotoResizeTest extends TestCase
     public function test_decode_budget_is_shared_with_pdf_image_and_enforced(): void
     {
         $limit = PdfImage::maxDecodedPixels();
-        $this->assertSame(16_000_000, $limit);
 
         $width = 4001;
         $height = (int) ($limit / $width) + 1;
@@ -93,6 +92,90 @@ class AttendancePhotoResizeTest extends TestCase
         $this->expectExceptionMessage('Gambar terlalu besar untuk diproses.');
 
         AttendancePhotoResize::store($file, 'attendances', 'foto.jpg');
+    }
+
+    /**
+     * A half-transparent PNG must keep its alpha channel through the scale
+     * and re-encode; flattening it to opaque black destroys evidence.
+     */
+    public function test_store_preserves_png_alpha_channel(): void
+    {
+        $gd = imagecreatetruecolor(2400, 1800);
+        imagesavealpha($gd, true);
+        imagealphablending($gd, false);
+        imagefill($gd, 0, 0, imagecolorallocatealpha($gd, 200, 50, 50, 127));
+        ob_start();
+        imagepng($gd);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($gd);
+
+        $file = UploadedFile::fake()->createWithContent('alpha.png', $bytes);
+        $path = AttendancePhotoResize::store($file, 'attendances', 'alpha.png');
+
+        $stored = imagecreatefrompng(Storage::disk('local')->path($path));
+        $rgba = imagecolorsforindex($stored, imagecolorat($stored, 10, 10));
+        $this->assertEqualsWithDelta(127, $rgba['alpha'], 2);
+    }
+
+    /**
+     * Corrupt content is deliberately stored byte-for-byte: evidence must
+     * never be silently discarded when GD cannot decode it.
+     */
+    public function test_store_keeps_corrupt_bytes_verbatim(): void
+    {
+        $file = UploadedFile::fake()->createWithContent('foto.jpg', 'not an image');
+
+        $path = AttendancePhotoResize::store($file, 'attendances', 'foto.jpg');
+
+        $this->assertSame('not an image', Storage::disk('local')->get($path));
+    }
+
+    /**
+     * Photos already within the cap must keep their exact original bytes.
+     */
+    public function test_store_leaves_small_photo_bytes_unchanged(): void
+    {
+        $gd = imagecreatetruecolor(100, 80);
+        imagefill($gd, 0, 0, imagecolorallocate($gd, 30, 90, 160));
+        ob_start();
+        imagejpeg($gd);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($gd);
+
+        $file = UploadedFile::fake()->createWithContent('small.jpg', $bytes);
+        $path = AttendancePhotoResize::store($file, 'attendances', 'small.jpg');
+
+        $this->assertSame($bytes, Storage::disk('local')->get($path));
+    }
+
+    /**
+     * The decode budget is a boundary, not a magic literal: N pixels pass,
+     * N+1 pixels are rejected, using the shared PdfImage accessor.
+     */
+    public function test_decode_budget_boundary_accepts_exact_limit_and_rejects_one_more(): void
+    {
+        $limit = PdfImage::maxDecodedPixels();
+        $width = 4000;
+        $acceptedHeight = intdiv($limit, $width);
+
+        $gd = imagecreatetruecolor($width, $acceptedHeight);
+        ob_start();
+        imagejpeg($gd, null, 30);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($gd);
+        $file = UploadedFile::fake()->createWithContent('boundary.jpg', $bytes);
+        $path = AttendancePhotoResize::store($file, 'attendances', 'boundary.jpg');
+        $this->assertSame('attendances/boundary.jpg', $path);
+
+        $gd = imagecreatetruecolor($width, $acceptedHeight + 1);
+        ob_start();
+        imagejpeg($gd, null, 30);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($gd);
+        $file = UploadedFile::fake()->createWithContent('boundary.jpg', $bytes);
+
+        $this->expectException(\InvalidArgumentException::class);
+        AttendancePhotoResize::store($file, 'attendances', 'boundary.jpg');
     }
 
     private function largePhoto(string $extension): UploadedFile
