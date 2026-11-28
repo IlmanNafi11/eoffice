@@ -8,6 +8,7 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class SchemaRelationshipTest extends TestCase
@@ -134,5 +135,34 @@ class SchemaRelationshipTest extends TestCase
 
         $this->assertNotNull($found);
         $this->assertSame($draft->id, $found->report_id);
+    }
+
+    /** Ship review #25: the fail-fast collision guard of the date-lock
+     *  migration. Two live reports for one (user, date) were legal under the
+     *  old draft-only index; the migration must abort with the offending
+     *  pairs instead of silently corrupting data. */
+    public function test_date_lock_migration_fails_fast_on_active_duplicates(): void
+    {
+        // The widened unique index blocks the fixture itself, so drop it —
+        // the migration's own collision guard is what must catch the state.
+        DB::statement('DROP INDEX IF EXISTS wfh_reports_active_draft_unique');
+
+        $user = User::factory()->create();
+
+        WfhReport::factory()->status('pending')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+        WfhReport::factory()->status('approved')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+
+        $this->artisan('migrate:rollback', ['--step' => 1]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Cannot lock report dates');
+
+        $this->artisan('migrate');
     }
 }

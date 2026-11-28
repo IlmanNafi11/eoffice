@@ -378,4 +378,62 @@ class ReportStoreUpdateTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['activities.0.links']);
     }
+
+    /** Ship review #25: moving a draft to another date must carry its
+     *  attendance rows along — the row's `date` is the report's date by
+     *  invariant (the copy path already re-dates copied rows). Without the
+     *  sync, (user, date) lookups miss the evidence and monitoring/PDF render
+     *  it on the wrong day. */
+    public function test_update_moving_date_resyncs_attendance_dates(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $create = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+            'attendances' => [
+                'pagi' => ['photo' => UploadedFile::fake()->image('pagi.jpg')],
+            ],
+        ]);
+        $reportId = $create->json('data.id');
+        $attendanceId = DB::table('wfh_attendances')->where('report_id', $reportId)->value('id');
+
+        $this->putJson("/api/wfh/reports/{$reportId}", [
+            'report_date' => '2026-07-27',
+        ])->assertStatus(200);
+
+        $attendance = DB::table('wfh_attendances')->find($attendanceId);
+        $this->assertSame('2026-07-27', $attendance->date, 'Attendance date must follow the report date.');
+    }
+
+    /** Ship review #25: the pending branch of the date-lock answer through
+     *  the PUT savepoint path — the report must stay on its original date. */
+    public function test_update_to_pending_locked_date_returns_422_and_keeps_original_date(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $create = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-27',
+        ]);
+        $reportId = $create->json('data.id');
+
+        WfhReport::factory()->status('pending')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response = $this->putJson("/api/wfh/reports/{$reportId}", [
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath(
+            'message',
+            'Masih ada laporan WFH pada tanggal ini yang menunggu keputusan atasan.',
+        );
+        $this->assertSame('2026-07-27', WfhReport::find($reportId)->report_date->format('Y-m-d'));
+    }
 }

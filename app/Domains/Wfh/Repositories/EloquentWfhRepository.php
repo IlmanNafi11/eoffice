@@ -221,7 +221,17 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
     {
         $safe = array_intersect_key($reportData, array_flip(self::METADATA_FIELDS));
 
-        return $report->update($safe);
+        $updated = $report->update($safe);
+
+        // Attendance ownership is the report, so a row's `date` must follow
+        // its report's date — otherwise (user_id, date) lookups miss the
+        // evidence and monitoring/PDF render it on the wrong day. The copy
+        // path re-dates copied rows for the same reason.
+        if ($updated && array_key_exists('report_date', $safe) && $report->wasChanged('report_date')) {
+            $report->attendances()->update(['date' => $report->report_date->format('Y-m-d')]);
+        }
+
+        return $updated;
     }
 
     // === Per-row helpers ===
@@ -409,7 +419,15 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
                     'sort_order' => $activity->sort_order,
                 ]);
 
+                // The copy is a write path too: the boundary rule is
+                // https-only (the detail page renders links into `href`), so
+                // a legacy non-https link on the archive must not inherit
+                // into the fresh draft.
                 foreach ($activity->links as $link) {
+                    if (! str_starts_with($link->url, 'https://')) {
+                        continue;
+                    }
+
                     $copy->links()->create([
                         'url' => $link->url,
                         'sort_order' => $link->sort_order,

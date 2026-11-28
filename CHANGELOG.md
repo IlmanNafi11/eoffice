@@ -5,6 +5,25 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend, 2026-11-28 — tuntas temuan ship review #25)
+- Memindah `report_date` draft via `PUT /api/wfh/reports/{report}` kini
+  menyinkronkan `date` baris absensinya dalam transaksi yang sama — sebelumnya
+  baris absensi tetap pada tanggal lama, sehingga lookup `(user_id, date)`
+  meleset, papan monitoring menghitung user "punya absensi" di hari tanpa
+  laporan, dan PDF approved mencetak bukti bertanggal salah. Invarian
+  "attendance.date = report_date" kini dijaga di kedua jalur tulis (copy
+  prefill sudah melakukannya). Dikunci test `ReportStoreUpdateTest`.
+- Copy prefill koreksi kini menolak menyalin link non-https dari arsip
+  rejected — jalur copy adalah write path ketiga selain POST/PUT, dan aturan
+  boundary https-only tidak boleh dilewati link warisan. Dikunci test
+  `RejectedReportCorrectionTest`.
+- Cakupan uji baru: fail-fast migrasi kunci tanggal (dua laporan aktif satu
+  (user, tanggal) → `RuntimeException` dengan daftar pasangan —
+  `SchemaRelationshipTest`), cabang `pending` jawaban tanggal terkunci via
+  PUT (`ReportStoreUpdateTest`), dan guard submit lintas-laporan vs sibling
+  `approved` di level HTTP (422 + pesan domain + draft tetap draft —
+  `SubmitContentGuardTest`).
+
 ### Added (frontend, 2026-11-28 — wfh-ux-remediation, report actions)
 - Shortcut "Buat Laporan Perbaikan" di halaman detail laporan WFH berstatus
   `rejected` (hanya pemilik): membuat draft koreksi via `POST /api/wfh/reports`

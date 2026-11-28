@@ -417,4 +417,39 @@ class RejectedReportCorrectionTest extends TestCase
             ->sole();
         $this->assertSame($rejected->id, $trashed->report_id);
     }
+
+    /** Ship review #25: the copy path is a write path too — a legacy
+     *  non-https link on the rejected report must not silently inherit into
+     *  the correction draft (the boundary rule is https-only). */
+    public function test_correction_prefill_skips_non_https_links(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-28'));
+        $rejected = $this->rejectedReportWithArchiveData('2026-07-28');
+
+        $rejected->activities[0]->links()->createMany([
+            ['url' => 'javascript:alert(1)', 'sort_order' => 2],
+            ['url' => 'http://intranet.example.com/sop', 'sort_order' => 3],
+        ]);
+
+        $response = $this->postJson('/api/wfh/reports', ['report_date' => '2026-07-28']);
+
+        $response->assertStatus(201);
+
+        $draftLinks = WfhReportLink::query()
+            ->whereIn(
+                'wfh_report_activity_id',
+                WfhReportActivity::query()
+                    ->where('wfh_report_id', $response->json('data.id'))
+                    ->pluck('id')
+            )
+            ->orderBy('sort_order')
+            ->pluck('url')
+            ->all();
+
+        $this->assertSame(
+            ['https://example.com/dokumen-a', 'https://example.com/dokumen-b'],
+            $draftLinks,
+            'Non-https source links must not be copied into the draft.',
+        );
+    }
 }
