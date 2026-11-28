@@ -35,6 +35,12 @@ class WfhReportDeleteTest extends TestCase
             ->assertNoContent();
 
         $this->assertSoftDeleted('wfh_reports', ['id' => $report->id]);
+
+        // Deleting a draft must free its date: the active-draft unique index
+        // excludes soft-deleted rows, so a new draft for the same date is
+        // accepted (ship review #24: the pre-fix index kept holding the lock).
+        $this->postJson('/api/wfh/reports', ['report_date' => $report->report_date->format('Y-m-d')])
+            ->assertStatus(201);
     }
 
     public function test_admin_can_delete_other_users_draft_report(): void

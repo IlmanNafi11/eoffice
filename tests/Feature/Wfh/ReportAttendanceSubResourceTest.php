@@ -22,6 +22,12 @@ class ReportAttendanceSubResourceTest extends TestCase
         $this->artisan('db:seed', ['--class' => 'SettingsSeeder']);
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     private function createDraftReport(User $user, string $date = '2026-07-28'): WfhReport
     {
         return WfhReport::factory()->status('draft')->create([

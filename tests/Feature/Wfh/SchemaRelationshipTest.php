@@ -1,5 +1,7 @@
 <?php
 
+namespace Tests\Feature\Wfh;
+
 use App\Domains\Wfh\Models\WfhAttendance;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;

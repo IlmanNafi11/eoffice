@@ -1,10 +1,13 @@
 <?php
 
+namespace Tests\Unit;
+
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;

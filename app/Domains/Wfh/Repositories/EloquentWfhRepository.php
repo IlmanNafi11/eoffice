@@ -429,7 +429,11 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
             $target->attendances()->create([
                 'user_id' => $userId,
-                'date' => $attendance->date,
+                // Attendance ownership is the report now, so the row's date
+                // follows the target's report_date. Legacy rows copied verbatim
+                // would keep an upload-day date that no longer matches their
+                // report, and (user_id, date) lookups would miss them.
+                'date' => $target->report_date->format('Y-m-d'),
                 'session' => $attendance->session,
                 'photo_path' => $this->copyAttendancePhoto($attendance, $target),
                 'check_in_at' => $attendance->check_in_at,

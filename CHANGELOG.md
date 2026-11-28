@@ -28,6 +28,23 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
   yang sama — draft koreksi terisi penuh tanpa mengetik ulang; arsip rejected
   tetap utuh. Konflik sesi menolak pembuatan tanpa file yatim.
 
+### Fixed (backend, 2026-11-28 — ship review #24)
+- Menghapus draft WFH kini membebaskan tanggalnya: unique index
+  `wfh_reports_active_draft_unique` mengecualikan baris soft-deleted
+  (`deleted_at IS NULL`), sehingga hapus-draft → buat-ulang untuk tanggal yang
+  sama tidak lagi tertahan 422 "sudah terkunci" selamanya. Regresi dikunci
+  test di `WfhReportDeleteTest`.
+- Absensi hasil salinan koreksi memakai `report_date` draft tujuan (bukan
+  tanggal upload baris sumber), sehingga baris hasil copy selalu cocok dengan
+  laporannya pada lookup `(user_id, date)`.
+- Suite test yang memakai `Carbon::setTestNow` tanpa reset kini me-reset di
+  `tearDown` (`RejectedReportCorrectionTest`,
+  `ReportAttendanceSubResourceTest`) — tidak lagi menggeser tanggal "hari ini"
+  bagi test lain dalam satu proses.
+- Deklarasi `namespace` yang terhapus di
+  `tests/Unit/WfhReportStateMachineTest.php` dan
+  `tests/Feature/Wfh/SchemaRelationshipTest.php` dipulihkan.
+
 ### Fixed (backend, 2026-11-28 — wfh-ux-remediation, locked-date messages)
 - Pelanggaran kunci satu-laporan-aktif-per-tanggal (SQLSTATE 23505) tidak lagi
   bocor sebagai 500. `POST /api/wfh/reports` menjawab 200 dengan draft yang

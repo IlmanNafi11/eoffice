@@ -63,11 +63,15 @@ return new class extends Migration
             ON wfh_attendances (user_id, date)
         ');
 
+        // Soft-deleted drafts must not hold the date lock: deleting a draft
+        // (soft delete) must free the date for a new one, matching the
+        // domain predicate (WfhReportStatus::ACTIVE + live rows).
         DB::statement('DROP INDEX IF EXISTS wfh_reports_active_draft_unique');
         DB::statement("
             CREATE UNIQUE INDEX wfh_reports_active_draft_unique
             ON wfh_reports (user_id, report_date)
             WHERE status IN ('draft', 'pending', 'approved')
+              AND deleted_at IS NULL
         ");
     }
 
@@ -82,6 +86,7 @@ return new class extends Migration
             CREATE UNIQUE INDEX wfh_reports_active_draft_unique
             ON wfh_reports (user_id, report_date)
             WHERE status = 'draft'
+              AND deleted_at IS NULL
         ");
 
         DB::statement('DROP INDEX IF EXISTS wfh_attendances_user_date_index');

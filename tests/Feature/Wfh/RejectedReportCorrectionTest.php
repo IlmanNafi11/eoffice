@@ -39,6 +39,12 @@ class RejectedReportCorrectionTest extends TestCase
         Sanctum::actingAs($this->user);
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     /**
      * A rejected report with one activity (two links) and one attendance whose
      * photo bytes exist on the private disk.
