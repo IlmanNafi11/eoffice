@@ -314,6 +314,9 @@ describe("MonitoringPage — Semua Laporan", () => {
     expect(screen.getByRole("columnheader", { name: "Status WFH" })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Kegiatan" })).toBeTruthy();
     expect(screen.getByTestId("wfh-attendance-status")).toBeTruthy();
+    // Monitoring tidak mengirim prop `actions` → tanpa kolom Aksi (opt-in).
+    expect(screen.queryByRole("columnheader", { name: "Aksi" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Aksi" })).toBeNull();
     expect(screen.getByLabelText("Pagi belum absen")).toBeTruthy();
 
     await userEvent.click(screen.getByTestId("wfh-report-row-10"));

@@ -24,6 +24,10 @@
  * `Pagination`); kolom "Status WFH" menambah ringkasan absensi per sesi
  * (`GET /wfh/session-config` → fallback `["pagi","siang","sore"]`); ikon
  * dekoratif ganda pada header halaman dihapus.
+ *
+ * Modul `wfh-report-actions`: kolom "Aksi" per baris (opt-in `WfhReportRow`
+ * `actions`) — Detail, Edit/Hapus draft, Unduh PDF pending/approved — gate
+ * permission `wfh.report.*` + status; klik baris tetap navigasi ke detail.
  */
 
 import { useEffect, useState } from "react";
@@ -66,8 +70,10 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/wfh/pagination";
-import { WfhReportRow } from "@/components/wfh/report-row";
+import { downloadBlob } from "@/components/wfh/pdf-download";
+import { WfhReportRow, type WfhReportRowActions } from "@/components/wfh/report-row";
 import {
+  deleteWfhReport,
   fetchWfhReports,
   selectWfhList,
   selectWfhListItems,
@@ -76,8 +82,8 @@ import {
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { can } from "@/lib/permissions";
 import { selectUser } from "@/store/authSlice";
-import { createWfhReport, getWfhSessionConfig } from "@/api/wfh";
-import type { WfhSession } from "@/api/types";
+import { createWfhReport, exportWfhReportPdf, getWfhSessionConfig } from "@/api/wfh";
+import type { WfhReport, WfhSession } from "@/api/types";
 
 /** Fallback sesi bila `GET /wfh/session-config` gagal (default 3 sesi). */
 const DEFAULT_SESSIONS: WfhSession[] = ["pagi", "siang", "sore"];
@@ -94,6 +100,13 @@ export function WfhReportsPage() {
   const meta = useAppSelector(selectWfhListMeta);
 
   const canCreate = can(user, "wfh.report.create");
+  // Gate kolom Aksi (spec wfh-report-actions): permission + status; aksi tak
+  // diizinkan disembunyikan, bukan disabled. Tanpa semua permission → kolom
+  // tidak dirender sama sekali.
+  const canUpdateReport = can(user, "wfh.report.update");
+  const canDeleteReport = can(user, "wfh.report.delete");
+  const canExportPdf = can(user, "wfh.report.export_pdf");
+  const hasActionsColumn = canUpdateReport || canDeleteReport || canExportPdf;
 
   // Filter lokal: baru dikirim ke backend saat "Terapkan" (menghindari fetch
   // per karakter). `perPage` null = pakai default backend (tidak dikirim).
@@ -114,6 +127,12 @@ export function WfhReportsPage() {
   const [createDate, setCreateDate] = useState(() => toDateString(new Date()));
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Dialog hapus draft dari kolom Aksi (deleteWfhReport; slice menghapus
+  // baris list pada fulfilled). Error ditampilkan di dalam dialog.
+  const [deleteTarget, setDeleteTarget] = useState<WfhReport | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchWfhReports({}));
@@ -200,6 +219,42 @@ export function WfhReportsPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  /** Hapus draft dari kolom Aksi; sukses → slice membuang baris dari list. */
+  async function submitDelete() {
+    if (deleting || !deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await dispatch(deleteWfhReport(deleteTarget.id)).unwrap();
+      setDeleteTarget(null);
+    } catch (err) {
+      // `unwrap()` melempar payload slice (string `messageOf`); non-string
+      // tetap lewat seam `toUiError`. Dialog tetap terbuka, banner dirender.
+      setDeleteError(typeof err === "string" && err !== "" ? err : toUiError(err).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  /** Menu Aksi per baris — item ter-gate status + permission (bukan role). */
+  function rowActions(): WfhReportRowActions {
+    return {
+      canEdit: canUpdateReport,
+      canDelete: canDeleteReport,
+      canDownloadPdf: canExportPdf,
+      onEdit: (r) => navigate(`/wfh/${r.id}`),
+      onDelete: (r) => {
+        setDeleteError(null);
+        setDeleteTarget(r);
+      },
+      onDownload: (r) => {
+        void exportWfhReportPdf(r.id)
+          .then((blob) => downloadBlob(blob, `WFH-${r.id}-${r.report_date}.pdf`))
+          .catch((e) => toast.error(toUiError(e).message));
+      },
+    };
   }
 
   const perPageSelect = (
@@ -331,6 +386,9 @@ export function WfhReportsPage() {
                       <th className="py-2 pr-4 font-medium">Status</th>
                       <th className="py-2 pr-4 font-medium">Status WFH</th>
                       <th className="py-2 text-right font-medium">Kegiatan</th>
+                      {hasActionsColumn ? (
+                        <th className="py-2 pl-2 text-right font-medium">Aksi</th>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -340,6 +398,7 @@ export function WfhReportsPage() {
                         report={r}
                         sessions={sessions}
                         onOpen={(reportId) => navigate(`/wfh/${reportId}`)}
+                        actions={hasActionsColumn ? rowActions() : undefined}
                       />
                     ))}
                   </tbody>
@@ -395,6 +454,46 @@ export function WfhReportsPage() {
               onClick={() => void submitCreate()}
             >
               Buat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus laporan</DialogTitle>
+            <DialogDescription>
+              Laporan tanggal "{deleteTarget?.report_date ?? ""}" akan dihapus
+              permanen, termasuk kegiatan dan absensinya.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              pending={deleting}
+              onClick={() => void submitDelete()}
+            >
+              Hapus
             </Button>
           </DialogFooter>
         </DialogContent>

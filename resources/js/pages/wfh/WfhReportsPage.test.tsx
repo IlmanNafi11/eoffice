@@ -28,6 +28,7 @@ vi.mock("@/api/wfh", () => ({
   rejectWfhReport: vi.fn(),
   updateWfhReportMetadata: vi.fn(),
   deleteWfhReport: vi.fn(),
+  exportWfhReportPdf: vi.fn(),
 }));
 
 import * as wfhApi from "@/api/wfh";
@@ -37,6 +38,8 @@ import { setUser } from "@/store/authSlice";
 
 const mockedList = wfhApi.listWfhReports as unknown as Mock;
 const mockedCreate = wfhApi.createWfhReport as unknown as Mock;
+const mockedExportPdf = wfhApi.exportWfhReportPdf as unknown as Mock;
+const mockedDelete = wfhApi.deleteWfhReport as unknown as Mock;
 const mockedSessionConfig = wfhApi.getWfhSessionConfig as unknown as Mock;
 
 const meta: PaginationMeta = { current_page: 1, last_page: 2, per_page: 10, total: 12 };
@@ -76,7 +79,12 @@ const user = {
   must_change_password: false,
   is_active: true,
   roles: ["staf"],
-  permissions: ["wfh.report.create"],
+  permissions: [
+    "wfh.report.create",
+    "wfh.report.update",
+    "wfh.report.delete",
+    "wfh.report.export_pdf",
+  ],
 };
 
 function renderPage(userOverride = user) {
@@ -109,6 +117,10 @@ beforeEach(() => {
   mockedList.mockResolvedValue({ reports: [reportA, reportB], meta });
   mockedCreate.mockResolvedValue(reportA);
   mockedSessionConfig.mockResolvedValue({ sessions: ["pagi", "siang", "sore"], allowed_days: [1, 2, 3, 4, 5] });
+  // jsdom tidak punya createObjectURL/revokeObjectURL (unduh PDF dari menu).
+  URL.createObjectURL = vi.fn(() => `blob:stub-${Math.random().toString(36).slice(2)}`);
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 });
 
 
@@ -381,5 +393,141 @@ describe("WfhReportsPage — spinner pending + toast create (T7b)", () => {
     });
     expect((buat as HTMLButtonElement).disabled).toBe(true);
     expect(buat.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  });
+});
+
+describe("WfhReportsPage — kolom Aksi per baris (wfh-report-actions)", () => {
+  it("punya permission lengkap → header kolom Aksi + menu per baris", async () => {
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    expect(screen.getByRole("columnheader", { name: "Aksi" })).toBeTruthy();
+    expect(screen.getByTestId("wfh-report-actions-1")).toBeTruthy();
+    expect(screen.getByTestId("wfh-report-actions-2")).toBeTruthy();
+  });
+
+  it("menu baris pending → Detail + Unduh PDF, tanpa Edit/Hapus", async () => {
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-1"));
+
+    expect(await screen.findByRole("menuitem", { name: "Detail" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Unduh PDF" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Hapus" })).toBeNull();
+  });
+
+  it("menu baris draft → Detail + Edit + Hapus, tanpa Unduh PDF", async () => {
+    renderPage();
+    await screen.findByText("2026-08-11");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-2"));
+
+    expect(await screen.findByRole("menuitem", { name: "Detail" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Edit" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Hapus" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Unduh PDF" })).toBeNull();
+  });
+
+  it("item Edit → navigate ke detail draft", async () => {
+    renderPage();
+    await screen.findByText("2026-08-11");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-2"));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+
+    expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
+  });
+
+  it("item Detail → navigate ke detail", async () => {
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-1"));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Detail" }));
+
+    expect(await screen.findByText("wfh-detail-stub")).toBeTruthy();
+  });
+
+  it("item Unduh PDF → exportWfhReportPdf dengan id baris", async () => {
+    mockedExportPdf.mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" }));
+    renderPage();
+    await screen.findByText("2026-08-10");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-1"));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Unduh PDF" }));
+
+    await waitFor(() => expect(mockedExportPdf).toHaveBeenCalledWith(1));
+  });
+
+  it("item Hapus → dialog konfirmasi; konfirmasi → deleteWfhReport + baris hilang", async () => {
+    mockedDelete.mockResolvedValue("Laporan WFH dihapus.");
+    renderPage();
+    await screen.findByText("2026-08-11");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-2"));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Hapus" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("2026-08-11");
+
+    await userEvent.click(screen.getByRole("button", { name: "Hapus" }));
+    await waitFor(() => expect(mockedDelete).toHaveBeenCalledWith(2));
+    await waitFor(() => {
+      expect(screen.queryByText("2026-08-11")).toBeNull();
+    });
+  });
+
+  it("hapus gagal → dialog tetap terbuka + pesan error", async () => {
+    mockedDelete.mockRejectedValueOnce(
+      new ApiError("http", "Tidak diizinkan.", { status: 403 }),
+    );
+    renderPage();
+    await screen.findByText("2026-08-11");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-2"));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Hapus" }));
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Hapus" }));
+
+    expect(await screen.findByText("Tidak diizinkan.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("batal di dialog konfirmasi → delete tidak dipanggil", async () => {
+    renderPage();
+    await screen.findByText("2026-08-11");
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-2"));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Hapus" }));
+    await screen.findByRole("dialog");
+    await userEvent.click(screen.getByRole("button", { name: "Batal" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(mockedDelete).not.toHaveBeenCalled();
+  });
+
+  it("tanpa permission aksi → kolom Aksi tidak dirender", async () => {
+    renderPage({
+      ...user,
+      permissions: ["wfh.report.create"],
+    });
+    await screen.findByText("2026-08-10");
+
+    expect(screen.queryByRole("columnheader", { name: "Aksi" })).toBeNull();
+    expect(screen.queryByTestId("wfh-report-actions-1")).toBeNull();
+  });
+
+  it("permission sebagian (hanya export_pdf) → menu hanya Detail + Unduh PDF", async () => {
+    renderPage({ ...user, permissions: ["wfh.report.export_pdf"] });
+    await screen.findByText("2026-08-10");
+
+    expect(screen.getByRole("columnheader", { name: "Aksi" })).toBeTruthy();
+
+    await userEvent.click(screen.getByTestId("wfh-report-actions-2"));
+    expect(await screen.findByRole("menuitem", { name: "Detail" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Hapus" })).toBeNull();
   });
 });
