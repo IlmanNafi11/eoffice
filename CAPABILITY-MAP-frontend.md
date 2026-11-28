@@ -10,14 +10,14 @@
 **Consumer:** SPA repo ini (staff, kepala tim, kepala bidang, admin). Backend out of scope —
 frontend only consumes the contract; no API/Laravel change.
 
-| Module id | Responsibility (operations) | Reuses primitives from |
-|---|---|---|
-| `wfh-reports` | Laporan WFH personal: list/create/get/update/delete + submit/approve/reject/revise + activities (add/update/delete/reorder) + attendance (add/delete) + PDF export + session-config (17 ops) | — |
-| `wfh-team-reports` | Laporan tim (kepala tim): list/create/approve/reject (4 ops) | `wfh-reports` |
-| `wfh-monitoring` | Dashboard monitoring (users × report status) + admin list semua laporan + PDF tim (3 ops: getWfhMonitoring/adminListWfhReports/exportTeamWfhPdf) | `wfh-reports` |
-| `change-package` | Change package: list/create/show/update/delete + submit/approve/reject + attachment upload + change-types + initiation/implementation PDF (12 ops) | `wfh-reports` |
-| `admin` | RBAC admin UI: user mgmt (list/create/get/update/delete/import, 6) + roles/permissions (list/update/sync, 3) + settings (list/update, 2) + listTeams (1) = 12 ops | `wfh-reports` |
-| `verification` | Halaman publik verifikasi QR (verifyQrToken, 1 op, tanpa auth) | — |
+| Module id | Responsibility (operations) | Reuses primitives from | Status |
+|---|---|---|---|
+| `wfh-reports` | Laporan WFH personal: list/create/get/update/delete + submit/approve/reject/revise + activities (add/update/delete/reorder) + attendance (add/delete) + PDF export + session-config (17 ops) | — | CLOSED 2026-11-01 |
+| `wfh-team-reports` | Laporan tim (kepala tim): list/create/approve/reject (4 ops) | `wfh-reports` | CLOSED 2026-11-01 |
+| `wfh-monitoring` | Dashboard monitoring (users × report status) + admin list semua laporan + PDF tim (3 ops: getWfhMonitoring/adminListWfhReports/exportTeamWfhPdf) | `wfh-reports` | CLOSED 2026-11-01 |
+| `change-package` | Change package: list/create/show/update/delete + submit/approve/reject + attachment upload + change-types + initiation/implementation PDF (12 ops) | `wfh-reports` | CLOSED 2026-11-01 |
+| `admin` | RBAC admin UI: user mgmt (list/create/get/update/delete/import, 6) + roles/permissions (list/update/sync, 3) + settings (list/update, 2) + listTeams (1) = 12 ops | `wfh-reports` | CLOSED 2026-11-02 |
+| `verification` | Halaman publik verifikasi QR (verifyQrToken, 1 op, tanpa auth) | — | **REMOVED 2026-11-28** (wfh-ux-remediation QR cut-off: page, API module, route, OpenAPI tag/path/schema all deleted — guard test `resources/js/api/verification-removal.test.ts` keeps it gone) |
 
 ## Build order
 
@@ -27,8 +27,7 @@ wfh-reports → wfh-team-reports → wfh-monitoring
    └─────────→ change-package  (independent domain, can slot anytime)
    └─────────→ admin           (independent domain, can slot anytime)
 
-verification → ship anytime (1 op, no auth, no dependency)
-```
+`verification` was cut on 2026-11-28 (see Status).
 
 **Per module**: `SPEC-<module-id>.md` at repo root (tracked), named by module id.
 The map, not filename guessing, is the index of what exists.

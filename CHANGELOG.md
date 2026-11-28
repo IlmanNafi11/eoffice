@@ -5,6 +5,21 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Removed (backend+frontend, 2026-11-28 — wfh-ux-remediation, QR cut-off)
+- Fitur verifikasi dokumen QR dihapus total: Dompdf 3.x tidak merender SVG
+  inline sehingga QR tidak pernah muncul di PDF manapun dan tidak ada konsumen
+  token. Task 1–2 menghapus service, kolom token (3 tabel), endpoint, dan
+  dependency; task ini melengkapi sisi SPA dan kontrak dokumen:
+  - Halaman publik `/verify/:token` (`VerifyPage` + test) dan route-nya
+    dihapus dari SPA.
+  - Modul API `verifyQrToken` (`api/verification.ts` + test) dan tipe
+    `QrVerification` dihapus.
+  - OpenAPI: tag `Verification`, path `GET /api/verify/{token}` (termasuk
+    redirect 302 `Accept: text/html`), dan schema `QrVerificationResponse`
+    dihapus; versi kontrak naik ke v6.10.0.
+  - Guard test baru (`verification-removal.test.ts`) mengunci keempat sisi
+    agar tetap terhapus.
+
 ### Fixed (backend+frontend, 2026-11-27 — tuntas temuan ship review #23)
 - **Security (config, benar-benar ini kali):** hardening
   `allowed_protocols` dari ship #22 ternyata NO-OP — kuncinya ditaruh di level

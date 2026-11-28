@@ -1,5 +1,11 @@
 # Spec: qr-spa-redirect
 
+> **REMOVED 2026-11-28** (wfh-ux-remediation, QR cut-off): seluruh fitur
+> verifikasi QR — service, token, endpoint, redirect, halaman SPA, dependency —
+> dihapus (OpenAPI v6.10.0). Dompdf 3.x tidak merender SVG inline sehingga QR
+> tidak pernah tercetak; dokumen beredar tidak membawa QR yang berfungsi.
+> Spec di bawah adalah catatan historis modul yang sudah dihapus.
+
 > Modul dari capability map 2026-11-02 (backend issues #1 & #2). Menutup
 > [issue #2](https://github.com/IlmanNafi11/eoffice/issues/2). Intent:
 > `docs/intent/backend-qr-spa-and-evaluator-picker.md`.

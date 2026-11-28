@@ -1,5 +1,10 @@
 # SPEC-verification
 
+> **REMOVED 2026-11-28** (wfh-ux-remediation, QR cut-off): halaman
+> `/verify/:token`, modul `api/verification.ts`, route, dan seluruh surface
+> OpenAPI `Verification`/`verifyQrToken`/`QrVerificationResponse` dihapus.
+> Spec di bawah adalah catatan historis modul yang sudah dihapus.
+
 > Module id: `verification` — dari `CAPABILITY-MAP-frontend.md` (Phase 0, approved 2026-10-31).
 > Intent: `docs/intent/frontend-fresh-build.md` · Contract: `postman/specs/openapi.yaml`
 > (tag `Verification`, 1 op: `verifyQrToken` = operasi ke-59 dari 59).

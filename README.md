@@ -11,7 +11,6 @@ Backend API for Kominfo Jatimprov with two modules:
 - dompdf (PDF generation)
 - Intervention Image (signature normalization)
 - Maatwebsite Excel (bulk import)
-- Bacon QR Code (document verification)
 - Docker / Docker Compose (dev environment)
 - Makefile (command gateway)
 
@@ -91,14 +90,13 @@ php artisan test
 ## Architecture
 - Domain-driven: `app/Domains/{Auth,Organization,Wfh,ChangeManagement}`
 - Repository pattern with interfaces for testability
-- Cross-cutting services: `app/Support/{Pdf,Signature,QrCode,Import}`
+- Cross-cutting services: `app/Support/{Pdf,Signature,Import}`
 - Spatie RBAC: roles (admin, kepala_bidang, kepala_tim, staf) + granular permissions
 - SPA: `resources/js` — `api/` (axios client + domain modules), `store/` (Redux Toolkit slices + thunks), `pages/` + `components/` (route-level), `lib/permissions.ts` satu pintu gating; guard rute di `routes/SessionBootstrap.tsx` + `components/layout/ProtectedRoute.tsx`
 
 ## PDF Generation
 - dompdf + Blade templates replicate government form layouts
 - Signature images rendered via `position:absolute` coordinates
-- QR codes as inline SVG (bacon/bacon-qr-code)
 - Templates: `resources/views/pdf/{wfh-report,change-initiation,change-implementation}.blade.php`
 
 ## Private Evidence Storage

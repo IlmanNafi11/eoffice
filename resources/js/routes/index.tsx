@@ -7,9 +7,6 @@
  * - `/login` publik (di luar guard)
  * - Alur reset password publik (openapi: security[]): `/forgot-password` →
  *   `/verify-otp` → `/reset-password`
- * - `/verify/:token` publik (modul verification, openapi: security[]): kartu
- *   hasil verifikasi dokumen QR — di luar guard, tanpa AppShell, tanpa entri
- *   nav-registry (bukan fitur sesi login).
  * - Route terlindungi dibungkus `ProtectedRoute` (guard sesi + must_change)
  *   dan `SessionBootstrap` (rehidrasi user via GET /auth/me). `/change-password`
  *   berada di dalam guard karena endpoint bearer; ia lolos guard via path.
@@ -33,7 +30,6 @@ const ChangePasswordPage = lazy(() => import("@/pages/auth/ChangePasswordPage").
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })));
 const OtpVerificationPage = lazy(() => import("@/pages/auth/OtpVerificationPage").then((m) => ({ default: m.OtpVerificationPage })));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
-const VerifyPage = lazy(() => import("@/pages/verification/VerifyPage").then((m) => ({ default: m.VerifyPage })));
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const WfhReportsPage = lazy(() => import("@/pages/wfh/WfhReportsPage").then((m) => ({ default: m.WfhReportsPage })));
 const WfhReportDetailPage = lazy(() => import("@/pages/wfh/WfhReportDetailPage").then((m) => ({ default: m.WfhReportDetailPage })));
@@ -111,14 +107,6 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={null}>
         <ResetPasswordPage />
-      </Suspense>
-    ),
-  },
-  {
-    path: "/verify/:token",
-    element: (
-      <Suspense fallback={null}>
-        <VerifyPage />
       </Suspense>
     ),
   },
