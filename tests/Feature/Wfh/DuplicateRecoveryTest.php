@@ -109,11 +109,11 @@ class DuplicateRecoveryTest extends TestCase
     }
 
     /**
-     * The report-level 23505 fallback rethrows when no surviving draft exists.
-     * Attendance photos are stored BEFORE the transaction, so the rethrow
-     * path must clean them up — same invariant as the attendance endpoint.
+     * The report-level 23505 fallback answers with a domain 422 when no
+     * surviving draft can be returned. Attendance photos are stored BEFORE
+     * the transaction, so that answer must still clean them up.
      */
-    public function test_report_race_rethrow_deletes_stored_attendance_photos(): void
+    public function test_report_race_without_surviving_draft_returns_422_and_deletes_photos(): void
     {
         $date = now()->toDateString();
         Storage::fake('local');
@@ -131,12 +131,17 @@ class DuplicateRecoveryTest extends TestCase
             ],
         ]);
 
-        // No surviving draft → the handler rethrows (500). The invariant under
-        // test is that the stored photo does not outlive the failed request.
-        $this->assertSame(500, $response->status(), $response->getContent());
+        // No surviving draft → the handler answers 422 (never a 500), and the
+        // stored photo does not outlive the failed request.
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonPath(
+            'message',
+            'Laporan WFH untuk tanggal ini sudah terkunci.',
+        );
 
         $remaining = Storage::disk('local')->allFiles("attendances/{$this->user->id}/{$date}");
-        $this->assertSame([], $remaining, 'Race-path rethrow must not leak stored attendance photos.');
+        $this->assertSame([], $remaining, 'Locked-date answer must not leak stored attendance photos.');
     }
 
     public function test_non_unique_sqlstate_is_not_swallowed(): void

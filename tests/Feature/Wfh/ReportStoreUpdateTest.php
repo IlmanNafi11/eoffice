@@ -95,6 +95,88 @@ class ReportStoreUpdateTest extends TestCase
         $this->assertDatabaseCount('wfh_reports', 1);
     }
 
+    /** Task 6: a 23505 from the date lock must surface as a domain answer,
+     *  never a 500. Pending means the supervisor still has to decide. */
+    public function test_store_with_pending_lock_returns_422_waiting_message(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        WfhReport::factory()->status('pending')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonPath(
+            'message',
+            'Masih ada laporan WFH pada tanggal ini yang menunggu keputusan atasan.',
+        );
+        $this->assertDatabaseCount('wfh_reports', 1);
+    }
+
+    /** Approved is final (owner decision 2026-11-28): the message must say so
+     *  and differ from the pending one. */
+    public function test_store_with_approved_lock_returns_422_final_message(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        WfhReport::factory()->status('approved')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonPath(
+            'message',
+            'Laporan WFH pada tanggal ini sudah final dan tidak dapat dibuat ulang.',
+        );
+        $this->assertDatabaseCount('wfh_reports', 1);
+    }
+
+    /** Moving a draft onto a locked date must fail with 422 and leave the
+     *  report on its original date. */
+    public function test_update_to_locked_date_returns_422_and_keeps_original_date(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $create = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-27',
+        ]);
+        $reportId = $create->json('data.id');
+
+        WfhReport::factory()->status('approved')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response = $this->putJson("/api/wfh/reports/{$reportId}", [
+            'report_date' => '2026-07-28',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath(
+            'message',
+            'Laporan WFH pada tanggal ini sudah final dan tidak dapat dibuat ulang.',
+        );
+        $this->assertSame('2026-07-27', WfhReport::find($reportId)->report_date->format('Y-m-d'));
+    }
+
     // === PUT metadata-only ===
 
     public function test_update_metadata_only_ignores_activities_attendances(): void

@@ -164,22 +164,28 @@ class ReportController extends Controller
                 return $report;
             });
         } catch (QueryException $e) {
-            // Race: unique index violation — fallback to existing draft
+            // The date lock is a partial unique index, so in production the
+            // first get-or-create check can miss a row a concurrent request
+            // just committed. Photos were stored before the transaction:
+            // every answer below must sweep them.
             if ($e->getCode() === '23505') {
+                $this->discardAttendancePhotos($attendances);
+
                 $existing = $this->wfhRepository->findDraftForUserDate($user->id, $date);
                 if ($existing) {
-                    $this->discardAttendancePhotos($attendances);
-
                     return ApiResponse::ok(
                         new WfhReportResource($existing->load(['activities.links', 'attendances'])),
                         'Laporan WFH sudah ada.',
                     );
                 }
+
+                return $this->lockedDateResponse($user->id, $date);
             }
 
-            // Photos are stored before the transaction; every failure path
-            // (unexpected exception, unrecoverable race) leaves orphans
-            // otherwise, and their unique key is already consumed.
+            // Unexpected failure: the photos were written before the
+            // transaction, so they must not outlive the request, and their
+            // unique key is otherwise consumed. Anything that is not our
+            // lock violation is rethrown untouched.
             $this->discardAttendancePhotos($attendances);
 
             throw $e;
@@ -226,14 +232,62 @@ class ReportController extends Controller
 
         // Metadata-only: only report_date is writable. Status transitions go
         // through submit/approve/reject — never via PUT.
-        $this->wfhRepository->updateReportMetadata($report, [
-            'report_date' => $request->input('report_date', $report->report_date->format('Y-m-d')),
-        ]);
+        // Wrapped in a transaction so a date-lock violation rolls back to a
+        // savepoint instead of leaving the connection in an aborted state for
+        // the lock lookup below.
+        try {
+            DB::transaction(fn () => $this->wfhRepository->updateReportMetadata($report, [
+                'report_date' => $request->input('report_date', $report->report_date->format('Y-m-d')),
+            ]));
+        } catch (QueryException $e) {
+            // Moving a draft onto a date another report already locks fails
+            // with the same 23505 as a create; the caller gets the domain
+            // answer for whichever state holds the lock.
+            if ($e->getCode() === '23505') {
+                return $this->lockedDateResponse(
+                    $report->user_id,
+                    $request->input('report_date'),
+                );
+            }
+
+            throw $e;
+        }
 
         return ApiResponse::ok(
             new WfhReportResource($this->wfhRepository->loadReportWithRelations($report->fresh())),
             'Laporan WFH berhasil diperbarui.',
         );
+    }
+
+    /**
+     * The (user, report_date) lock is enforced by a partial unique index, so
+     * a violating INSERT surfaces as SQLSTATE 23505. Translate it into the
+     * domain answer for whichever state holds the lock — a pending report
+     * means the supervisor still has to decide, an approved one is final,
+     * and anything else (a race the get-or-create check cannot see) gets a
+     * generic locked-date answer. Never a raw 500.
+     */
+    private function lockedDateResponse(int $userId, string $date): JsonResponse
+    {
+        $locking = WfhReport::query()
+            ->where('user_id', $userId)
+            ->where('report_date', $date)
+            ->whereIn('status', WfhReportStatus::ACTIVE)
+            ->first();
+
+        if ($locking?->status === WfhReportStatus::PENDING) {
+            return ApiResponse::fail(
+                'Masih ada laporan WFH pada tanggal ini yang menunggu keputusan atasan.',
+            );
+        }
+
+        if ($locking?->status === WfhReportStatus::APPROVED) {
+            return ApiResponse::fail(
+                'Laporan WFH pada tanggal ini sudah final dan tidak dapat dibuat ulang.',
+            );
+        }
+
+        return ApiResponse::fail('Laporan WFH untuk tanggal ini sudah terkunci.');
     }
 
     public function destroy(Request $request, WfhReport $report): Response

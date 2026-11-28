@@ -5,6 +5,17 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Fixed (backend, 2026-11-28 — wfh-ux-remediation, locked-date messages)
+- Pelanggaran kunci satu-laporan-aktif-per-tanggal (SQLSTATE 23505) tidak lagi
+  bocor sebagai 500. `POST /api/wfh/reports` menjawab 200 dengan draft yang
+  selamat saat race, atau 422 dengan pesan yang membedakan tiga keadaan:
+  ada `pending` yang masih menunggu keputusan atasan, ada `approved` yang
+  sudah final, atau tanggal terkunci tanpa draft yang bisa dikembalikan.
+  `PUT /api/wfh/reports/{report}` menjawab 422 dengan pesan yang sama saat
+  `report_date` dipindah ke tanggal terkunci, dan laporan tetap pada tanggal
+  asalnya. Foto absensi yang tersimpan sebelum transaksi tetap dibersihkan
+  di semua jalur gagal. Kontrak OpenAPI naik ke v6.10.0 → v6.11.0.
+
 ### Removed (backend+frontend, 2026-11-28 — wfh-ux-remediation, QR cut-off)
 - Fitur verifikasi dokumen QR dihapus total: Dompdf 3.x tidak merender SVG
   inline sehingga QR tidak pernah muncul di PDF manapun dan tidak ada konsumen

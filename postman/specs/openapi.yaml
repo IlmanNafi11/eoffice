@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Intern Kominfo API
-  version: 6.10.0
+  version: 6.11.0
   description: |
     API for the Intern Kominfo application — a government intern management
     platform with Work-From-Home (WFH) reporting, change management workflows,
@@ -9,7 +9,17 @@ info:
 
     Authentication uses Laravel Sanctum bearer tokens.
     Authorization uses Spatie permission-based roles (admin, kepala_bidang, kepala_tim, staf).
-    **v6.9.0 — Dashboard Beranda (`dashboard`):**
+
+    **v6.11.0 — Locked-date answers on WFH report create/update:**
+    - A create or a `report_date` change that collides with the one-active-
+      report-per-date lock no longer 500s. `POST /api/wfh/reports` answers
+      422 with "Masih ada laporan WFH pada tanggal ini yang menunggu keputusan
+      atasan." when a pending report holds the date, "Laporan WFH pada tanggal
+      ini sudah final dan tidak dapat dibuat ulang." when it is approved, and
+      "Laporan WFH untuk tanggal ini sudah terkunci." otherwise.
+    - `PUT /api/wfh/reports/{report}` answers the same 422 messages and keeps
+      the report on its original date.
+
     - Added `GET /api/dashboard` — one endpoint backing the SPA home page. The
       payload carries `generated_at` plus only the sections the requester's
       permissions allow (`today` for everyone; `today.scope`, `queue`,
@@ -3962,14 +3972,31 @@ paths:
                 success: false
                 message: This action is unauthorized.
         "422":
-          description: Validation error
+          description: |
+            Validation error, or the date is locked by another active report
+            (one-active-report-per-date): pending holds it while awaiting the
+            supervisor's decision, approved is final.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                success: false
-                message: "The report date field is required."
+              examples:
+                validation:
+                  value:
+                    success: false
+                    message: "The report date field is required."
+                date_locked_pending:
+                  value:
+                    success: false
+                    message: "Masih ada laporan WFH pada tanggal ini yang menunggu keputusan atasan."
+                date_locked_approved:
+                  value:
+                    success: false
+                    message: "Laporan WFH pada tanggal ini sudah final dan tidak dapat dibuat ulang."
+                date_locked_other:
+                  value:
+                    success: false
+                    message: "Laporan WFH untuk tanggal ini sudah terkunci."
   /api/wfh/reports/{report}:
     get:
       tags: [WFH Reports]
@@ -4092,14 +4119,31 @@ paths:
                 success: false
                 message: Laporan tidak ditemukan.
         "422":
-          description: Report already approved or validation error
+          description: |
+            Report already approved, validation error, or the target date is
+            locked by another active report (one-active-report-per-date); the
+            report keeps its original date.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                success: false
-                message: Laporan yang sudah disetujui tidak dapat diubah.
+              examples:
+                locked_report:
+                  value:
+                    success: false
+                    message: Laporan yang sudah disetujui tidak dapat diubah.
+                date_locked_pending:
+                  value:
+                    success: false
+                    message: "Masih ada laporan WFH pada tanggal ini yang menunggu keputusan atasan."
+                date_locked_approved:
+                  value:
+                    success: false
+                    message: "Laporan WFH pada tanggal ini sudah final dan tidak dapat dibuat ulang."
+                date_locked_other:
+                  value:
+                    success: false
+                    message: "Laporan WFH untuk tanggal ini sudah terkunci."
     delete:
       tags: [WFH Reports]
       summary: Delete WFH report
