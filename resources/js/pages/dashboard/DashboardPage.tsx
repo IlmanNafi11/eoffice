@@ -12,13 +12,13 @@
  * - fetch gagal → pesan error siap tampil; data lama (bila ada) tetap
  *   dirender di atasnya (refetch halus, slice T5 yang mempertahankannya).
  */
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { fetchDashboard, selectDashboard } from "@/store/dashboardSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { TodayCards } from "@/pages/dashboard/sections/TodayCards";
-import { TrendChart } from "@/pages/dashboard/sections/TrendChart";
+const TrendChart = lazy(() => import("@/pages/dashboard/sections/TrendChart").then((m) => ({ default: m.TrendChart })));
 import { QueueCard } from "@/pages/dashboard/sections/QueueCard";
 import { AttentionCard } from "@/pages/dashboard/sections/AttentionCard";
 import { ShortcutsRow } from "@/pages/dashboard/sections/ShortcutsRow";
@@ -54,7 +54,9 @@ export function DashboardPage() {
 
       <div className={refetching ? "space-y-6 opacity-60 transition-opacity" : "space-y-6"}>
         <TodayCards section={data?.today} status={status} />
-        <TrendChart trend={data?.trend} />
+        <Suspense fallback={null}>
+          <TrendChart trend={data?.trend} />
+        </Suspense>
         <QueueCard queue={data?.queue} />
         <AttentionCard attention={data?.attention} />
       </div>
