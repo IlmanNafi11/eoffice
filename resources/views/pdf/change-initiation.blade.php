@@ -38,8 +38,6 @@
         .signature-name { font-weight: bold; border-top: 1px solid #000; padding-top: 3px; margin-top: 2px; }
         .signature-nip, .signature-position { font-size: 10px; }
 
-        .qr-box { position: absolute; top: 0; right: 0; width: 60px; height: 60px; }
-        .qr-box svg { width: 60px; height: 60px; }
     </style>
     <title>Form Inisiasi Perubahan</title>
 </head>
@@ -99,7 +97,6 @@
 
     {{-- TANDA TANGAN --}}
     <div class="signature-area">
-        <div class="qr-box">{!! $qrSvg !!}</div>
         <table class="signature-table">
             <tr>
                 <td>

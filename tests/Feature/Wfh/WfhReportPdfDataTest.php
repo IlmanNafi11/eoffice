@@ -99,7 +99,7 @@ class WfhReportPdfDataTest extends TestCase
         $this->assertSame('BUDI SANTOSO', $data['makerName']);
         $this->assertSame('Bidang Test', $data['unitKerja']);
         $this->assertFalse($data['isApproved']);
-        $this->assertNull($data['qrSvg']);
+        $this->assertArrayNotHasKey('qrSvg', $data);
         $this->assertNull($data['signatureSupervisorPath']);
         $this->assertSame(
             [[
@@ -138,7 +138,7 @@ class WfhReportPdfDataTest extends TestCase
         $this->assertSame('08:00 – 10:00', $data['kegiatan'][0]['waktu']);
     }
 
-    public function test_report_builder_sets_qr_code_only_for_approved_reports(): void
+    public function test_report_builder_does_not_expose_qr_payload(): void
     {
         $field = Field::create(['name' => 'Bidang Test']);
         $team = Team::create(['field_id' => $field->id, 'name' => 'Tim Test']);
@@ -162,7 +162,7 @@ class WfhReportPdfDataTest extends TestCase
         );
 
         $this->assertTrue($data['isApproved']);
-        $this->assertNotNull($data['qrSvg']);
+        $this->assertArrayNotHasKey('qrSvg', $data);
         $this->assertNotNull($data['signatureSupervisorPath']);
     }
 
@@ -243,7 +243,6 @@ class WfhReportPdfDataTest extends TestCase
             'makerNip',
             'supervisorName',
             'supervisorNip',
-            'qrSvg',
             'logoDoc',
         ];
     }

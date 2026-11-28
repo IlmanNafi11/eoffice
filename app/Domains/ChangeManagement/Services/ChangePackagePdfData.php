@@ -6,7 +6,6 @@ use App\Domains\ChangeManagement\Models\ChangeImplementation;
 use App\Domains\ChangeManagement\Models\ChangeInitiation;
 use App\Support\Media\PrivateMediaPath;
 use App\Support\Pdf\PdfImage;
-use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 
 /**
@@ -15,10 +14,6 @@ use App\Support\Signature\SignaturePath;
  */
 class ChangePackagePdfData
 {
-    public function __construct(
-        private QrCodeService $qrCodeService,
-    ) {}
-
     /**
      * @return array<string, mixed>
      */
@@ -43,9 +38,6 @@ class ChangePackagePdfData
             'reviewerNip' => $reviewer?->nip ?? '-',
             'reviewerPosition' => $reviewer?->position ?? '-',
             'reviewerSig' => $this->resolveSignature($reviewer?->signature_path),
-            'qrSvg' => $this->qrCodeService->generate(
-                $this->qrCodeService->generateVerificationUrl($package->verification_token)
-            ),
             'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }

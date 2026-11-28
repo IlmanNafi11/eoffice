@@ -9,7 +9,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\Media\PrivateMediaPath;
 use App\Support\Pdf\PdfImage;
-use App\Support\QrCode\QrCodeService;
 use App\Support\Signature\SignaturePath;
 use Illuminate\Support\Carbon;
 
@@ -17,7 +16,6 @@ class WfhReportPdfData
 {
     public function __construct(
         private WfhRepositoryInterface $wfhRepository,
-        private QrCodeService $qrCodeService,
     ) {}
 
     /**
@@ -43,13 +41,6 @@ class WfhReportPdfData
             ];
         })->toArray();
 
-        $qrSvg = null;
-        if ($isApproved && $report->verification_token) {
-            $qrSvg = $this->qrCodeService->generate(
-                $this->qrCodeService->generateVerificationUrl($report->verification_token)
-            );
-        }
-
         $makerSig = SignaturePath::resolve($user->signature_path) ?: null;
 
         $supervisorSig = null;
@@ -72,7 +63,6 @@ class WfhReportPdfData
             'makerNip' => $user->nip,
             'supervisorName' => $supervisor ? strtoupper($supervisor->name) : '-',
             'supervisorNip' => $supervisor?->nip ?? '-',
-            'qrSvg' => $qrSvg,
             'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }

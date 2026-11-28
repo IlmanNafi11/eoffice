@@ -25,7 +25,6 @@ class ChangeFormPdfTemplateTest extends TestCase
             'reviewerNip' => '1',
             'reviewerPosition' => 'Kepala Tim',
             'reviewerSig' => 'data:image/png;base64,AAAA',
-            'qrSvg' => '<svg></svg>',
             'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }
@@ -42,6 +41,16 @@ class ChangeFormPdfTemplateTest extends TestCase
         $this->assertStringContainsString('Aplikasi Informatika', $html);
         $this->assertStringNotContainsString('ditandatangani secara elektronik', $html);
         $this->assertStringNotContainsString('BSrE-BSSN', $html);
+    }
+
+    public function test_initiation_template_omits_the_qr_verification_box(): void
+    {
+        $html = view('pdf.change-initiation', array_merge($this->initiationData(), [
+            'qrSvg' => '<svg data-probe="1"></svg>',
+        ]))->render();
+
+        $this->assertStringNotContainsString('qr-box', $html);
+        $this->assertStringNotContainsString('data-probe="1"', $html);
     }
 
     public function test_initiation_signature_image_renders_inside_the_box_without_negative_offset(): void

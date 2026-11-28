@@ -153,30 +153,10 @@
             font-size: 10px;
             margin-top: 1px;
         }
-
-        /* === TEMPAT/TANGGAL + QR ===
+        /* === TATA LETAK FOOTER ===
            Tanggal menempati baris tabel TERSENDIRI di atas kolom "Atasan
            Langsung" (sel kanan), sehingga label "Yang Membuat Laporan" dan
            "Atasan Langsung" berada di baris yang sama dan sejajar. */
-        .footer-bar {
-            position: relative;
-            margin-top: 10px;
-        }
-        .tanggal {
-            text-align: center;
-            margin-bottom: 6px;
-        }
-        .qr-box {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 60px;
-            height: 60px;
-        }
-        .qr-box svg {
-            width: 60px;
-            height: 60px;
-        }
     </style>
     <title>Laporan WFH</title>
 </head>
@@ -237,15 +217,6 @@
             @endforeach
         </tbody>
     </table>
-
-    {{-- FOOTER: QR (tanggal berada di atas label Atasan Langsung) --}}
-    <div class="footer-bar">
-        <div class="qr-box">
-            @if ($isApproved && $qrSvg)
-                {!! $qrSvg !!}
-            @endif
-        </div>
-    </div>
 
     {{-- BLOK TANDA TANGAN — baris 1: tanggal di kolom kanan saja; baris 2:
          kedua label di baris yang sama sehingga sejajar horizontal. --}}

@@ -24,7 +24,6 @@ class WfhReportPdfTemplateTest extends TestCase
             'makerNip' => '199001012023011001',
             'supervisorName' => 'ATASAN',
             'supervisorNip' => '198210162011011005',
-            'qrSvg' => null,
             'logoDoc' => PdfImage::dataUri('images/logo-doc.webp'),
         ];
     }
@@ -88,6 +87,16 @@ class WfhReportPdfTemplateTest extends TestCase
         $this->assertNotFalse($makerPos);
         $this->assertNotFalse($supervisorPos);
         $this->assertTrue($datePos < $makerPos && $makerPos < $supervisorPos);
+    }
+
+    public function test_template_omits_the_qr_verification_box(): void
+    {
+        $html = view('pdf.wfh-report', array_merge($this->data(), [
+            'qrSvg' => '<svg data-probe="1"></svg>',
+        ]))->render();
+
+        $this->assertStringNotContainsString('qr-box', $html);
+        $this->assertStringNotContainsString('data-probe="1"', $html);
     }
 
     public function test_template_omits_the_electronic_signature_legal_paragraph(): void

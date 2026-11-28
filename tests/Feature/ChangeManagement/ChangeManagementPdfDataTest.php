@@ -64,7 +64,7 @@ class ChangeManagementPdfDataTest extends TestCase
         $this->assertSame($package->doc_number, $data['docNumber']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['initiatorSig']);
         $this->assertStringStartsWith('data:image/png;base64,', $data['reviewerSig']);
-        $this->assertStringContainsString('<svg', $data['qrSvg']);
+        $this->assertArrayNotHasKey('qrSvg', $data);
     }
 
     public function test_implementation_builder_returns_the_exact_view_data_keys(): void
@@ -176,7 +176,6 @@ class ChangeManagementPdfDataTest extends TestCase
             'reviewerNip',
             'reviewerPosition',
             'reviewerSig',
-            'qrSvg',
             'logoDoc',
         ];
     }
