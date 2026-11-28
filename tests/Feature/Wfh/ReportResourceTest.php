@@ -105,23 +105,6 @@ class ReportResourceTest extends TestCase
             ]);
     }
 
-    public function test_approved_report_response_excludes_verification_token(): void
-    {
-        $user = User::factory()->create();
-        $user->assignRole('staf');
-        Sanctum::actingAs($user);
-
-        $report = WfhReport::factory()->create([
-            'user_id' => $user->id,
-            'status' => 'approved',
-            'verification_token' => 'abc123def456abc123def456abc123def456abc123def456abc123def456abcd',
-        ]);
-
-        $this->getJson("/api/wfh/reports/{$report->id}")
-            ->assertStatus(200)
-            ->assertJsonMissingPath('data.verification_token');
-    }
-
     public function test_report_index_query_count_does_not_grow_per_activity(): void
     {
         $user = User::factory()->create();

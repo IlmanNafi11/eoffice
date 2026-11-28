@@ -145,7 +145,6 @@ class EnvelopeContractTest extends TestCase
         $this->assertContains('id', $keys);
         $this->assertContains('team', $keys);
         $this->assertContains('creator', $keys);
-        $this->assertNotContains('verification_token', $keys);
         $this->assertNotContains('signature_path', $keys);
     }
 

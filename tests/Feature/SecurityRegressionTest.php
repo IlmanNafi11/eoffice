@@ -97,16 +97,4 @@ class SecurityRegressionTest extends TestCase
             ],
         ])->assertStatus(403);
     }
-
-    /**
-     * C1 regression: a valid-format but nonexistent verification token returns 404.
-     */
-    public function test_qr_verification_rejects_nonexistent_token(): void
-    {
-        $token = bin2hex(random_bytes(32));
-
-        $this->getJson("/api/verify/{$token}")
-            ->assertStatus(404)
-            ->assertJsonPath('success', false);
-    }
 }

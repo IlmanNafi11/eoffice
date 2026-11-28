@@ -46,7 +46,6 @@ class PayloadAllowlistTest extends TestCase
     {
         return [
             'status approved' => [['status' => 'approved']],
-            'verification token' => [['verification_token' => bin2hex(random_bytes(32))]],
             'reviewer id' => [['reviewer_id' => 1]],
             'initiator signed at' => [['initiator_signed_at' => now()->toIso8601String()]],
             'reviewed at + review status' => [['reviewed_at' => now()->toIso8601String(), 'review_status' => 'approved']],
@@ -97,7 +96,6 @@ class PayloadAllowlistTest extends TestCase
         $this->assertSame('draft', $package->status);
         $this->assertNotNull($package->doc_number);
         $this->assertSame($this->staf->id, $package->initiator_id);
-        $this->assertNull($package->verification_token);
     }
 
     public function test_implementation_state_keys_are_rejected(): void

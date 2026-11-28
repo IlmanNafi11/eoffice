@@ -8,10 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Shared approve/reject transition logic for WFH report state machines.
  *
- * The pending guard, the approve/reject field updates, and the
- * verification-token generation each live here exactly once; the concrete
- * state machines keep only the parts that differ (the supervisor-id extra on
- * team reports, and the report-specific submit flow).
+ * The pending guard and the approve/reject field updates each live here
+ * exactly once; the concrete state machines keep only the parts that differ
+ * (the supervisor-id extra on team reports, and the report-specific submit
+ * flow).
  */
 trait TransitionsReportState
 {
@@ -24,11 +24,6 @@ trait TransitionsReportState
         }
     }
 
-    private function ensureVerificationToken(Model $report): string
-    {
-        return $report->verification_token ?? bin2hex(random_bytes(32));
-    }
-
     private function approveTransition(Model $report, User $actor, array $extra = []): Model
     {
         $this->assertPending($report, 'disetujui');
@@ -37,7 +32,6 @@ trait TransitionsReportState
         $report->forceFill(array_merge([
             'status' => 'approved',
             'supervisor_signed_at' => now(),
-            'verification_token' => $this->ensureVerificationToken($report),
         ], $extra))->save();
 
         return $report->fresh();

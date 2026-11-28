@@ -16,7 +16,7 @@ class ChangeInitiation extends Model
 
     /**
      * Business fields only. Workflow state (status, initiator_id, reviewer_id,
-     * doc_number, review_*, *_signed_at, verification_token) is written
+     * doc_number, review_*, *_signed_at) is written
      * exclusively through transitionPackage()/forceFill so a request payload
      * can never set it.
      */

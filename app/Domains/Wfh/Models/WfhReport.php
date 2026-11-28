@@ -15,7 +15,7 @@ class WfhReport extends Model
 
     /*
      * Only creation metadata is fillable. Workflow state (status, signature
-     * timestamps, supervisor_id, verification_token) is written exclusively
+     * timestamps, supervisor_id) is written exclusively
      * through forceFill() in the state machines, never from client input
      * (ship review SEC-07 — defence in depth behind the controller allowlists).
      */

@@ -9,9 +9,8 @@ class ChangePackageRules
 {
     /**
      * Payload allowlist. Only these keys may reach the models; workflow state
-     * (status, reviewer_id, review_*, *_signed_at, verification_token) is set
-     * exclusively by transitionPackage()/ChangePackageDecision — never from
-     * client input.
+     * (status, reviewer_id, review_*, *_signed_at) is set exclusively by
+     * transitionPackage()/ChangePackageDecision — never from client input.
      *
      * @var list<string>
      */
@@ -113,7 +112,6 @@ class ChangePackageRules
             'initiation.review_status' => ['prohibited'],
             'initiation.reviewed_at' => ['prohibited'],
             'initiation.initiator_signed_at' => ['prohibited'],
-            'initiation.verification_token' => ['prohibited'],
             'implementation.change_initiation_id' => ['prohibited'],
             'implementation.status' => ['prohibited'],
             'implementation.reviewer_id' => ['prohibited'],

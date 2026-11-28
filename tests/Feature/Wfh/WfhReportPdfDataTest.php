@@ -154,7 +154,6 @@ class WfhReportPdfDataTest extends TestCase
             'user_id' => $staf->id,
             'status' => 'approved',
             'supervisor_id' => $supervisor->id,
-            'verification_token' => 'tok-123',
         ]);
 
         $data = app(WfhReportPdfData::class)->forReport(

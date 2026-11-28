@@ -17,7 +17,6 @@
         "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {
-        "bacon/bacon-qr-code": "^3.1",
         "barryvdh/laravel-dompdf": "^3.1",
         "fakerphp/faker": "^1.9.1",
         "laravel/boost": "^2.4",
