@@ -5,6 +5,29 @@ Rilis internal dibatasi oleh modul; lihat `SPEC-*.md` untuk kontrak tiap modul.
 
 ## [Unreleased]
 
+### Added (frontend, 2026-11-28 — wfh-ux-remediation, report actions)
+- Shortcut "Buat Laporan Perbaikan" di halaman detail laporan WFH berstatus
+  `rejected` (hanya pemilik): membuat draft koreksi via `POST /api/wfh/reports`
+  dengan `report_date` laporan rejected, lalu langsung menavigasi ke draft
+  hasil prefill. Pesan 422 dari server (tanggal terkunci) tampil sebagai pesan.
+- Kolom "Aksi" opt-in di daftar laporan WFH personal (`/wfh`): dropdown per
+  baris berisi Detail, Edit (draft + `wfh.report.update`), Hapus (draft +
+  `wfh.report.delete`), Unduh PDF (`pending|approved` +
+  `wfh.report.export_pdf`). Item yang tak diizinkan tidak dirender; klik baris
+  tetap membuka detail; papan Monitoring tidak berubah.
+
+### Changed (backend, 2026-11-28 — wfh-ux-remediation, correction prefill)
+- Absensi laporan WFH kini dimiliki per-laporan: unique index
+  `(report_id, session)` menggantikan `(user_id, date, session)`; index
+  partial laporan diperluas ke `status IN ('draft','pending','approved')`
+  sehingga satu tanggal hanya boleh punya satu laporan non-rejected (arsip
+  rejected tidak mengunci). Migration fail-fast dengan daftar collision dan
+  menghapus baris absensi yatim (`report_id` NULL).
+- `POST /api/wfh/reports` kini menyalin (copy, bukan move) kegiatan + link
+  dan absensi + file foto dari laporan rejected terbaru untuk (user, tanggal)
+  yang sama — draft koreksi terisi penuh tanpa mengetik ulang; arsip rejected
+  tetap utuh. Konflik sesi menolak pembuatan tanpa file yatim.
+
 ### Fixed (backend, 2026-11-28 — wfh-ux-remediation, locked-date messages)
 - Pelanggaran kunci satu-laporan-aktif-per-tanggal (SQLSTATE 23505) tidak lagi
   bocor sebagai 500. `POST /api/wfh/reports` menjawab 200 dengan draft yang

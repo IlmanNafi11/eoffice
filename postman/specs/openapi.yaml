@@ -4816,7 +4816,7 @@ paths:
         Generates a personal WFH report PDF (Laporan Pelaksanaan Tugas WFH).
         Available from `pending` status — the maker (staf) must have set their
         signature in their profile first; export is refused with 422 otherwise.
-        Kepala Bidang signature + QR code appear only when `approved`, and the
+        Kepala Bidang signature appears only when `approved`, and the
         supervisor must also have set their signature before an approved report
         can be exported.
       parameters:
@@ -4958,7 +4958,7 @@ paths:
               example:
                 success: false
                 message: This action is unauthorized.
-  # ── QR Verification ──────────────────────────────────────────────
+  # ── WFH Reports (admin list) ─────────────────────────────────────
   /api/admin/wfh/reports:
     get:
       tags: [WFH Monitoring]

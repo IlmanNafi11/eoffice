@@ -10,7 +10,7 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Envelope module (Task 3): app-root controllers (auth, settings, QR verify)
+ * Envelope module (Task 3): app-root controllers (auth, settings)
  * must emit the single ApiResponse contract — `success` on every response,
  * {success, data, message, meta} shape, 404 for missing setting keys.
  */

@@ -78,3 +78,14 @@ terpisah. Spec: `SPEC-qr-spa-redirect.md`, `SPEC-field-user-picker.md`.
 | Module id | Responsibility | Depends on | Status |
 |---|---|---|---|
 | `dashboard` | Beranda `/` per-permission: `GET /api/dashboard` + halaman SPA; seksi `today` (me + scope), `queue`, `trend` 14 hari kerja, `attention` maks 5 < 60%, dikirim hanya bila peminta berhak | — | **IMPLEMENTED 2026-11-24** (T1–T8, `cb841b0`…`f865e68`; backend `tests/Feature/Dashboard` 31 passed, FE suite + typecheck + build hijau, smoke browser 4 role; closeout menunggu review human) |
+
+## Capability Map: WFH UX Remediation + QR Cut-off (2026-11-28)
+
+> Spec: `SPEC.md` root (approved 2026-11-28). Plan: `tasks/plan.md` (T1–T9).
+> Intent: `docs/superpowers/specs/2026-11-28-wfh-ux-remediation-design.md`.
+
+| Module id | Responsibility | Depends on | Status |
+|---|---|---|---|
+| `wfh-qr-cutoff` | Penghapusan total fitur QR/verifikasi dokumen (service, token 3 tabel, endpoint, SPA, blok PDF, dependency) | — | **CLOSED 2026-11-28** (T1–T3, `38dd030`…`9cc3e82` + drop `bacon/bacon-qr-code`; guard test `QrVerificationRemovalTest` + `verification-removal.test.ts`; full suite hijau, review human approved) |
+| `wfh-correction-prefill` | Satu laporan non-rejected per (user, tanggal) di level DB + copy prefill kegiatan/absensi dari rejected + pesan tanggal terkunci | `wfh-qr-cutoff` | **CLOSED 2026-11-28** (T4–T6, `d91d88d`…`9fe3a00`; `UniqueActiveDraftTest` + `RejectedReportCorrectionTest` + `ReportStoreUpdateTest` hijau; WFH suite 306 passed / 866 assertions, Pint clean, review human approved) |
+| `wfh-report-actions` | Shortcut "Buat Laporan Perbaikan" di detail rejected + kolom Aksi dropdown opt-in di list personal | `wfh-correction-prefill` | **CLOSED 2026-11-28** (T7–T8, `2ddf716`, `f279ebe`; `WfhReportDetailPage.test.tsx` + `WfhReportsPage.test.tsx` + `report-row.test.tsx` hijau, typecheck + build bersih, smoke browser alur koreksi, review human approved) |

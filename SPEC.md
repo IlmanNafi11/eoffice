@@ -3,7 +3,8 @@
 > Capability map (Phase 0, approved 2026-11-28): tiga modul — `wfh-qr-cutoff`,
 > `wfh-correction-prefill`, `wfh-report-actions`. Build order: qr-cutoff →
 > correction-prefill → report-actions; tidak ada siklus. Tiap modul punya suite
-> test sendiri dan bisa dinilai terpisah.
+> test sendiri dan bisa dinilai terpisah. **Status: CLOSED 2026-11-28** —
+> T1–T9 selesai, gate penuh hijau, closure log di `CAPABILITY-MAP.md`.
 >
 > Intent & keputusan yang disetujui owner:
 > `docs/superpowers/specs/2026-11-28-wfh-ux-remediation-design.md` (approved
