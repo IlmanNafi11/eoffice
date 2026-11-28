@@ -11,6 +11,11 @@ class AttendancePhotoResize
     /** 10× the 60px print box in the WFH report PDF template. */
     private const MAX_SIDE = 600;
 
+    public static function maxSide(): int
+    {
+        return self::MAX_SIDE;
+    }
+
     /**
      * Decode-guard → scale once → re-encode in the source format → write to
      * the private disk. Corrupt or unsupported content is stored byte-for-byte
