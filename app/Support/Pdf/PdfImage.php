@@ -22,6 +22,12 @@ class PdfImage
      */
     private const MAX_DECODED_PIXELS = 16_000_000;
 
+    /** Decode budget shared with upload-side guards (px²). */
+    public static function maxDecodedPixels(): int
+    {
+        return self::MAX_DECODED_PIXELS;
+    }
+
     /**
      * Data URI untuk aset gambar publik. MIME diambil dari isi berkas
      * (bukan diasumsikan), dan bitmap diturunkan skalanya ke lebar render.
