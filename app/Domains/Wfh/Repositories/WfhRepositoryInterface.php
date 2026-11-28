@@ -61,10 +61,10 @@ interface WfhRepositoryInterface extends RepositoryInterface
     public function findDraftForUserDate(int $userId, string $date): ?WfhReport;
 
     /**
-     * Move live attendances owned by rejected reports for (user, date) onto
-     * the given report. Photos are untouched.
-     *
-     * @return list<string> sessions moved, e.g. ['pagi', 'sore']
+     * Copy, never move: a rejected report is archive. Copy the latest
+     * rejected report's activities (with links) and attendances (with their
+     * photo bytes) onto the given correction draft. Nothing on the source
+     * rows changes; a session already owned by the target is not copied.
      */
-    public function relinkRejectedAttendances(int $userId, string $date, int $toReportId): array;
+    public function copyRejectedDataToReport(int $userId, string $date, WfhReport $target): void;
 }

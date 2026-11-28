@@ -138,15 +138,18 @@ class ReportController extends Controller
                     attendances: [],
                 );
 
-                // Correction flow: attendances from the rejected report for
-                // this (user, date) move onto the new report. A session that
-                // arrives again in this request would violate the attendance
-                // unique key, so its fresh upload is dropped and the orphan
-                // photo deleted (same recovery as the attendance endpoint).
-                $moved = $this->wfhRepository->relinkRejectedAttendances($user->id, $date, $report->id);
+                // Correction flow: the rejected report is archive, so the new
+                // draft RECEIVES COPIES of its activities and attendances
+                // (photo bytes included) instead of taking its rows away. A
+                // session re-uploaded here would collide with the copied row,
+                // so its fresh upload is dropped and the orphan photo deleted
+                // (same recovery as the attendance endpoint).
+                $this->wfhRepository->copyRejectedDataToReport($user->id, $date, $report);
+
+                $copied = $attendances ? $report->attendances()->pluck('session')->all() : [];
 
                 foreach ($attendances as $session => $data) {
-                    if (in_array($session, $moved, true)) {
+                    if (in_array($session, $copied, true)) {
                         Storage::disk('local')->delete($data['photo_path']);
 
                         continue;

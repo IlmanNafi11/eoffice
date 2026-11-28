@@ -12,6 +12,7 @@ use App\Support\Constants\WfhReportStatus;
 use App\Support\Media\PrivateMediaPath;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryInterface
 {
@@ -374,27 +375,96 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
             ->first();
     }
 
-    public function relinkRejectedAttendances(int $userId, string $date, int $toReportId): array
+    /**
+     * Copy, never move: a rejected report is archive and keeps every row it
+     * owns. The correction draft receives NEW activities (with links) and NEW
+     * attendance rows whose photo bytes are copied onto the private disk
+     * under the draft's own path — sharing a path would let deleting one
+     * report's evidence blank the other's. Business timestamps (start/end,
+     * check_in_at) survive; created_at/updated_at are fresh.
+     */
+    public function copyRejectedDataToReport(int $userId, string $date, WfhReport $target): void
     {
-        // Rejected is terminal, so its attendances still belong to
-        // (user, date, session) and move with the correction report. The
-        // SoftDeletingScope keeps this to live rows; photos are untouched.
-        $rejectedIds = WfhReport::query()
+        $source = WfhReport::query()
             ->where('user_id', $userId)
             ->where('report_date', $date)
-            ->where('status', 'rejected')
-            ->pluck('id');
+            ->where('status', WfhReportStatus::REJECTED)
+            ->with(['activities.links', 'attendances'])
+            ->latest('id')
+            ->first();
 
-        if ($rejectedIds->isEmpty()) {
-            return [];
+        if (! $source) {
+            return;
         }
 
-        $attendance = WfhAttendance::query()->whereIn('report_id', $rejectedIds);
-        $sessions = (clone $attendance)->pluck('session')->all();
+        // Prefill only when the create request omitted activities (B2): at
+        // this point the draft owns activities iff the request supplied them,
+        // so copying here never overwrites user edits.
+        if ($target->activities()->doesntExist()) {
+            foreach ($source->activities as $activity) {
+                $copy = $target->activities()->create([
+                    'start_time' => $activity->start_time,
+                    'end_time' => $activity->end_time,
+                    'activity' => $activity->activity,
+                    'sort_order' => $activity->sort_order,
+                ]);
 
-        $attendance->update(['report_id' => $toReportId]);
+                foreach ($activity->links as $link) {
+                    $copy->links()->create([
+                        'url' => $link->url,
+                        'sort_order' => $link->sort_order,
+                    ]);
+                }
+            }
+        }
 
-        return $sessions;
+        // Sessions already owned by the draft (e.g. a retried store) are not
+        // copied again; the (report_id, session) key would reject them.
+        $taken = $target->attendances()->pluck('session')->all();
+
+        foreach ($source->attendances as $attendance) {
+            if (in_array($attendance->session, $taken, true)) {
+                continue;
+            }
+
+            $target->attendances()->create([
+                'user_id' => $userId,
+                'date' => $attendance->date,
+                'session' => $attendance->session,
+                'photo_path' => $this->copyAttendancePhoto($attendance, $target),
+                'check_in_at' => $attendance->check_in_at,
+            ]);
+        }
+    }
+
+    /**
+     * Copy the source photo bytes onto the private disk under a path that
+     * belongs to the target report. Legacy rows may still live on the public
+     * disk (resolveAny); when no bytes exist anywhere the row keeps its
+     * original path and the UI renders its placeholder.
+     */
+    private function copyAttendancePhoto(WfhAttendance $attendance, WfhReport $target): ?string
+    {
+        $sourceBytes = PrivateMediaPath::resolveAny($attendance->photo_path);
+
+        if ($sourceBytes === '') {
+            return $attendance->photo_path;
+        }
+
+        $path = sprintf(
+            'attendances/%d/%s/%d-%s%s',
+            $target->user_id,
+            $target->report_date->format('Y-m-d'),
+            $target->id,
+            $attendance->session,
+            pathinfo($attendance->photo_path, PATHINFO_EXTENSION) !== ''
+                ? '.'.pathinfo($attendance->photo_path, PATHINFO_EXTENSION)
+                : '',
+        );
+
+        Storage::disk('local')->put($path, file_get_contents($sourceBytes));
+
+        return $path;
     }
 
     // === Monitoring ===
