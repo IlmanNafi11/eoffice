@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Organization;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -82,6 +83,65 @@ class AdminUserListQueryCountTest extends TestCase
             $largeTotal,
             'Total query count must stay flat as rows grow, not just the pivot count.',
         );
+    }
+
+    /**
+     * UserResource serializes `team.leader` for every row. Only `team.field`
+     * used to be eager-loaded, so the admin list lazy-loaded one users row per
+     * distinct team (measured: 13 lazy SELECTs for 13 teams). The list must
+     * batch-load the leaders instead.
+     */
+    public function test_admin_user_list_does_not_lazy_load_team_leaders(): void
+    {
+        $admin = User::factory()->create([
+            'must_change_password' => false,
+            'is_active' => true,
+        ]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        // Distinct non-admin leader per team: a lazy load cannot be served
+        // from any cache, so every row would cost one SELECT.
+        $leaderIds = [];
+        $memberIds = [];
+        foreach (range(1, 10) as $i) {
+            $leader = User::factory()->create();
+            $leaderIds[] = $leader->id;
+            $team = Team::factory()->create(['leader_id' => $leader->id]);
+            $member = User::factory()->create(['team_id' => $team->id]);
+            $memberIds[$member->id] = $leader->id;
+            $member->assignRole('staf');
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $response = $this->getJson('/api/admin/users?per_page=100')->assertOk();
+
+        $queries = collect(DB::getQueryLog());
+
+        // The lazy-load signature is a by-key users SELECT (the eager load uses
+        // a WHERE ... IN (...), which this pattern does not match).
+        $lazyLeaderLoads = $queries
+            ->filter(fn (array $query) => str_contains(
+                $query['query'],
+                '"users"."id" = ? and "users"."deleted_at" is null',
+            ))
+            ->count();
+
+        $this->assertSame(
+            0,
+            $lazyLeaderLoads,
+            'team.leader must be batch-eager-loaded, never one users SELECT per row.',
+        );
+        $this->assertGreaterThan(0, $queries->count(), 'Query log must not be empty.');
+        $this->assertTrue(
+            $queries->contains(fn (array $query) => str_contains(strtolower($query['query']), ' in (')),
+            'Leaders must be loaded in one WHERE IN query.',
+        );
+        $rows = collect($response->json('data'))->keyBy('id');
+        foreach ($memberIds as $memberId => $leaderId) {
+            $this->assertSame($leaderId, $rows->get($memberId)['team']['leader']['id'] ?? null);
+        }
     }
 
     /**

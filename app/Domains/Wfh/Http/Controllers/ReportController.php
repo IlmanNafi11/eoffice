@@ -13,6 +13,7 @@ use App\Support\Constants\WfhReportStatus;
 use App\Support\Dates\DateRangeHelper;
 use App\Support\Http\ApiResponse;
 use App\Support\Http\Concerns\ClampsPerPage;
+use App\Support\Media\AttendancePhotoResize;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -121,7 +122,11 @@ class ReportController extends Controller
         foreach (['pagi', 'siang', 'sore'] as $session) {
             if ($photo = $request->file("attendances.{$session}.photo")) {
                 // Private disk: attendance photos are evidence, never web-served.
-                $path = $photo->store("attendances/{$user->id}/{$date}", 'local');
+                $path = AttendancePhotoResize::store(
+                    $photo,
+                    "attendances/{$user->id}/{$date}",
+                    $photo->hashName(),
+                );
                 $attendances[$session] = ['photo_path' => $path];
             }
         }

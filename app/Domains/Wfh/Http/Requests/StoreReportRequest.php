@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wfh\Http\Requests;
 
+use App\Rules\DecodedImageBudget;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReportRequest extends FormRequest
@@ -34,7 +35,7 @@ class StoreReportRequest extends FormRequest
             'activities.*.links' => ['nullable', 'array'],
             'activities.*.links.*' => ['url', 'starts_with:https://'],
             'attendances' => ['sometimes', 'array:pagi,siang,sore'],
-            'attendances.*.photo' => ['sometimes', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'attendances.*.photo' => ['sometimes', 'image', 'mimes:jpg,jpeg,png', 'max:2048', new DecodedImageBudget],
         ];
     }
 }

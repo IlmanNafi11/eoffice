@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -212,6 +213,124 @@ class ReportStoreUpdateTest extends TestCase
         $report = WfhReport::withCount(['activities', 'attendances'])->find($reportId);
         $this->assertEquals(2, $report->activities_count, 'Activities should be unchanged');
         $this->assertEquals(1, $report->attendances_count, 'Attendances should be unchanged');
+    }
+
+    /**
+     * The create-report path must resize once at write time, just like the
+     * append-attendance endpoint: a 2400x1800 photo otherwise decompresses to
+     * ~16 MB per PDF cell. The evidence path contract must not change.
+     */
+    public function test_store_attendance_photo_with_longest_side_capped_at_600px(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $date = '2026-07-28';
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => $date,
+            'attendances' => [
+                'pagi' => ['photo' => $this->largePhoto()],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $path = DB::table('wfh_attendances')->value('photo_path');
+        $this->assertMatchesRegularExpression(
+            '#^attendances/'.$user->id.'/'.$date.'/[^/]+\.jpg$#',
+            $path,
+        );
+        $info = getimagesizefromstring((string) Storage::disk('local')->get($path));
+        $this->assertIsArray($info);
+        $this->assertLessThanOrEqual(600, max($info[0], $info[1]));
+    }
+
+    public function test_store_rejects_decode_bomb_with_422_and_no_partial_write(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+            'attendances' => [
+                'pagi' => ['photo' => $this->decodeBomb()],
+            ],
+        ]);
+        $response->assertStatus(422);
+        $this->assertContains(
+            'Gambar terlalu besar untuk diproses.',
+            collect($response->json('errors'))->flatten()->all(),
+        );
+
+        $this->assertDatabaseCount('wfh_reports', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles('attendances/'.$user->id));
+    }
+
+    public function test_store_multi_session_resizes_every_photo(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+            'attendances' => [
+                'pagi' => ['photo' => $this->largePhoto()],
+                'siang' => ['photo' => $this->largePhoto()],
+                'sore' => ['photo' => $this->largePhoto()],
+            ],
+        ])->assertStatus(201);
+
+        foreach (DB::table('wfh_attendances')->pluck('photo_path') as $path) {
+            $info = getimagesizefromstring((string) Storage::disk('local')->get($path));
+            $this->assertLessThanOrEqual(600, max($info[0], $info[1]));
+        }
+        $this->assertSame(3, DB::table('wfh_attendances')->count());
+    }
+
+    public function test_store_keeps_resized_photos_on_the_private_disk(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/wfh/reports', [
+            'report_date' => '2026-07-28',
+            'attendances' => [
+                'pagi' => ['photo' => $this->largePhoto()],
+            ],
+        ])->assertStatus(201);
+
+        $path = DB::table('wfh_attendances')->value('photo_path');
+        Storage::disk('public')->assertMissing($path);
+        Storage::disk('local')->assertExists($path);
+    }
+
+    private function largePhoto(): UploadedFile
+    {
+        $gd = imagecreatetruecolor(2400, 1800);
+        imagefill($gd, 0, 0, imagecolorallocate($gd, 30, 90, 160));
+        imagefilledrectangle($gd, 100, 100, 500, 400, imagecolorallocate($gd, 230, 40, 40));
+
+        ob_start();
+        imagejpeg($gd, null, 85);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($gd);
+
+        return UploadedFile::fake()->createWithContent('foto.jpg', $bytes);
+    }
+
+    private function decodeBomb(): UploadedFile
+    {
+        $bytes = "\x89PNG\r\n\x1a\n"
+            .pack('N', 13).'IHDR'
+            .pack('N', 5000).pack('N', 5000)
+            .chr(8).chr(2).chr(0).chr(0).chr(0)
+            .pack('N', 0);
+
+        return UploadedFile::fake()->createWithContent('bomb.png', $bytes);
     }
 
     public function test_update_nonexistent_report_returns_404(): void

@@ -243,6 +243,20 @@ describe("DashboardPage — seksi lanjutan (T7)", () => {
     expect(screen.getByTestId("trend-summary").textContent).toContain("118 dari 140");
     expect(document.querySelectorAll(".recharts-bar-rectangle").length).toBe(10);
   });
+
+  it("tidak memuat chunk TrendChart sebelum data trend tersedia", async () => {
+    const TrendChartAfterLoad = vi.fn(() => <div data-testid="trend-chart" />);
+    vi.doMock("@/pages/dashboard/sections/TrendChart", () => ({ TrendChart: TrendChartAfterLoad }));
+
+    mockedGet.mockResolvedValue(staffToday);
+    renderPage();
+    await screen.findByTestId("today-attendance");
+
+    expect(screen.queryByTestId("trend-chart")).toBeNull();
+    expect(screen.queryByTestId("trend-chart-skeleton")).toBeNull();
+    expect(TrendChartAfterLoad).not.toHaveBeenCalled();
+    vi.doUnmock("@/pages/dashboard/sections/TrendChart");
+  });
 });
 
 describe("DashboardPage — QueueCard (T7)", () => {

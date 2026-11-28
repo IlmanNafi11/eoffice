@@ -3,6 +3,7 @@
 namespace App\Domains\Wfh\Http\Requests;
 
 use App\Models\Setting;
+use App\Rules\DecodedImageBudget;
 use Illuminate\Foundation\Http\FormRequest;
 
 class AppendAttendanceRequest extends FormRequest
@@ -17,7 +18,7 @@ class AppendAttendanceRequest extends FormRequest
         $sessions = Setting::get('wfh_sessions', ['pagi', 'siang', 'sore']);
 
         return [
-            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048', new DecodedImageBudget],
             'session' => ['required', 'string', 'in:'.implode(',', $sessions)],
         ];
     }

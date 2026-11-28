@@ -89,3 +89,19 @@ terpisah. Spec: `SPEC-qr-spa-redirect.md`, `SPEC-field-user-picker.md`.
 | `wfh-qr-cutoff` | Penghapusan total fitur QR/verifikasi dokumen (service, token 3 tabel, endpoint, SPA, blok PDF, dependency) | — | **CLOSED 2026-11-28** (T1–T3, `38dd030`…`9cc3e82` + drop `bacon/bacon-qr-code`; guard test `QrVerificationRemovalTest` + `verification-removal.test.ts`; full suite hijau, review human approved) |
 | `wfh-correction-prefill` | Satu laporan non-rejected per (user, tanggal) di level DB + copy prefill kegiatan/absensi dari rejected + pesan tanggal terkunci | `wfh-qr-cutoff` | **CLOSED 2026-11-28** (T4–T6, `d91d88d`…`9fe3a00`; `UniqueActiveDraftTest` + `RejectedReportCorrectionTest` + `ReportStoreUpdateTest` hijau; WFH suite 306 passed / 866 assertions, Pint clean, review human approved) |
 | `wfh-report-actions` | Shortcut "Buat Laporan Perbaikan" di detail rejected + kolom Aksi dropdown opt-in di list personal | `wfh-correction-prefill` | **CLOSED 2026-11-28** (T7–T8, `2ddf716`, `f279ebe`; `WfhReportDetailPage.test.tsx` + `WfhReportsPage.test.tsx` + `report-row.test.tsx` hijau, typecheck + build bersih, smoke browser alur koreksi, review human approved) |
+
+## Capability Map: PDF Image Performance (2026-11-28)
+
+> Spec: `SPEC.md` root (approved 2026-11-28). Plan: `tasks/plan.md` (T1–T6,
+> sengaja tidak diarsipkan). Design:
+> `docs/superpowers/specs/2026-11-28-pdf-image-performance-design.md`.
+
+| Module id | Responsibility | Depends on | Status |
+|---|---|---|---|
+| `pdf-image-performance` | Resize foto presensi ≤600 px di dua jalur upload + command `media:resize-attendance` untuk data lama; trim tanda tangan full-resolution (grid scan 4px dibatalkan karena kehilangan konten); format sumber tetap dijaga termasuk alpha PNG | — | **CLOSED 2026-11-28** (T1–T5 `ed58b41`…`f22b348` + closeout temuan ship review #26; `PERF-LEDGER.md` dan `SPEC.md` diperbarui; migration command dibatasi `attendances/`, chunked, dan isolasi error; pixel bomb ditolak 422) |
+
+## Closure log (PDF Image Performance)
+
+| Date | Module | Findings closed | Evidence |
+|---|---|---|---|
+| 2026-11-28 | `pdf-image-performance` | Temuan ship review #26: trim grid scan kehilangan stroke off-grid, alpha PNG hilang saat resize, command menimpa path di luar `attendances/`, pixel bomb menggagalkan batch, dua test vacuous, klaim ledger tidak akurat | `ImageSignatureServiceTest` (off-grid dot RED→GREEN), `AttendancePhotoResizeTest` (alpha/corrupt/no-op/boundary), `ResizeAttendancePhotosTest` (scope/isolasi/dry-run), `ReportStoreUpdateTest` + `ReportAttendanceSubResourceTest` (422 pixel bomb, multi-sesi, orphan), `AdminUserListQueryCountTest` (non-vacuous), `DashboardPage.test.tsx` (lazy boundary); lockfile tak berubah, tanpa migration/env baru |
