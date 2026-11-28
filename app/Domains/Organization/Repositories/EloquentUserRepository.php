@@ -14,7 +14,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         parent::__construct($model);
     }
 
-    public function paginateWithRelations(int $perPage = 15, array $relations = ['team.field']): LengthAwarePaginator
+    public function paginateWithRelations(int $perPage = 15, array $relations = ['team.field', 'team.leader']): LengthAwarePaginator
     {
         return $this->model->with($relations)->paginate($perPage);
     }
