@@ -3,7 +3,8 @@
 > Module id: `dashboard` (satu modul; endpoint + halaman tidak bisa dipisah tanpa menulis ulang
 > kontrak — Phase 0 capability map terpisah tidak diperlukan).
 > Spec: `SPEC-dashboard.md` (approved 2026-11-24; dipindah dari `SPEC.md` saat
-> spec team-reports-detail-filter-theme mengambil alih nama root).
+> spec team-reports-detail-filter-theme mengambil alih nama root; root `SPEC.md`
+> kini = WFH UX remediation + QR cut-off, 2026-11-28).
 > Intent: `docs/superpowers/specs/2026-11-24-dashboard-design.md`.
 > Plan: `docs/superpowers/plans/2026-11-24-dashboard.md` (Tasks 1–8).
 

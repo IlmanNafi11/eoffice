@@ -1,179 +1,125 @@
-# SPEC: Laporan Tim — Detail, Filter, dan Toggle Tema
+# SPEC: WFH UX Remediation + QR Cut-off
 
-> Capability map (Phase 0, approved 2026-11-27): tiga modul — `wfh-team-report-filters`,
-> `wfh-team-report-detail`, `theme-modes`. Build order: filters → detail; theme-modes
-> independen. Tiap modul punya suite test sendiri dan bisa dinilai terpisah.
+> Capability map (Phase 0, approved 2026-11-28): tiga modul — `wfh-qr-cutoff`,
+> `wfh-correction-prefill`, `wfh-report-actions`. Build order: qr-cutoff →
+> correction-prefill → report-actions; tidak ada siklus. Tiap modul punya suite
+> test sendiri dan bisa dinilai terpisah.
 >
-> Intent & keputusan yang disetujui: `docs/superpowers/specs/2026-11-25-team-reports-detail-filter-theme-design.md`
-> (approved 2026-11-25, builder check selesai).
-> Rencana implementasi TDD (9 task): `docs/superpowers/plans/2026-11-25-team-reports-detail-filter-theme.md`.
-> Kontrak API: `postman/specs/openapi.yaml` (tag `WFH Team Reports`).
+> Intent & keputusan yang disetujui owner:
+> `docs/superpowers/specs/2026-11-28-wfh-ux-remediation-design.md` (approved
+> 2026-11-28, builder check passed). Rencana implementasi TDD (8 task):
+> `docs/superpowers/plans/2026-11-28-wfh-ux-remediation.md`.
 >
-> Catatan penamaan root: `SPEC.md` sebelumnya berisi spec Dashboard Beranda; dipindah ke
-> `SPEC-dashboard.md` dan rujukan di `CAPABILITY-MAP.md` + `CAPABILITY-MAP-dashboard.md`
-> sudah diperbarui. Module id `wfh-team-reports` di `CAPABILITY-MAP-frontend.md` tetap
-> CLOSED — modul di spec ini adalah kelanjutannya, bukan penulisan ulang.
+> Catatan penamaan root: `SPEC.md` sebelumnya berisi spec Laporan Tim (Detail,
+> Filter, Toggle Tema) yang seluruh modulnya sudah CLOSED; dipindah ke
+> `SPEC-team-reports.md` dan rujukan di `CAPABILITY-MAP.md` +
+> `CAPABILITY-MAP-dashboard.md` sudah diperbarui.
 
 ## Capability Map
 
 | Module id | Tanggung jawab | Depends on | Backend change | Selesai bila |
 |---|---|---|---|---|
-| `wfh-team-report-filters` | List Laporan Tim menerima filter status/rentang tanggal/tim, scope peran tidak melonggar; dropdown filter tunggal di header card `/team-reports` | — | Ya: validasi + query filter di `TeamReportController::index`, `openapi.yaml` | `TeamReportFilterTest` hijau; filter & pagination diuji di `TeamReportsPage.test.tsx` |
-| `wfh-team-report-detail` | Halaman detail laporan tim (`/team-reports/:id`) dengan approve/reject ber-alasan dan unduh PDF; action Detail + Unduh PDF di list; admin boleh unduh PDF lintas bidang | `wfh-team-report-filters` (berbagi `TeamReportsPage.tsx`, `wfhTeamSlice.ts`, `api/types.ts`) | Ya: `GET /admin/wfh/team-reports/{report}`, repo `getTeamReportDetailData`, `TeamReportDetailResource`, guard `exportTeam`, `openapi.yaml` | `TeamReportShowTest` + `PdfExportGuardsTest` hijau; `TeamReportDetailPage.test.tsx` hijau; smoke browser admin |
-| `theme-modes` | Toggle Terang/Gelap/Sistem di header (kiri dropdown user), persist, ikut OS pada mode Sistem, tanpa flash saat reload | — | Tidak | `theme-toggle.test.tsx` + `AppShell.test.tsx` hijau; smoke visual dark di halaman utama |
+| `wfh-qr-cutoff` | Penghapusan total fitur QR/verifikasi dokumen: service, token (3 tabel), endpoint `/api/verify`, redirect text/html, halaman SPA `/verify/:token`, blok `.qr-box` di kedua template PDF, dependency `bacon/bacon-qr-code`, test & rujukan spec | — | Ya: migration drop kolom `verification_token` di `wfh_reports`, `change_initiations`, `wfh_team_reports`; hapus route, controller, service, trait-minting | `QrCodeServiceTest`, `QrVerificationTest`, `VerificationTokenStabilityTest` dihapus; `WfhReportPdfDataTest`/`WfhReportPdfTemplateTest`/`ChangeManagementPdfDataTest` hijau tanpa `qrSvg`; full suite hijau |
+| `wfh-correction-prefill` | Aturan "satu laporan non-rejected per (user, tanggal)": migrasi unique absensi → `(report_id, session)` + index laporan → `status IN ('draft','pending','approved')`; guard lintas-laporan di `submit()`; copy (bukan move) kegiatan+link+absensi+foto dari rejected terbaru ke draft perbaikan; pesan 422 "menunggu keputusan" untuk store/update | `wfh-qr-cutoff` (bersih dulu kolom & test-nya agar migration tidak tabrakan test) | Ya: satu migration pair + perubahan `ReportController`, `ReportAttendanceController`, `EloquentWfhRepository`, `WfhReportStateMachine`, interface repo | `RejectedReportCorrectionTest` (rename+perluas `RejectedReportRecoveryTest`) + `UniqueActiveDraftTest` (diperluas) hijau; arsip rejected terbukti utuh |
+| `wfh-report-actions` | Shortcut "Buat Laporan Perbaikan" di detail rejected; kolom "Aksi" dropdown per baris di list personal (`/wfh`) — Detail, Edit (draft), Hapus (draft), Unduh PDF (pending/approved) — gate permission; klik baris tetap buka detail; Monitoring tidak berubah | `wfh-correction-prefill` (shortcut bergantung pada prefill server; dropdown independen secara kode tapi divalidasi setelah flow koreksi utuh) | Tidak ada | `WfhReportDetailPage.test.tsx` + `WfhReportsPage.test.tsx` + `report-row.test.tsx` hijau; typecheck + build bersih |
 
-**Alasan urutan:** filter bisa dikirim dan divalidasi tanpa endpoint detail; detail butuh
-kontrak baru + guard PDF sendiri sehingga mengikuti filter. Tema tidak menyentuh backend
-dan tidak berbagi berkas dengan dua modul lain — boleh kapan saja, dijadwalkan terakhir
-di plan hanya karena urutan task.
+**Alasan urutan:** qr-cutoff paling mandiri dan menghapus test yang akan
+menabrak migration modul berikutnya; correction-prefill memegang seluruh
+perubahan skema + kontrak store; report-actions murni frontend dan butuh
+perilaku store hasil prefill untuk diuji end-to-end.
+
+**Dependency direction:** satu arah, tanpa siklus. Antarmuka lintas-modul:
+- `wfh-correction-prefill` → kontrak API `POST /api/wfh/reports` tetap
+  (get-or-create + 201/200); baru: 422 dengan pesan domain saat diblokir
+  `pending`/`approved`.
+- `wfh-report-actions` → thunk `createWfhReport({report_date})`,
+  `deleteWfhReport(id)`, `exportWfhReportPdf(id)` (semua existing); tanpa
+  endpoint baru.
 
 ## Objective
 
-Menu **Laporan Tim** (`/team-reports`) hari ini hanya daftar ringkas: approver memutuskan
-approve/reject dari satu baris (tim, tanggal, status, pembuat) tanpa bisa melihat isi
-laporan, unduh PDF hanya tersedia di Monitoring, dan daftar tidak bisa disaring. Selain
-itu aplikasi tidak punya kontrol tema: `app.css` sudah memuat blok `.dark`, tetapi tidak
-ada kode yang men-set class `dark`, sehingga UI praktis selalu terang apa pun setelan
-perangkat.
+Tiga temuan usability di modul WFH personal ditambah satu fitur mati yang
+dipotong:
+
+1. **QR tidak pernah bermakna.** Rantai QR lengkap ter-wire (token per
+   dokumen, service, endpoint verify, halaman SPA, blok `.qr-box` di PDF)
+   tetapi Dompdf 3.x tidak merender SVG inline sehingga QR tidak pernah muncul
+   di PDF cetakan; tidak ada fitur lain yang memakainya. Keputusan owner:
+   potong total, bukan perbaiki render.
+2. **Koreksi kehilangan kerja.** Setelah penolakan, laporan baru hanya
+   mewarisi foto absensi — dan itu pun dengan cara **memindahkan** barisnya,
+   mengosongkan arsip laporan rejected. Kegiatan (jam, nama, link) tidak
+   dibawa sama sekali sehingga user mengetik ulang semuanya.
+3. **Pintu masuk koreksi terkubur.** User membaca alasan di detail, kembali ke
+   list, mengingat tanggal, lalu membuat laporan baru dari sana.
+4. **List tanpa aksi per baris.** Klik baris membuka detail, tapi edit/hapus/
+   unduh PDF harus dicari di tempat lain.
+
+Prinsip owner (2026-11-28): laporan rejected adalah **arsip/history** — tidak
+boleh ada data yang hilang darinya (copy, never move); **satu laporan
+non-rejected per (user, tanggal)** sebagai anti-spam submit (pending/approved
+mengunci tanggal sampai rejected); perubahan skema diperbolehkan demi
+kebenaran, efisiensi (tanpa N+1), dan best practice.
 
 Target pengguna:
 
-| Role | Permission Laporan Tim | Yang dibutuhkan |
-|---|---|---|
-| admin | view/create/approve/reject + `wfh.report.export_pdf` | semua laporan semua bidang, detail, unduh PDF lintas bidang, filter |
-| kepala bidang | view/approve/reject + `wfh.report.export_pdf` | laporan se-bidang, detail untuk memutuskan, filter, unduh PDF |
-| kepala tim | view + `wfh.report.export_pdf` | laporan timnya, detail read-only, filter (tanpa aksi transisi) |
-| staf | — | tanpa akses (403; menu disembunyikan) — tidak berubah |
-| semua role login | — | toggle tema Terang/Gelap/Sistem di header |
+| Role | Yang berubah untuk mereka |
+|---|---|
+| staf (pemilik laporan) | koreksi pasca-reject tinggal cek & perbaiki (prefill penuh); tombol "Buat Laporan Perbaikan" di detail rejected; aksi per baris di list; diblokir jelas saat tanggal terkunci pending/approved |
+| kepala bidang | tidak berubah alurnya (submit → pending → keputusan); PDF tanpa QR kosong |
+| admin | list personal punya aksi per baris sesuai permission; monitoring tetap row-click |
 
 **Success = semua kondisi ini benar:**
 
-1. `/team-reports` punya satu tombol filter di header card; memilih status, tim, dan/atau
-   rentang tanggal lalu "Terapkan" mengirim query yang sesuai dan kembali ke halaman 1.
-   Pagination dan per-halaman mempertahankan filter aktif.
-2. Filter tidak pernah memperluas scope: kepala tim yang memilih tim lain mendapat data
-   kosong, bukan kebocoran; kepala bidang di luar bidangnya juga kosong; admin bebas.
-3. Setiap baris punya aksi **Detail** (navigasi `/team-reports/:id`) dan **Unduh PDF**
-   (gate `wfh.report.export_pdf`), tanpa mengubah tombol approve/reject yang ada.
-4. `/team-reports/:id` memuat data lewat endpoint (aman untuk refresh/deep-link) dan
-   menampilkan: tim, tanggal, status, pembuat, supervisor, alasan penolakan (bila
-   `rejected`), tombol Unduh PDF, serta satu kartu per anggota aktif berisi status laporan
-   personal, absensi per sesi (foto bukti), dan kegiatan (jam, teks, tautan).
-5. Status `pending` + permission menampilkan Setujui dan Tolak di halaman detail; Tolak
-   wajib alasan (dialog, tombol mati saat kosong/spasi); sukses memicu refetch dan status
-   berubah di tempat. Tanpa permission, tombol tidak dirender sama sekali.
-6. Admin dapat mengunduh PDF tim milik bidang mana pun (200); non-admin lintas bidang tetap
-   403 dengan pesan server; konten PDF tidak berubah sedikit pun.
-7. Header menampilkan toggle tema (ikon + menu Terang/Gelap/Sistem) tepat di kiri dropdown
-   user. Memilih Gelap menambahkan class `dark` pada `documentElement`, Terang
-   menghapusnya, Sistem mengikuti `prefers-color-scheme` dan ikut berubah saat OS berganti.
-8. Pilihan tema bertahan setelah reload dan diterapkan sebelum paint (tidak ada kilatan
-   terang→gelap), dan toast (`sonner`) ikut tema aktif.
-
-## Scope
-
-### `wfh-team-report-filters`
-
-Backend:
-
-- `GET /api/admin/wfh/team-reports` menerima query opsional `status`
-  (`draft|pending|approved|rejected`), `date_from`, `date_to` (`date`, inklusif kedua
-  batas), `team_id` (integer, `exists:teams,id`) — selain `per_page`/`page` yang sudah ada.
-- Validasi ketat: status tak dikenal / `team_id` non-numerik / tim tak exist → 422 (bukan
-  500), mengikuti preseden `AdminReportFilterValidationTest`.
-- Filter berlapis di atas scope yang ada (admin semua; non-admin bidang; kepala bidang
-  semua tim bidang; kepala tim/staf tim sendiri).
-
-Frontend:
-
-- Dropdown filter tunggal di `CardAction` header card daftar, port pola Monitoring tab
-  Semua Laporan (`ListFilter` + `DropdownMenu modal={false}` + `onInteractOutside` guard
-  popover/select; Field Status/Tim/Dari tanggal/Sampai tanggal; tombol Terapkan).
-- Filter lokal sampai Terapkan; `date_from`/`date_to` diteruskan apa adanya bila terisi
-  (pola Monitoring), `per_page` default tidak dikirim.
-- Dropdown Tim memakai `listTeams()` dan tersedia untuk semua pemegang `view` (bukan hanya
-  pemegang `create`).
-
-### `wfh-team-report-detail`
-
-Backend:
-
-- `GET /api/admin/wfh/team-reports/{report}` (`permission:wfh.team_report.view`) →
-  envelope `ApiResponse::ok` berisi field `TeamReportResource` + `members[]`.
-- Scope: admin semua; non-admin tanpa bidang → 422 "User tidak terhubung dengan bidang
-  manapun."; lintas bidang → 403 "Laporan tidak berada dalam bidang Anda."; kepala tim di
-  luar timnya → 403 pesan sama.
-- `WfhRepositoryInterface::getTeamReportDetailData(int $teamId, string $date): array` —
-  per anggota aktif: `user_id, name, nip, report_id|null, report_status|null`,
-  `activities[{id,start_time,end_time,activity,links[]}]`,
-  `attendances[{id,session,photo_url|null}]`.
-- Laporan personal ganda per anggota per tanggal (alur no-revision: `rejected` + laporan
-  baru; partial unique index hanya melarang dua draft/rejected): pilih laporan live
-  terbaru — `pending|approved` di atas `draft|rejected`, lalu `updated_at` terbaru.
-  Absensi milik laporan lain tidak dirender.
-- `photo_url` = route `attendances.photo` (`PrivateMediaPath::attendanceUrl`) untuk absensi
-  laporan terpilih; endpoint foto yang ada tidak diubah (guard-nya tetap).
-- `getTeamReportData` (dipakai PDF) dan `WfhReportPdfData::forTeam` **tidak diubah**.
-- `ReportPdfController::exportTeam`: role admin (`Roles::ADMIN`) boleh mengekspor tim dari
-  bidang mana pun; non-admin aturan lama (own team boleh, tim tetangga butuh
-  `wfh.monitoring.view`, lintas bidang 403). Konten PDF byte-identical.
-- `openapi.yaml`: parameter filter pada op list, op `getWfhTeamReport`, schema
-  `WfhTeamReportDetail` + `WfhTeamReportMember`.
-
-Frontend:
-
-- `api/types.ts`: `ListTeamReportsQuery` + filter; `WfhTeamReportDetail`,
-  `WfhTeamReportMember`.
-- `api/wfh-team.ts`: `getWfhTeamReport(id)`; `listWfhTeamReports` meneruskan filter.
-- `wfhTeamSlice`: state `detail {data,status,error}`, thunk `fetchWfhTeamReportDetail`,
-  selektor; approve/reject sukses me-refetch list (sudah ada) dan detail aktif.
-- `pages/wfh/TeamReportDetailPage.tsx` di route `/team-reports/:id`: header (tim, tanggal,
-  badge status, pembuat, supervisor, alasan reject), tombol Unduh PDF
-  (`wfh.report.export_pdf`), kartu anggota dengan foto via `fetchAttendanceObjectUrl`,
-  footer Setujui/Tolak (dialog alasan wajib, pola list), back link ke `/team-reports`.
-- `TeamReportsPage`: aksi Detail + Unduh PDF per baris
-  (`exportTeamWfhPdf(team_id, {date: report_date, team_report_id: id})`, nama unduhan
-  `WFH-Team-{teamId}-{date}.pdf`).
-
-### `theme-modes`
-
-- `next-themes ^0.4.6` sudah menjadi dependency dan sudah dipakai `components/ui/sonner.tsx`
-  (`useTheme()`), jadi tidak ada dependency baru; memakainya menyatukan class `dark` dengan
-  warna toast.
-- `ThemeProvider` (`attribute="class"`, `defaultTheme="system"`, `enableSystem`,
-  `storageKey="theme"`, `disableTransitionOnChange`) membungkus app di `app.tsx`.
-- `components/layout/theme-toggle.tsx`: Button ghost berikon (Sun/Moon/Monitor) + menu
-  Terang/Gelap/Sistem, `aria-label="Tema"`, `data-testid="theme-toggle"`; dirender di
-  `Header.tsx` di dalam grup `ml-auto` sebelum dropdown user.
-- Script inline kecil di `resources/views/app.blade.php` (`<head>`, sebelum `@vite`) yang
-  menerapkan tema dari `localStorage` + `matchMedia` sebelum bundle berjalan (anti-flash).
+1. Tidak ada jejak QR/verifikasi di kode, skema, route, SPA, PDF, dependency,
+   dan dokumen kontrak; suite penuh hijau tanpa test QR.
+2. Setelah reject, `POST /wfh/reports` untuk (user, tanggal) sama membuat
+   draft baru yang berisi: kegiatan+link hasil **copy** dari rejected terbaru,
+   absensi (baris + file foto) hasil **copy**. Laporan rejected tetap memuat
+   semua datanya (kegiatan, link, absensi) — diverifikasi test.
+3. Tanggal dengan laporan `draft`/`pending`/`approved` menolak laporan baru
+   (dan perubahan `report_date` ke tanggal terkunci) dengan pesan Indonesia
+   yang membedakan "sudah ada draft" (get-or-create) vs "menunggu keputusan"
+   (422) vs "sudah final" (422); dua `pending` mustahil (guard `submit()` +
+   index).
+4. Detail rejected milik sendiri menampilkan tombol "Buat Laporan Perbaikan"
+   yang membuat draft dan langsung menavigasi ke sana.
+5. Setiap baris `/wfh` punya dropdown "Aksi" berisi Detail, Edit (draft +
+   `wfh.report.update`), Hapus (draft + `wfh.report.delete`), Unduh PDF
+   (`pending|approved` + `wfh.report.export_pdf`); aksi tak diizinkan tidak
+   dirender; klik baris tetap buka detail; Monitoring tak berubah.
+6. Absensi hasil copy mempertahankan `date` + `check_in_at` asli (bukti
+   bisnis); hanya `created_at`/`updated_at` yang baru.
 
 ## Tech Stack
 
-Backend (existing, tanpa dependensi baru):
+Backend (existing; **dependency dikurangi**, bukan ditambah):
 
-- PHP `^8.2` (host: 8.4.28), Laravel `^12.69`, Sanctum, `spatie/laravel-permission`.
-- Domain `app/Domains/Wfh/` (controller, repository, resource sudah ada).
-- Envelope `App\Support\Http\ApiResponse` (`ok`/`paginated`/`fail`).
+- PHP `^8.2` (host 8.4), Laravel `^12.69`, Sanctum, `spatie/laravel-permission`,
+  Postgres (partial unique index).
+- `bacon/bacon-qr-code` **dihapus** dari `composer.json` (require-dev) pada
+  modul `wfh-qr-cutoff`.
+- Domain `app/Domains/Wfh/` + `app/Domains/ChangeManagement/`,
+  `app/Support/{QrCode,Media,Pdf,Signature}`, envelope `ApiResponse`.
 
 Frontend (existing, tanpa dependensi baru):
 
-- React `^19`, Vite, Redux Toolkit, TypeScript, Vitest + jsdom, Tailwind v4 + shadcn.
-- `next-themes ^0.4.6` (sudah terpasang), `sonner` (sudah terpasang).
-- Primitif yang dipakai ulang: `Card`, `Button`, `Dialog`, `DropdownMenu`, `Select`,
-  `DateInput`, `Skeleton`, `WfhStatusBadge`, `Pagination`, `PdfDownloadButton`.
+- React `^19`, Vite, Redux Toolkit, TypeScript strict, Vitest 5 + jsdom,
+  Tailwind v4 + shadcn/radix.
+- Primitif dipakai ulang: `DropdownMenu`, `Button`, `WfhStatusBadge`,
+  `PdfDownloadButton`, `WfhReportRow`, toast `sonner`.
 
 ## Commands
 
 Dari root repo:
 
 ```
-# Backend — modul ini
-vendor/bin/phpunit --filter TeamReportFilterTest
-vendor/bin/phpunit --filter TeamReportShowTest
-vendor/bin/phpunit --filter PdfExportGuardsTest
-vendor/bin/phpunit --filter TeamReportTest
-vendor/bin/phpunit --filter TeamReportPdfTest     # konten PDF tidak berubah
+# Backend — per modul
+php artisan test --compact --filter="QrVerificationTest|QrCodeServiceTest"      # Task 1: harus 404 test setelah dihapus
+php artisan test --compact tests/Feature/Wfh/WfhReportPdfDataTest.php tests/Feature/Wfh/WfhReportPdfTemplateTest.php
+php artisan test --compact tests/Feature/ChangeManagement
+php artisan test --compact --filter="RejectedReportCorrectionTest|UniqueActiveDraftTest|DuplicateRecoveryTest|WfhReportStateMachineTest"
+php artisan test --compact tests/Feature/Wfh            # seluruh modul WFH
 
 # Backend — penuh & lint
 php artisan test --compact
@@ -181,9 +127,7 @@ vendor/bin/pint --test
 make lint
 
 # Frontend
-npm test -- resources/js/api/wfh-team.test.ts resources/js/store/wfhTeamSlice.test.ts
-npm test -- resources/js/pages/wfh/TeamReportsPage.test.tsx resources/js/pages/wfh/TeamReportDetailPage.test.tsx
-npm test -- resources/js/components/layout/theme-toggle.test.tsx resources/js/components/layout/AppShell.test.tsx
+npm test -- resources/js/pages/wfh/ resources/js/components/wfh/ resources/js/store/wfhSlice.test.ts resources/js/api/wfh.test.ts
 npm run typecheck
 npm run build
 
@@ -197,192 +141,225 @@ Bila host tidak punya PHP/vendor: `docker compose exec app php artisan test --co
 ## Project Structure
 
 ```
-app/Domains/Wfh/
-  Http/Controllers/TeamReportController.php          → index (+filter) + show()
-  Http/Controllers/ReportPdfController.php           → guard admin di exportTeam()
-  Http/Resources/TeamReportResource.php              → tidak diubah
-  Http/Resources/TeamReportDetailResource.php        → NEW: resource + members[]
-  Repositories/WfhRepositoryInterface.php            → + getTeamReportDetailData()
-  Repositories/EloquentWfhRepository.php             → implementasi detail (getTeamReportData TIDAK diubah)
-  Services/WfhReportPdfData.php                      → tidak diubah (PDF byte-identical)
-routes/api.php                                       → GET /admin/wfh/team-reports/{report}
-postman/specs/openapi.yaml                           → filter params + getWfhTeamReport + schemas
+database/migrations/
+  2026_11_28_000001_drop_verification_tokens_for_qr_cutoff.php   → NEW: drop kolom token (3 tabel)
+  2026_11_28_000002_rekey_attendance_and_widen_report_lock.php   → NEW: unique absensi (report_id, session)
+                                                                    + index laporan IN (draft,pending,approved)
+                                                                    + delete orphan attendance + fail-fast collision
 
-tests/Feature/Wfh/
-  TeamReportFilterTest.php                           → NEW (filter + scope)
-  TeamReportShowTest.php                             → NEW (repo data + endpoint + guard)
-  PdfExportGuardsTest.php                            → + admin lintas bidang 200 / non-admin 403
+app/Support/QrCode/QrCodeService.php                             → DELETE
+app/Http/Controllers/QrVerificationController.php                → DELETE
+routes/api.php                                                   → hapus route /api/verify/{token} + redirect text/html
+app/Domains/Wfh/Services/Concerns/TransitionsReportState.php     → hapus minting token (trait tetap untuk pending guard)
+app/Domains/Wfh/Services/WfhReportPdfData.php                    → tanpa QrCodeService/qrSvg
+app/Domains/ChangeManagement/Services/ChangePackagePdfData.php   → idem
+resources/views/pdf/wfh-report.blade.php                         → hapus blok .qr-box + @if qrSvg
+resources/views/pdf/change-initiation.blade.php                  → idem
+composer.json / composer.lock                                    → hapus bacon/bacon-qr-code
+
+app/Domains/Wfh/Repositories/WfhRepositoryInterface.php          → relinkRejectedAttendances GANTI
+                                                                    copyRejectedDataToReport(int $userId, string $date, WfhReport $target): void
+app/Domains/Wfh/Repositories/EloquentWfhRepository.php           → implementasi copy (activities+links, attendances+foto via
+                                                                    PrivateMediaPath::resolveAny); findAttendanceByUserAndDate
+                                                                    → scope laporan aktif; findDraftForUserDate tetap draft-only
+app/Domains/Wfh/Http/Controllers/ReportController.php            → store: copy prefill + pemetaan 23505 (draft/pending/approved)
+app/Domains/Wfh/Http/Controllers/ReportAttendanceController.php  → guard duplikat sesi per laporan aktif
+app/Domains/Wfh/Services/WfhReportStateMachine.php               → submit(): guard lintas-laporan (tanggal terkunci)
+
+tests/Feature/Wfh/RejectedReportCorrectionTest.php               → NEW (rename+perluas RejectedReportRecoveryTest):
+                                                                    arsip utuh, copy lengkap, tidak dobel, foto tersalin
+tests/Feature/Wfh/UniqueActiveDraftTest.php                      → perluas: draft/pending/approved mengunci; rejected tidak
+tests/Feature/Wfh/VerificationTokenStabilityTest.php             → DELETE
+tests/Feature/QrVerificationTest.php, tests/Unit/QrCodeServiceTest.php → DELETE
+tests/Feature/SecurityRegressionTest.php                         → buang kasus token QR (regresi lain tetap)
 
 resources/js/
-  api/types.ts                                       → ListTeamReportsQuery filter, WfhTeamReportDetail, WfhTeamReportMember
-  api/wfh-team.ts (+ .test.ts)                       → getWfhTeamReport, filter params
-  store/wfhTeamSlice.ts (+ .test.ts)                 → detail state + thunk + refetch pasca-mutasi
-  pages/wfh/TeamReportsPage.tsx (+ .test.tsx)        → filter dropdown, aksi Detail/PDF
-  pages/wfh/TeamReportDetailPage.tsx (+ .test.tsx)   → NEW
-  routes/index.tsx                                   → route /team-reports/:id
-  components/layout/Header.tsx                       → ThemeToggle kiri dropdown user
-  components/layout/theme-toggle.tsx (+ .test.tsx)   → NEW
-  app.tsx                                            → ThemeProvider
-resources/views/app.blade.php                        → inline anti-flash theme script
+  pages/verification/ (VerifyPage + test)                        → DELETE
+  api/verification.ts (+ test)                                   → DELETE
+  api/types.ts                                                   → hapus blok "QR Verification"
+  routes/index.tsx                                               → hapus route /verify/:token + lazy VerifyPage
+  pages/wfh/WfhReportDetailPage.tsx (+ test)                     → tombol "Buat Laporan Perbaikan" (rejected, owner)
+  pages/wfh/WfhReportsPage.tsx (+ test)                          → kolom "Aksi" + header kolom
+  components/wfh/report-row.tsx (+ test)                         → prop opt-in `actions?` (dropdown), default tanpa
+  store/wfhSlice.ts                                              → tanpa perubahan kontrak (thunk existing dipakai)
 
-docs/superpowers/specs/2026-11-25-...-design.md      → intent (approved)
-docs/superpowers/plans/2026-11-25-...-detail-filter-theme.md → langkah TDD per task
-SPEC.md                                              → file ini
-SPEC-dashboard.md                                    → spec root sebelumnya (dipindah)
+postman/specs/openapi.yaml                                       → hapus tag/path Verification + 302; bump minor (v6.9.0)
+CHANGELOG.md / CAPABILITY-MAP*.md / SPEC-qr-spa-redirect.md      → entri Removed/Changed + status modul
+
+docs/superpowers/specs/2026-11-28-wfh-ux-remediation-design.md   → intent (approved)
+docs/superpowers/plans/2026-11-28-wfh-ux-remediation.md          → langkah TDD per task
+SPEC.md                                                          → file ini
 ```
 
 ## Code Style
 
-Backend — filter sebagai closure yang diterapkan ke kedua builder scope; guard admin
-memakai konstanta role, bukan string:
+Backend — copy sebagai satu operasi repo yang dipanggil di dalam transaksi
+store; komentar menjelaskan keputusan arsip, bukan mekanik:
 
 ```php
-// TeamReportController::index
-$validated = $request->validate([
-    'status' => ['nullable', Rule::in(['draft', 'pending', 'approved', 'rejected'])],
-    'date_from' => ['nullable', 'date'],
-    'date_to' => ['nullable', 'date'],
-    'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')],
-]);
+// EloquentWfhRepository — copy, never move: a rejected report is archive.
+public function copyRejectedDataToReport(int $userId, string $date, WfhReport $target): void
+{
+    $source = WfhReport::query()
+        ->where('user_id', $userId)->where('report_date', $date)
+        ->where('status', 'rejected')
+        ->with(['activities.links', 'attendances'])
+        ->latest('id')->first();
+    if (! $source) {
+        return;
+    }
+    // ... insert activities+links (sort_order & url dipertahankan),
+    //     attendances (date & check_in_at asli; foto disalin ke private disk)
+}
 
-$filters = fn ($query) => $query
-    ->when($validated['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
-    ->when($validated['date_from'] ?? null, fn ($q, $v) => $q->whereDate('report_date', '>=', $v))
-    ->when($validated['date_to'] ?? null, fn ($q, $v) => $q->whereDate('report_date', '<=', $v))
-    ->when($validated['team_id'] ?? null, fn ($q, $v) => $q->where('team_id', $v));
-
-// ReportPdfController::exportTeam
-$isAdmin = $admin->hasRole(Roles::ADMIN);
-if (! $isAdmin && (! $fieldId || $team->field_id !== $fieldId)) {
-    return ApiResponse::fail('Tim tidak ditemukan dalam bidang Anda.', 403);
+// ReportController::store — pemetaan race yang membedakan tiga keadaan
+} catch (QueryException $e) {
+    if ($e->getCode() === '23505') {
+        if ($existing = $this->wfhRepository->findDraftForUserDate($user->id, $date)) {
+            return ApiResponse::ok(new WfhReportResource($existing->load([...])), 'Laporan WFH sudah ada.');
+        }
+        return ApiResponse::fail('Masih ada laporan untuk tanggal tersebut (menunggu keputusan atau sudah final).', 422);
+    }
+    throw $e;
 }
 ```
 
-Frontend — tipe mengikuti kontrak envelope; aksi gate permission, bukan role:
+Frontend — aksi gate permission dan status, bukan role; aksi tak diizinkan
+tidak dirender:
 
 ```tsx
-// TeamReportDetailPage.tsx — footer aksi
-const canApprove = can(user, "wfh.team_report.approve");
-const canReject = can(user, "wfh.team_report.reject");
-const canExportPdf = can(user, "wfh.report.export_pdf");
-
-{detail.status === "pending" && canApprove && <Button onClick={submitApprove}>Setujui</Button>}
-{detail.status === "pending" && canReject && <Button onClick={openReject}>Tolak</Button>}
+// report-row.tsx — menu Aksi (opt-in; Monitoring tidak mengirim prop)
+{actions && (
+  <td className="py-2 pr-4 text-right">
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Aksi"><MoreHorizontal /></Button></DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canEdit && <Item onSelect={onEdit} icon={Pencil}>Edit</Item>}
+        {canDelete && <Item onSelect={onDelete} icon={Trash2}>Hapus</Item>}
+        {canDownloadPdf && <Item onSelect={onDownload} icon={Download}>Unduh PDF</Item>}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </td>
+)}
 ```
 
 Konvensi:
 
-- PHP: `PascalCase` kelas/berkas, `camelCase` method, `UPPER_SNAKE` konstanta; satu method,
-  satu tanggung jawab (`show()` tidak menyusun konten sendiri — delegasi ke repository).
-- TS: komponen `PascalCase`, slice/modul `camelCase`, tipe domain di `api/types.ts`, tidak
-  ada `any` baru.
-- UI copy bahasa Indonesia; label status hanya dari `WFH_STATUS_LABELS`/`WfhStatusBadge`.
-- Foto privat selalu lewat `fetchAttendanceObjectUrl` (bearer), tidak pernah `<img src=url>`
-  langsung atau `/storage`.
-- Komentar hanya untuk keputusan non-obvious (mis. aturan "laporan live terbaru").
+- PHP: `PascalCase` kelas, `camelCase` method; workflow state hanya lewat
+  `forceFill` (SEC-07); satu method satu tanggung jawab; komentar Inggris,
+  pesan pengguna Indonesia.
+- TS: komponen `PascalCase`, tipe domain di `api/types.ts`, tanpa `any` baru.
+- UI copy Indonesia; label status hanya dari `WfhStatusBadge`.
+- Foto privat selalu `fetchAttendanceObjectUrl` (bearer) — tidak pernah
+  `<img src>` langsung atau `/storage`.
+- Envelope error konsisten `ApiResponse::fail(pesan, kode)`; tidak pernah
+  membocorkan detail internal (kode SQL, trace).
 
 ## Testing Strategy
 
 | Level | Framework | Lokasi | Menguji |
 |---|---|---|---|
-| Backend feature | PHPUnit | `tests/Feature/Wfh/TeamReportFilterTest.php` | kombinasi filter, batas tanggal inklusif, 422 input invalid, scope tidak melonggar (kepala tim/bidang) |
-| Backend feature | PHPUnit | `tests/Feature/Wfh/TeamReportShowTest.php` | repo detail (laporan live terbaru, absensi asing dihilangkan, anggota tanpa laporan), endpoint 200/403/422 per peran, payload `members` |
-| Backend feature | PHPUnit | `tests/Feature/Wfh/PdfExportGuardsTest.php` | admin lintas bidang 200; non-admin lintas bidang 403; non-admin tim sendiri 200 |
-| Backend regression | PHPUnit | `TeamReportTest`, `TeamReportPdfTest` | list tanpa filter tidak berubah; PDF tim byte-identical |
-| Frontend unit | Vitest + jsdom | `api/wfh-team.test.ts`, `store/wfhTeamSlice.test.ts` | filter params diteruskan; unwrap detail; refetch detail pasca-mutasi; state error |
-| Frontend komponen | Vitest + jsdom | `pages/wfh/TeamReportsPage.test.tsx` | Terapkan → query + halaman 1; pagination menjaga filter; Detail navigasi; Unduh PDF memanggil `exportTeamWfhPdf` dengan `date` + `team_report_id` |
-| Frontend halaman | Vitest + jsdom | `pages/wfh/TeamReportDetailPage.test.tsx` | mount fetch by route param; gate approve/reject; dialog alasan wajib; alasan reject tampil; anggota tanpa laporan tidak crash |
-| Frontend komponen | Vitest + jsdom | `components/layout/theme-toggle.test.tsx` | Gelap menambah `dark`, Terang menghapus, Sistem mengikuti `matchMedia` |
-| Manual/E2E | browser | admin + kepala bidang + kepala tim | filter, detail, approve/reject dari detail, unduh PDF (termasuk lintas bidang sebagai admin), tema Gelap/Terang/Sistem + reload |
+| Backend feature | PHPUnit | `tests/Feature/Wfh/RejectedReportCorrectionTest.php` | copy lengkap (kegiatan+link+absensi+foto), arsip rejected utuh pasca-copy, re-create tidak menduplikasi, sesi konflik ditolak tanpa file yatim, `check_in_at` asli |
+| Backend feature | PHPUnit | `tests/Feature/Wfh/UniqueActiveDraftTest.php` | draft/pending/approved mengunci (23505); rejected membuka; dua pending mustahil via guard submit |
+| Backend feature | PHPUnit | `tests/Feature/Wfh/ReportStoreUpdateTest.php` | get-or-create; 422 pesan pending/approved; `update()` tanggal terkunci → 422 bukan 500 |
+| Backend regression | PHPUnit | `WfhReportPdfDataTest`, `WfhReportPdfTemplateTest`, `ChangeManagementPdfDataTest`, `ChangeFormPdfTemplateTest` | tidak ada `qrSvg`/`.qr-box` di view-data maupun HTML ter-render; tanda tangan & kop tak berubah |
+| Backend feature | PHPUnit | `DuplicateRecoveryTest` | race 23505 tetap pulih (draft) / 422 (terkunci), tanpa file yatim |
+| Migration | PHPUnit | `tests/Feature/Wfh/SchemaRelationshipTest.php` (+ kasus baru) | unique `(report_id, session)` live-rows; index laporan mencakup 3 status; orphan terhapus; collision fail-fast |
+| Frontend unit | Vitest + jsdom | `api/wfh.test.ts`, `store/wfhSlice.test.ts` | `createWfhReport` dipakai shortcut; `deleteWfhReport` menghapus baris list; 422 terkonsumsi jadi pesan |
+| Frontend komponen | Vitest + jsdom | `components/wfh/report-row.test.tsx` | menu Aksi hanya dengan prop; item ter-gate status+permission; tanpa prop → tidak ada kolom |
+| Frontend halaman | Vitest + jsdom | `WfhReportsPage.test.tsx`, `WfhReportDetailPage.test.tsx` | kolom Aksi di list personal; klik baris tetap navigasi; tombol perbaikan hanya rejected+owner → create+navigate; Monitoring tanpa kolom |
+| Manual/E2E | browser | staf + kepala bidang | alur koreksi penuh (reject → tombol → draft terprefill → submit); dropdown aksi; PDF tanpa QR |
 
 Aturan:
 
-- Test-first per task: tulis test gagal → jalankan (pastikan gagal) → implement → hijau →
-  commit. Setiap task menambah test di lokasi yang sudah ada; tidak membuat harness kedua.
-- Test lama yang mengunci kontrak lama (mis. `ListTeamReportsQuery` hanya `per_page`/`page`)
-  diperbarui di task yang sama, tidak di-pin ulang.
-- Tanpa target coverage angka; ukurannya adalah Acceptance Criteria per modul.
-- `make ci` dijalankan sekali di task verifikasi terakhir.
+- Test-first per task: RED → jalankan (pastikan gagal dengan alasan benar) →
+  GREEN → commit. Test lama yang mengunci kontrak lama (relink/move, token QR,
+  S9 tanpa aksi baris) diperbarui/dihapus di task yang sama, tidak di-pin ulang.
+- Tanpa target coverage angka; ukurannya Success Criteria per modul.
+- `make ci` sekali di task verifikasi terakhir.
 
 ## Boundaries
 
 **Always:**
 
-- Jalankan test yang relevan sebelum setiap commit (`vendor/bin/phpunit --filter=...`,
-  `npm test -- <path>`), lalu `npm run typecheck`.
-- Catat setiap perubahan kontrak di `postman/specs/openapi.yaml` pada commit yang sama
-  dengan perubahan controller-nya.
-- Pertahankan scope peran di setiap query baru: filter hanya mempersempit; admin satu-
-  satunya role lintas bidang, dan hanya untuk role `Roles::ADMIN` (bukan string literal).
-- Bangun `photo_url` lewat `PrivateMediaPath::attendanceUrl` (route `attendances.photo`) dan
-  ambil di FE lewat `fetchAttendanceObjectUrl`.
-- Tolak (reject) selalu lewat dialog alasan; server tetap `required|string`.
-- Tema membaca/menulis satu kunci `localStorage` (`theme`) lewat `next-themes`; komponen
-  lain memakai `useTheme()`, bukan manipulasi class sendiri.
-- Sembunyikan aksi yang tidak diizinkan (bukan `disabled`), dan biarkan server tetap
-  penentu akhir (403/422 tetap tersaji).
+- Jalankan test yang relevan sebelum setiap commit, lalu `npm run typecheck`.
+- Copy, never move: operasi data apa pun pada laporan rejected tidak boleh
+  mengubah/menghapus baris miliknya (verifikasi test eksplisit per jalur).
+- Pertahankan aturan satu laporan non-rejected per (user, tanggal) di level
+  database (index), bukan hanya di aplikasi.
+- Catat perubahan kontrak di `postman/specs/openapi.yaml` pada commit yang
+  sama dengan perubahan controller-nya (termasuk penghapusan `/api/verify`).
+- Foto disalin lewat `PrivateMediaPath::resolveAny` (foto legacy bisa di disk
+  public); file hilang tetap menyalin baris (UI sudah punya placeholder).
+- Aksi tak diizinkan disembunyikan (bukan disabled); server tetap penentu
+  akhir (403/422 tetap tersaji).
+- Pesan domain Indonesia untuk semua jalur 422; tanpa 500 dari 23505.
 
 **Ask first:**
 
-- Menambah dependensi (tema wajib memakai `next-themes`; library tema kedua tidak boleh).
-- Mengubah `getTeamReportData`, `WfhReportPdfData`, atau blade `pdf.wfh-report-admin`
-  (konten PDF harus byte-identical; perubahan hanya boleh disetujui eksplisit).
-- Mengubah skema database/migrasi (modul ini seharusnya tidak perlu).
-- Menyentuh `nav-registry.ts` (detail bukan menu baru).
-- Mengubah aturan segregation of duties atau state machine approve/reject.
-- Memperluas akses `exportTeam` untuk role selain admin.
+- Mengubah `WfhReportPdfData` di luar penghapusan QR (konten PDF harus tidak
+  berubah selain hilangnya QR).
+- Menambah dependensi baru apa pun (plan ini net-minus satu dependency).
+- Menyentuh flow approve/reject laporan tim atau segregation of duties.
+- Mengubah komponen `WfhReportRow` di luar prop opt-in (Monitoring bergantung
+  padanya).
+- Re-seed data demo bila migration fail-fast menemukan collision.
 
 **Never:**
 
-- Membuka data lintas bidang/tim lewat filter atau `show()` untuk non-admin.
-- Mengganti preview detail dengan embed PDF (ditolak user; keputusan design terkunci).
-- Mengubah guard `attendance photo` (`wfh.monitoring.view` + bidang) untuk memudahkan
-  halaman detail.
-- Menampilkan foto absensi lewat `<img src>` langsung atau URL `/storage` publik.
-- Menambahkan endpoint `/storage` publik atau menghapus header privat pada PDF.
-- Melemahkan atau menghapus test yang gagal tanpa persetujuan manusia.
-- Menyimpan kopi kedua label status/sesi — satu peta, dipakai bersama.
-- Menaruh `dark` sebagai default statis di blade (default tetap `system`).
+- Menghapus/mengosongkan data laporan rejected dalam bentuk apa pun
+  (termasuk "sementara" saat migrasi).
+- Memindahkan baris absensi antar laporan (`relinkRejectedAttendances`
+  dihapus, bukan disimpan).
+- Mengizinkan dua laporan non-rejected untuk (user, tanggal) yang sama —
+  juga tidak lewat jalur race/PUT.
+- Menyajikan foto absensi via URL publik atau melemahkan guard
+  `wfh.monitoring.view` + bidang.
+- Menghapus test yang gagal tanpa persetujuan manusia (test QR dihapus karena
+  fiturnya dihapus — itu cakupan task, bukan pelarian dari merah).
+- Menyimpan kopi kedua label status/sesi; satu peta dipakai bersama.
+- Meng-commit secret atau menyentuh `vendor/`.
 
 ## Open Questions
 
-1. **Penempatan tombol Detail/Unduh PDF** — plan memilih aksi per baris. Bila saat review UI
-   tombol PDF lebih pas di header card (satu tombol untuk filter aktif), itu keputusan
-   implementasi yang tidak mengubah kontrak; default: per baris.
-2. **Bentuk kartu anggota** — jumlah kolom, ukuran thumbnail foto, dan tampilan kegiatan
-   mengikuti bahasa visual Monitoring/detail personal. Tidak mengubah data.
-3. **Animasi transisi tema** — default instant (`disableTransitionOnChange`). Bila ada
-   permintaan transisi halus, itu perubahan baru.
+1. **Bentuk visual dropdown Aksi** (posisi ikon, urutan item, pemisah) — plan
+   menetapkan urutan Detail → Edit → Hapus → Unduh PDF dengan ikon lucide
+   standar; penyesuaian kosmetik saat review UI tidak mengubah kontrak.
+2. **Status code persis untuk tanggal terkunci** — plan memakai 422 dengan
+   pesan domain (konsisten pola guard existing); bila review menghendaki 409,
+   itu perubahan satu baris + openapi pada task yang sama.
+3. **Label tombol perbaikan** — "Buat Laporan Perbaikan" (default); variasi
+   copy lokal diperbolehkan tanpa mengubah perilaku.
 
 ## Success Criteria
 
-### `wfh-team-report-filters`
+### `wfh-qr-cutoff`
 
-- [ ] `GET /admin/wfh/team-reports?status=&date_from=&date_to=&team_id=` memfilter sesuai
-      kontrak, inklusif di kedua batas tanggal, dan 422 untuk input invalid.
-- [ ] Filter tidak memperluas scope kepala tim/kepala bidang (diuji test backend).
-- [ ] Dropdown filter tunggal di header card `/team-reports`; Terapkan → halaman 1; pagination
-      dan per-halaman menjaga filter aktif (diuji test frontend).
-- [ ] `openapi.yaml` memuat parameter filter baru.
+- `rg -i "qr|verification_token|verifyQrToken"` di `app/`, `resources/`,
+  `routes/`, `tests/`, `postman/` hanya menyisakan kebutuhan non-QR
+  (`verify-otp`, reset password, `QrVerificationController` tidak ada lagi).
+- Migration turun-naik bersih; `composer validate` + `composer.lock` tanpa
+  `bacon/bacon-qr-code`; `php artisan test --compact` hijau penuh.
+- PDF laporan personal & paket perubahan ter-render tanpa QR dan tanpa
+  perubahan visual lain (test template mengunci elemen yang tersisa).
 
-### `wfh-team-report-detail`
+### `wfh-correction-prefill`
 
-- [ ] `GET /admin/wfh/team-reports/{report}` mengembalikan header + `members[]`; 403 untuk
-      lintas bidang/tim, 422 untuk user tanpa bidang.
-- [ ] Detail memilih laporan personal live terbaru per anggota dan tidak merender absensi
-      milik laporan lain (diuji test).
-- [ ] Admin dapat mengunduh PDF tim lintas bidang (200); non-admin tetap 403; `TeamReportPdfTest`
-      hijau (konten PDF tidak berubah).
-- [ ] `/team-reports/:id` aman untuk refresh/deep-link, menampilkan header, alasan reject,
-      kartu anggota (foto + kegiatan), dan tombol Setujui/Tolak hanya untuk `pending` +
-      permission; Tolak wajib alasan.
-- [ ] List punya aksi Detail dan Unduh PDF dengan gate permission yang benar.
+- Test arsip: setelah `POST /wfh/reports` koreksi, laporan rejected masih
+  memuat N kegiatan + link + M absensi yang sama (id tak berubah).
+- Test prefill: draft baru memuat salinan lengkap; pembuatan ulang tidak
+  menduplikasi (get-or-create); foto tersalin ke private disk dan baris lama
+  + baru menunjuk file masing-masing.
+- Test kunci: `draft`+`pending`+`approved` masing-masing memblokir (23505 /
+  422 pesan benar); `rejected` membuka; `submit()` menolak draft pada tanggal
+  yang sudah terkunci; `PUT` tanggal terkunci → 422.
+- `UniqueActiveDraftTest` + `RejectedReportCorrectionTest` + full suite hijau;
+  Pint bersih.
 
-### `theme-modes`
+### `wfh-report-actions`
 
-- [ ] Header menampilkan toggle tema di kiri dropdown user; tiga opsi berfungsi dan
-      menandai pilihan aktif.
-- [ ] Gelap/Terang mengubah class `dark` di `documentElement`; Sistem mengikuti
-      `prefers-color-scheme` dan bereaksi saat OS berganti.
-- [ ] Pilihan bertahan setelah reload tanpa kilatan tema; toast mengikuti tema.
-- [ ] `make ci` hijau di akhir seluruh modul.
+- Vitest: dropdown hanya dengan prop `actions`; item ter-gate; klik baris
+  tetap navigasi; tombol perbaikan hanya rejected + owner; Monitoring
+  merender tanpa kolom Aksi.
+- `npm run typecheck` + `npm run build` hijau; smoke browser alur koreksi
+  end-to-end di device nyata.

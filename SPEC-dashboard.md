@@ -131,7 +131,7 @@ resources/js/lib/nav-registry.ts               → entri "Beranda" tetap (`id: h
 
 docs/superpowers/specs/2026-11-24-dashboard-design.md  → intent & keputusan (approved)
 docs/superpowers/plans/2026-11-24-dashboard.md         → langkah TDD per task
-SPEC.md                                                → file ini
+SPEC-dashboard.md                                      → file ini
 CHANGELOG.md, CAPABILITY-MAP-dashboard.md              → diperbarui di Task 8
 ```
 

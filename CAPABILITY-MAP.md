@@ -70,8 +70,9 @@ terpisah. Spec: `SPEC-qr-spa-redirect.md`, `SPEC-field-user-picker.md`.
 
 ## Capability Map: Dashboard Beranda (2026-11-24)
 
-> Spec: `SPEC-dashboard.md` (approved 2026-11-24; dipindah dari `SPEC.md` saat spec
-> team-reports-detail-filter-theme mengambil alih nama root). Plan: `tasks/plan.md` (T1–T8).
+> Spec: `SPEC-dashboard.md` (approved 2026-11-24; dipindah dari `SPEC.md` saat
+> spec team-reports-detail-filter-theme mengambil alih nama root; root `SPEC.md`
+> kini = WFH UX remediation + QR cut-off, 2026-11-28). Plan: `tasks/plan.md` (T1–T8).
 > Peta modul lengkap: `CAPABILITY-MAP-dashboard.md`.
 
 | Module id | Responsibility | Depends on | Status |
