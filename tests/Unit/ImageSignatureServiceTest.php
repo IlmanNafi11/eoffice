@@ -61,4 +61,32 @@ class ImageSignatureServiceTest extends TestCase
 
         $this->assertInstanceOf(ImageSignatureService::class, $resolved);
     }
+
+    public function test_trim_keeps_isolated_thin_stroke(): void
+    {
+        $file = UploadedFile::fake()->image('thin.png', 1200, 400);
+        $gd = imagecreatetruecolor(1200, 400);
+        imagefill($gd, 0, 0, imagecolorallocate($gd, 255, 255, 255));
+        $ink = imagecolorallocate($gd, 0, 0, 0);
+        imagesetpixel($gd, 1, 1, $ink);
+        imagesetpixel($gd, 1198, 398, $ink);
+        imagepng($gd, $file->getRealPath());
+
+        $path = $this->service->normalize($file->getRealPath(), 7);
+        $saved = imagecreatefrompng(Storage::disk('local')->path($path));
+
+        $this->assertLessThan(240, (imagecolorat($saved, 0, 0) >> 16) & 0xFF);
+        $bottomRight = imagecolorat($saved, imagesx($saved) - 1, imagesy($saved) - 1);
+        $this->assertLessThan(240, ($bottomRight >> 16) & 0xFF);
+    }
+
+    public function test_trim_handles_large_image_without_error(): void
+    {
+        $file = UploadedFile::fake()->image('big.png', 2000, 2000);
+
+        $path = $this->service->normalize($file->getRealPath(), 8);
+
+        $this->assertSame('signatures/8.png', $path);
+        Storage::disk('local')->assertExists($path);
+    }
 }
