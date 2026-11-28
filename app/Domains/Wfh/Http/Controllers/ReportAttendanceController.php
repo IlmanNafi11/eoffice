@@ -10,6 +10,7 @@ use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Models\Setting;
 use App\Support\Http\ApiResponse;
+use App\Support\Media\AttendancePhotoResize;
 use App\Support\Media\PrivateMediaPath;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -68,7 +69,11 @@ class ReportAttendanceController extends Controller
         $photo = $request->file('photo');
         // Private disk: a face photo is evidence, and the previous public disk
         // made /storage/attendances/... downloadable without authentication.
-        $path = $photo->store("attendances/{$user->id}/{$date}", 'local');
+        $path = AttendancePhotoResize::store(
+            $photo,
+            "attendances/{$user->id}/{$date}",
+            $photo->hashName(),
+        );
 
         try {
             $attendance = $this->wfhRepository->addAttendanceToReport($report, [

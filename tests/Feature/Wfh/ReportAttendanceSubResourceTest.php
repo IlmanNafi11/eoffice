@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -218,6 +219,54 @@ class ReportAttendanceSubResourceTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonPath('errors.photo.0', 'Ukuran foto maksimal 2MB.');
+    }
+
+    /**
+     * The attendance endpoint must resize once at write time: a 2400x1800
+     * photo would otherwise be decompressed to ~16 MB per PDF cell.
+     */
+    public function test_append_attendance_stores_photo_with_longest_side_capped_at_600px(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-07-28'));
+
+        $user = User::factory()->create();
+        $user->assignRole('staf');
+        Sanctum::actingAs($user);
+
+        $report = $this->createDraftReport($user, '2026-07-28');
+
+        $response = $this->postJson("/api/wfh/reports/{$report->id}/attendances", [
+            'photo' => $this->largePhoto('jpg'),
+            'session' => 'pagi',
+        ]);
+
+        $response->assertStatus(201);
+
+        $attendance = WfhAttendance::query()->firstOrFail();
+        $this->assertMatchesRegularExpression(
+            '#^attendances/'.$user->id.'/2026-07-28/[^/]+\.jpg$#',
+            $attendance->photo_path,
+        );
+        $info = getimagesizefromstring((string) Storage::disk('local')->get($attendance->photo_path));
+        $this->assertIsArray($info);
+        $this->assertLessThanOrEqual(600, max($info[0], $info[1]));
+    }
+
+    private function largePhoto(string $extension): UploadedFile
+    {
+        $gd = imagecreatetruecolor(2400, 1800);
+        imagefill($gd, 0, 0, imagecolorallocate($gd, 30, 90, 160));
+        imagefilledrectangle($gd, 100, 100, 500, 400, imagecolorallocate($gd, 230, 40, 40));
+
+        ob_start();
+        match ($extension) {
+            'jpg' => imagejpeg($gd, null, 85),
+            'png' => imagepng($gd, null, 6),
+        };
+        $bytes = (string) ob_get_clean();
+        imagedestroy($gd);
+
+        return UploadedFile::fake()->createWithContent("foto.{$extension}", $bytes);
     }
 
     // === DELETE ===
