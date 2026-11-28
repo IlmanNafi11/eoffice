@@ -22,7 +22,7 @@
  *   DELETE, urutan berubah → PATCH {ids}).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { toUiError } from "@/lib/ui-errors";
 import { ArrowLeft, Save } from "lucide-react";
@@ -51,7 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { exportWfhReportPdf, getWfhSessionConfig } from "@/api/wfh";
+import { createWfhReport, exportWfhReportPdf, getWfhSessionConfig } from "@/api/wfh";
 import { can } from "@/lib/permissions";
 import type { WfhReport, WfhReportActivity, WfhSessionConfig } from "@/api/types";
 import {
@@ -84,6 +84,7 @@ export function WfhReportDetailPage() {
   // deep-link tidak punya state → fallback ke daftar WFH.
   const location = useLocation();
   const backTo = (location.state as { from?: string } | null)?.from ?? "/wfh";
+  const navigate = useNavigate();
   const id = Number.parseInt(reportId ?? "", 10);
 
   const user = useAppSelector(selectUser);
@@ -99,6 +100,11 @@ export function WfhReportDetailPage() {
   // DIDEKLARASIKAN SEBELUM early-return — Rules of Hooks.
   const busyRef = useRef(false);
   const [pendingMutation, setPendingMutation] = useState(false);
+  // Shortcut "Buat Laporan Perbaikan" (rejected + owner): error 422 dari
+  // create (tanggal terkunci) tampil inline — bukan lewat slice, karena
+  // create bukan thunk resource utama.
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [creatingCorrection, setCreatingCorrection] = useState(false);
 
   useEffect(() => {
     if (Number.isFinite(id)) dispatch(fetchWfhReport(id));
@@ -174,6 +180,8 @@ export function WfhReportDetailPage() {
   const canDownloadPdf =
     (report.status === "pending" || report.status === "approved") &&
     can(user, "wfh.report.export_pdf");
+  const canCreateCorrection =
+    isOwner && report.status === "rejected" && can(user, "wfh.report.create");
 
   /** Satu mutasi: tunggu selesai lalu refetch detail. Guard double-submit:
    *  `busyRef` menolak klik kedua saat in-flight; `pendingMutation` men-disable
@@ -191,6 +199,24 @@ export function WfhReportDetailPage() {
     } finally {
       busyRef.current = false;
       setPendingMutation(false);
+    }
+  }
+
+  /** Shortcut perbaikan: create draft dengan tanggal laporan rejected lalu
+   *  navigate ke detailnya (200/201 get-or-create sama-sama navigate). */
+  async function createCorrection() {
+    if (!report || creatingCorrection) return;
+    const reportDate = report.report_date;
+    setCreatingCorrection(true);
+    setCorrectionError(null);
+    try {
+      const created = await createWfhReport({ report_date: reportDate });
+      toast.success(created.message);
+      navigate(`/wfh/${created.id}`);
+    } catch (err) {
+      setCorrectionError(toUiError(err).message);
+    } finally {
+      setCreatingCorrection(false);
     }
   }
 
@@ -318,6 +344,22 @@ export function WfhReportDetailPage() {
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
           <p className="font-medium">Alasan penolakan:</p>
           <p>{report.reject_reason}</p>
+        </div>
+      ) : null}
+
+      {canCreateCorrection ? (
+        <div className="flex flex-col gap-2">
+          <Button
+            disabled={creatingCorrection}
+            onClick={() => void createCorrection()}
+          >
+            Buat Laporan Perbaikan
+          </Button>
+          {correctionError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {correctionError}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

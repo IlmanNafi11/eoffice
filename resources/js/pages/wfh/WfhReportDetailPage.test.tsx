@@ -54,6 +54,7 @@ const mockedDeleteActivity = wfhApi.deleteReportActivity as unknown as Mock;
 const mockedAddActivity = wfhApi.addReportActivity as unknown as Mock;
 const mockedUpdateMetadata = wfhApi.updateWfhReportMetadata as unknown as Mock;
 const mockedPdf = wfhApi.exportWfhReportPdf as unknown as Mock;
+const mockedCreate = wfhApi.createWfhReport as unknown as Mock;
 const config: WfhSessionConfig = {
   sessions: ["pagi", "siang", "sore"],
   allowed_days: [1, 2, 3, 4, 5],
@@ -516,6 +517,74 @@ describe("WfhReportDetailPage — unduh PDF gagal (pdf-signature S6)", () => {
     expect(
       await screen.findByText(/anda belum mengatur tanda tangan/i),
     ).toBeTruthy();
+  });
+});
+// ── Shortcut Buat Laporan Perbaikan (Task 7) ────────────────────────
+
+describe("WfhReportDetailPage — shortcut Buat Laporan Perbaikan", () => {
+  it("rejected + owner: tombol tampil", async () => {
+    renderDetail("staf", detail("rejected"));
+
+    expect(
+      await screen.findByRole("button", { name: /buat laporan perbaikan/i }),
+    ).toBeTruthy();
+  });
+
+  it("pending: tombol disembunyikan (hanya rejected)", async () => {
+    renderDetail("staf", detail("pending"));
+
+    await screen.findByRole("button", { name: /unduh pdf/i });
+    expect(
+      screen.queryByRole("button", { name: /buat laporan perbaikan/i }),
+    ).toBeNull();
+  });
+
+  it("rejected non-owner (kepala): tombol disembunyikan", async () => {
+    renderDetail("kepala", detail("rejected"));
+
+    await screen.findByText(/2026-08-10/);
+    expect(
+      screen.queryByRole("button", { name: /buat laporan perbaikan/i }),
+    ).toBeNull();
+  });
+
+  it("klik → createWfhReport dengan tanggal laporan, navigate ke draft baru", async () => {
+    mockedCreate.mockResolvedValue({ id: 7, message: "Draft perbaikan dibuat." });
+    renderDetail("staf", detail("rejected"));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /buat laporan perbaikan/i }),
+    );
+
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith({ report_date: "2026-08-10" });
+    });
+    // Navigate ke /wfh/7 → route /wfh/:reportId remount → fetch detail baru.
+    await waitFor(() => {
+      expect(mockedGet).toHaveBeenCalledWith(7);
+    });
+  });
+
+  it("gagal 422 (tanggal terkunci) → pesan tampil, tidak navigate", async () => {
+    mockedCreate.mockRejectedValue(
+      new ApiError(
+        "http",
+        "Tanggal 2026-08-10 masih menunggu keputusan atasan.",
+        { status: 422 },
+      ),
+    );
+    renderDetail("staf", detail("rejected"));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /buat laporan perbaikan/i }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Tanggal 2026-08-10 masih menunggu keputusan atasan.",
+      ),
+    ).toBeTruthy();
+    expect(mockedGet).not.toHaveBeenCalledWith(7);
   });
 });
 
