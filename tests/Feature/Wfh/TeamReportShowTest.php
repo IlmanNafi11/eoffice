@@ -122,16 +122,23 @@ class TeamReportShowTest extends TestCase
         $this->assertSame([], $data[0]['attendances']);
     }
 
-    /** Draf yang lebih baru tidak menggeser laporan live yang dipilih. */
-    public function test_detail_data_prefers_live_report_over_newer_draft(): void
+    /**
+     * Draf yang lebih baru tidak menggeser laporan live yang dipilih.
+     *
+     * Only reachable shape after the one-active-report rule: a draft/rejected
+     * pair. Drafts themselves never coexist with a live report for the same
+     * date any more, so the preference is exercised against a newer terminal
+     * report instead.
+     */
+    public function test_detail_data_prefers_live_report_over_newer_rejected(): void
     {
         [$team, $member] = $this->teamWithMember();
 
         $pending = $this->personalReport($member, 'pending');
         $pending->forceFill(['updated_at' => now()->subHour()])->save();
 
-        $draft = $this->personalReport($member, 'draft');
-        $draft->forceFill(['updated_at' => now()])->save();
+        $rejected = $this->personalReport($member, 'rejected');
+        $rejected->forceFill(['updated_at' => now()])->save();
 
         $data = $this->repo()->getTeamReportDetailData($team->id, now()->toDateString());
 
@@ -209,8 +216,12 @@ class TeamReportShowTest extends TestCase
         $this->assertSame([], $data[0]['photos']);
     }
 
-    /** Draf yang lebih baru tidak menggeser laporan live yang dicetak ke PDF. */
-    public function test_team_pdf_data_prefers_live_report_over_newer_draft(): void
+    /**
+     * Draf yang lebih baru tidak menggeser laporan live yang dicetak ke PDF —
+     * diuji lewat pasangan live + rejected (satu-satunya bentuk yang masih
+     * bisa berdampingan untuk (user, tanggal) yang sama).
+     */
+    public function test_team_pdf_data_prefers_live_report_over_newer_rejected(): void
     {
         [$team, $member] = $this->teamWithMember();
 
@@ -218,9 +229,9 @@ class TeamReportShowTest extends TestCase
         $this->repo()->addActivityToReport($pending, ['activity' => 'Kerja live', 'links' => ['https://live.id/1']]);
         $pending->forceFill(['updated_at' => now()->subHour()])->save();
 
-        $draft = $this->personalReport($member, 'draft');
-        $this->repo()->addActivityToReport($draft, ['activity' => 'Draf rahasia', 'links' => ['https://draf.rahasia/1']]);
-        $draft->forceFill(['updated_at' => now()])->save();
+        $rejected = $this->personalReport($member, 'rejected');
+        $this->repo()->addActivityToReport($rejected, ['activity' => 'Laporan ditolak', 'links' => ['https://rejected.id/1']]);
+        $rejected->forceFill(['updated_at' => now()])->save();
 
         $data = $this->repo()->getTeamReportData($team->id, now()->toDateString());
 

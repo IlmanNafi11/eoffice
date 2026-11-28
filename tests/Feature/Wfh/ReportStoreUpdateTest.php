@@ -73,25 +73,26 @@ class ReportStoreUpdateTest extends TestCase
         $this->assertSame('draft', WfhReport::sole()->status);
     }
 
-    public function test_store_allows_draft_and_approved_same_date(): void
+    public function test_store_rejects_draft_when_approved_locks_the_date(): void
     {
         $user = User::factory()->create();
         $user->assignRole('staf');
         Sanctum::actingAs($user);
 
-        // Create approved report
+        // Approved is final: it locks the date for any further report until a
+        // rejection reopens it (owner decision 2026-11-28). The 23505 → 4xx
+        // mapping is Task 6; this test pins the lock itself.
         WfhReport::factory()->status('approved')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-28',
         ]);
 
-        // Creating a draft for same date should still work (get-or-create returns existing draft,
-        // but here no draft exists — creates a new one)
-        $this->postJson('/api/wfh/reports', [
+        $response = $this->postJson('/api/wfh/reports', [
             'report_date' => '2026-07-28',
-        ])->assertStatus(201);
+        ]);
 
-        $this->assertDatabaseCount('wfh_reports', 2);
+        $this->assertNotSame(201, $response->status(), $response->getContent());
+        $this->assertDatabaseCount('wfh_reports', 1);
     }
 
     // === PUT metadata-only ===

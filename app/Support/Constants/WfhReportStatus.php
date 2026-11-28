@@ -28,4 +28,14 @@ final class WfhReportStatus
      * @return list<string>
      */
     public const LIVE = [self::PENDING, self::APPROVED];
+
+    /**
+     * Statuses that lock a (user, report_date): at most one report in one of
+     * these states may exist per user and date (enforced by the partial
+     * unique index `wfh_reports_active_draft_unique`). A rejected report is
+     * terminal and the only state that reopens the date for a correction.
+     *
+     * @return list<string>
+     */
+    public const ACTIVE = [self::DRAFT, self::PENDING, self::APPROVED];
 }

@@ -55,21 +55,92 @@ class UniqueActiveDraftTest extends TestCase
         $this->assertDatabaseCount('wfh_reports', 2);
     }
 
-    public function test_allow_draft_and_approved_for_same_user_date(): void
+    public function test_reject_pending_alongside_draft(): void
     {
         $user = User::factory()->create();
 
-        $draft = WfhReport::factory()->status('draft')->create([
+        WfhReport::factory()->status('pending')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
         ]);
 
-        $approved = WfhReport::factory()->status('approved')->create([
+        $this->expectException(QueryException::class);
+        $this->expectExceptionCode(23505);
+
+        WfhReport::factory()->status('draft')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+    }
+
+    public function test_reject_second_pending_report(): void
+    {
+        $user = User::factory()->create();
+
+        WfhReport::factory()->status('pending')->create([
             'user_id' => $user->id,
             'report_date' => '2026-07-27',
         ]);
 
-        $this->assertDatabaseHas('wfh_reports', ['id' => $draft->id]);
-        $this->assertDatabaseHas('wfh_reports', ['id' => $approved->id]);
+        $this->expectException(QueryException::class);
+        $this->expectExceptionCode(23505);
+
+        WfhReport::factory()->status('pending')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+    }
+
+    public function test_reject_approved_alongside_draft(): void
+    {
+        $user = User::factory()->create();
+
+        WfhReport::factory()->status('approved')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionCode(23505);
+
+        WfhReport::factory()->status('draft')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+    }
+
+    public function test_reject_draft_alongside_approved(): void
+    {
+        $user = User::factory()->create();
+
+        WfhReport::factory()->status('draft')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionCode(23505);
+
+        WfhReport::factory()->status('approved')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+    }
+
+    public function test_allow_multiple_rejected_reports_for_same_user_date(): void
+    {
+        $user = User::factory()->create();
+
+        WfhReport::factory()->status('rejected')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+
+        WfhReport::factory()->status('rejected')->create([
+            'user_id' => $user->id,
+            'report_date' => '2026-07-27',
+        ]);
+
+        $this->assertDatabaseCount('wfh_reports', 2);
     }
 }

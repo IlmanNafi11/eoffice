@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Wfh;
 
+use App\Domains\Wfh\Models\WfhAttendance;
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Repositories\WfhRepositoryInterface;
 use App\Models\User;
@@ -150,5 +151,36 @@ class DuplicateRecoveryTest extends TestCase
         $this->expectException(QueryException::class);
 
         $this->postJson('/api/wfh/reports', ['report_date' => now()->toDateString()]);
+    }
+
+    public function test_duplicate_session_on_active_report_is_rejected(): void
+    {
+        // The daily one-evidence-per-session rule now reads the user's ACTIVE
+        // report rows: a row already on the report for this date blocks a
+        // second upload with a domain answer (422), not a 500.
+        $this->travelTo('2026-11-02 08:00:00');
+        Storage::fake('local');
+
+        $report = WfhReport::factory()->create([
+            'user_id' => $this->user->id,
+            'report_date' => '2026-11-02',
+        ]);
+        WfhAttendance::create([
+            'user_id' => $this->user->id,
+            'date' => '2026-11-02',
+            'session' => 'pagi',
+            'photo_path' => 'attendances/2026-11-02/pagi.jpg',
+            'report_id' => $report->id,
+        ]);
+
+        $response = $this->postJson("/api/wfh/reports/{$report->id}/attendances", [
+            'session' => 'pagi',
+            'photo' => UploadedFile::fake()->image('absen.png'),
+        ]);
+
+        $this->assertNotSame(500, $response->status(), $response->getContent());
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Anda sudah melakukan absensi untuk sesi ini.');
+        $this->assertSame([], Storage::disk('local')->allFiles('attendances/'.$this->user->id.'/2026-11-02'));
     }
 }

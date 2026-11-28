@@ -11,6 +11,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 interface WfhRepositoryInterface extends RepositoryInterface
 {
     // Attendance
+
+    /**
+     * Session evidence for (user, date) scoped to the user's ACTIVE report
+     * (draft/pending/approved). Rows on rejected reports are archived and do
+     * not count; the daily one-evidence-per-session rule is derived from the
+     * one-active-report-per-date constraint plus one row per (report, session).
+     */
     public function findAttendanceByUserAndDate(int $userId, string $date, ?string $session = null): ?WfhAttendance;
 
     // Reports

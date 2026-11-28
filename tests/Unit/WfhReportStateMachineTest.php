@@ -1,13 +1,12 @@
 <?php
 
-namespace Tests\Unit;
-
 use App\Domains\Wfh\Models\WfhReport;
 use App\Domains\Wfh\Services\WfhReportStateMachine;
 use App\Models\Field;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class WfhReportStateMachineTest extends TestCase
@@ -79,7 +78,7 @@ class WfhReportStateMachineTest extends TestCase
 
     public function test_cannot_submit_non_draft_report(): void
     {
-        $this->expectException(\DomainException::class);
+        $this->expectException(DomainException::class);
         $this->expectExceptionMessage('Hanya laporan dengan status draft yang dapat disubmit.');
 
         $report = WfhReport::factory()->create([
@@ -92,7 +91,7 @@ class WfhReportStateMachineTest extends TestCase
 
     public function test_cannot_submit_approved_report(): void
     {
-        $this->expectException(\DomainException::class);
+        $this->expectException(DomainException::class);
 
         $report = WfhReport::factory()->create([
             'status' => 'approved',
@@ -120,7 +119,7 @@ class WfhReportStateMachineTest extends TestCase
 
     public function test_cannot_approve_non_pending_report(): void
     {
-        $this->expectException(\DomainException::class);
+        $this->expectException(DomainException::class);
 
         $report = WfhReport::factory()->create([
             'status' => 'draft',
@@ -172,5 +171,32 @@ class WfhReportStateMachineTest extends TestCase
 
         $this->assertTrue($this->machine->isImmutable($approved));
         $this->assertFalse($this->machine->isImmutable($draft));
+    }
+
+    public function test_cannot_submit_draft_when_active_report_exists_for_date(): void
+    {
+        // Cross-report guard: two pending reports for the same (user, date)
+        // must be impossible through the application path. The widened
+        // unique index already blocks the fixture itself, so it is dropped
+        // for this test — the guard is what must catch the violation.
+        DB::statement('DROP INDEX IF EXISTS wfh_reports_active_draft_unique');
+
+        WfhReport::factory()->status('pending')->create([
+            'user_id' => $this->user->id,
+            'report_date' => '2026-07-27',
+        ]);
+
+        $report = WfhReport::factory()->status('draft')->create([
+            'user_id' => $this->user->id,
+            'report_date' => '2026-07-27',
+        ]);
+        $report->activities()->create(['activity' => 'Test', 'sort_order' => 0]);
+
+        try {
+            $this->machine->submit($report, $this->user);
+            $this->fail('Submit must be blocked when an active report exists for the date.');
+        } catch (DomainException $e) {
+            $this->assertSame('Tanggal laporan sudah memiliki laporan yang menunggu keputusan atau sudah final.', $e->getMessage());
+        }
     }
 }

@@ -26,7 +26,6 @@ class InverseRelationsDeadCodeTest extends TestCase
         return [
             'Team::users' => [Team::class, 'users'],
             'Field::teams' => [Field::class, 'teams'],
-            'WfhAttendance::report' => [WfhAttendance::class, 'report'],
             'WfhReportActivity::report' => [WfhReportActivity::class, 'report'],
             'WfhReportLink::activity' => [WfhReportLink::class, 'activity'],
         ];
@@ -47,7 +46,10 @@ class InverseRelationsDeadCodeTest extends TestCase
         $this->assertTrue(method_exists(Team::class, 'leader'));
         $this->assertTrue(method_exists(Field::class, 'head'));
         $this->assertTrue(method_exists(WfhAttendance::class, 'user'));
-        $this->assertTrue(method_exists(WfhReportActivity::class, 'links'));
+        // WfhAttendance::report() left A11: the active-report scoping of
+        // findAttendanceByUserAndDate queries through it (rejected evidence
+        // must not block a correction draft).
+        $this->assertTrue(method_exists(WfhAttendance::class, 'report'));
         $this->assertInstanceOf(Relation::class, (new WfhReportActivity)->links());
     }
 }

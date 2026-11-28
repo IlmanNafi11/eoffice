@@ -25,10 +25,19 @@ class EloquentWfhRepository extends EloquentRepository implements WfhRepositoryI
 
     // === Attendance ===
 
+    /**
+     * Resolve the session evidence for a (user, date) against the user's
+     * ACTIVE report for that day. Rows on rejected reports are archived
+     * evidence and must not block a fresh correction draft; the day-level
+     * rule (one evidence per session per day) is derived from the one
+     * non-rejected report per date plus one row per (report, session).
+     */
     public function findAttendanceByUserAndDate(int $userId, string $date, ?string $session = null): ?WfhAttendance
     {
-        $query = WfhAttendance::where('user_id', $userId)
-            ->where('date', $date);
+        $query = WfhAttendance::query()
+            ->where('user_id', $userId)
+            ->where('date', $date)
+            ->whereHas('report', fn ($q) => $q->whereIn('status', WfhReportStatus::ACTIVE));
 
         if ($session) {
             $query->where('session', $session);
